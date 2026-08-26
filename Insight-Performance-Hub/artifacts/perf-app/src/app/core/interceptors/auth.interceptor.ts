@@ -10,7 +10,6 @@ import { environment } from '@env/environment';
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const cloned = req.clone({
     setHeaders: { 'x-user': environment.demoUser },
-    withCredentials: true,
   });
   return next(cloned);
 };

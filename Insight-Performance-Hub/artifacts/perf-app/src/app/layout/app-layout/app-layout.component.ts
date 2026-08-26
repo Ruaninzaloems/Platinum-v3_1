@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 import { SidebarComponent } from '../sidebar/sidebar.component';
@@ -10,15 +10,11 @@ import { TopbarComponent } from '../topbar/topbar.component';
   imports: [RouterOutlet, SidebarComponent, TopbarComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="shell" [class.shell--embedded]="embedded()">
-      @if (!embedded()) {
-        <app-sidebar class="shell__side" />
-      }
+    <div class="shell">
+      <app-sidebar class="shell__side" />
       <div class="shell__main">
-        @if (!embedded()) {
-          <app-topbar class="shell__top" />
-        }
-        <main class="shell__content" [class.shell__content--embedded]="embedded()">
+        <app-topbar class="shell__top" />
+        <main class="shell__content">
           <router-outlet />
         </main>
       </div>
@@ -27,15 +23,12 @@ import { TopbarComponent } from '../topbar/topbar.component';
   styles: [`
     .shell {
       display: grid;
-      grid-template-columns: 240px 1fr;
+      grid-template-columns: 220px 1fr;
       min-height: 100vh;
     }
-    .shell--embedded {
-      grid-template-columns: 1fr;
-    }
     .shell__side {
-      background: var(--plat-surface);
-      border-right: 1px solid var(--plat-border);
+      background: var(--plat-navy);
+      border-right: 1px solid #1e293b;
       position: sticky;
       top: 0;
       height: 100vh;
@@ -55,19 +48,8 @@ import { TopbarComponent } from '../topbar/topbar.component';
     }
     .shell__content {
       flex: 1;
-      padding: 24px 32px;
-    }
-    .shell__content--embedded {
-      padding: 16px;
+      padding: 16px 20px;
     }
   `],
 })
-export class AppLayoutComponent {
-  protected readonly embedded = signal<boolean>(this.detectEmbedded());
-
-  private detectEmbedded(): boolean {
-    if (typeof window === 'undefined') return false;
-    const params = new URLSearchParams(window.location.search);
-    return params.get('embedded') === '1' || window.self !== window.top;
-  }
-}
+export class AppLayoutComponent {}

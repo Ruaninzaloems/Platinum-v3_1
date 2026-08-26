@@ -1,6 +1,7 @@
 import "./Configuration/database";
 import app from "./app";
 import { seedDatabase } from "./Services/seed";
+import { startMfmaReminderScheduler } from "./Services/mfma-reminders";
 
 const rawPort = process.env["PORT"];
 
@@ -18,6 +19,7 @@ if (Number.isNaN(port) || port <= 0) {
 
 async function start() {
   await seedDatabase();
+  startMfmaReminderScheduler();
   app.listen(port, () => {
     console.log(`Server listening on port ${port}`);
   });

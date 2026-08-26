@@ -7,7 +7,7 @@
  */
 
 export interface UpdateSubmissionDeadlineInput {
-  deadlineDate?: Date;
+  deadlineDate?: string;
   reminderDaysBefore?: number;
   isActive?: boolean;
 }

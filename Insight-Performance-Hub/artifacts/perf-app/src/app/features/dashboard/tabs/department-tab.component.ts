@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, viewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { catchError, of, switchMap } from 'rxjs';
 import { ApiService } from '@core/services/api.service';
-import { CycleStore } from './cycle-picker';
+import { DashboardNavStore } from '../dashboard-nav.store';
+import { CycleStore, PeriodStore } from './cycle-picker';
 
 interface Dept { departmentId: number; departmentName: string; }
 interface HeatRow { kpiNumber: string; description: string; q1Status?: string; q2Status?: string; q3Status?: string; q4Status?: string; }
@@ -23,13 +24,10 @@ interface DeptData {
   template: `
     <div class="bar">
       <div class="bar__title">
-        <h2>Department Dashboard</h2>
-        <p>Departmental performance overview</p>
+        <h2>Indicator Status (Departmental)</h2>
+        <p>Departmental KPI status and performance overview</p>
       </div>
       <div class="bar__ctrl">
-        <select [ngModel]="cycles.cycleId()" (ngModelChange)="cycles.setCycle($event)">
-          <option *ngFor="let c of cycles.cycles()" [ngValue]="c.id">{{ c.financialYearLabel }}</option>
-        </select>
         <select [ngModel]="deptId()" (ngModelChange)="deptId.set($event)">
           <option [ngValue]="null">Select Department</option>
           <option *ngFor="let d of departments()" [ngValue]="d.departmentId">{{ d.departmentName }}</option>
@@ -38,6 +36,13 @@ interface DeptData {
     </div>
 
     <ng-container *ngIf="cycles.cycleId() && deptId(); else picker">
+      <div class="focus" *ngIf="focusQuarter() as fq">
+        <span class="material-symbols-rounded">filter_alt</span>
+        Focused on Q{{ fq }} from the heat map
+        <button class="focus__x" (click)="clearFocus()" title="Clear quarter focus">
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </div>
       <div class="kpis">
         <div class="plat-card kpi center"><div class="muted">Overall Score</div><div class="big">{{ (data()?.overallScore ?? 0) | number:'1.1-1' }}%</div></div>
         <div class="plat-card kpi"><span class="material-symbols-rounded blue">description</span><div><div class="muted">Evidence</div><b>{{ (data()?.evidenceCompleteness ?? 0) | number:'1.0-0' }}%</b></div></div>
@@ -45,18 +50,24 @@ interface DeptData {
         <div class="plat-card kpi"><span class="material-symbols-rounded red">warning</span><div><div class="muted">Constraints</div><b>{{ data()?.unresolvedConstraints ?? 0 }}</b></div></div>
       </div>
 
-      <div class="plat-card panelp">
+      <div class="plat-card panelp" #heatmapPanel>
         <h3>KPI Heatmap by Quarter</h3>
         <table class="tbl" *ngIf="(data()?.kpiHeatmap?.length ?? 0) > 0; else noHeat">
-          <thead><tr><th>KPI</th><th>Description</th><th class="c">Q1</th><th class="c">Q2</th><th class="c">Q3</th><th class="c">Q4</th></tr></thead>
+          <thead><tr>
+            <th>KPI</th><th>Description</th>
+            <th class="c" [class.hl]="focusQuarter() === 1">Q1</th>
+            <th class="c" [class.hl]="focusQuarter() === 2">Q2</th>
+            <th class="c" [class.hl]="focusQuarter() === 3">Q3</th>
+            <th class="c" [class.hl]="focusQuarter() === 4">Q4</th>
+          </tr></thead>
           <tbody>
             <tr *ngFor="let k of data()?.kpiHeatmap">
               <td><b>{{ k.kpiNumber }}</b></td>
               <td class="trunc">{{ k.description }}</td>
-              <td class="c"><span class="badge" [ngClass]="cls(k.q1Status)">{{ k.q1Status || 'N/A' }}</span></td>
-              <td class="c"><span class="badge" [ngClass]="cls(k.q2Status)">{{ k.q2Status || 'N/A' }}</span></td>
-              <td class="c"><span class="badge" [ngClass]="cls(k.q3Status)">{{ k.q3Status || 'N/A' }}</span></td>
-              <td class="c"><span class="badge" [ngClass]="cls(k.q4Status)">{{ k.q4Status || 'N/A' }}</span></td>
+              <td class="c" [class.hl]="focusQuarter() === 1"><span class="badge" [ngClass]="cls(k.q1Status)">{{ k.q1Status || 'N/A' }}</span></td>
+              <td class="c" [class.hl]="focusQuarter() === 2"><span class="badge" [ngClass]="cls(k.q2Status)">{{ k.q2Status || 'N/A' }}</span></td>
+              <td class="c" [class.hl]="focusQuarter() === 3"><span class="badge" [ngClass]="cls(k.q3Status)">{{ k.q3Status || 'N/A' }}</span></td>
+              <td class="c" [class.hl]="focusQuarter() === 4"><span class="badge" [ngClass]="cls(k.q4Status)">{{ k.q4Status || 'N/A' }}</span></td>
             </tr>
           </tbody>
         </table>
@@ -66,7 +77,9 @@ interface DeptData {
       <div class="plat-card panelp">
         <h3>Quarter-on-Quarter Trend</h3>
         <div class="bars" *ngIf="(data()?.quarterTrend?.length ?? 0) > 0; else noTrend">
-          <div class="bar2" *ngFor="let p of data()?.quarterTrend">
+          <div class="bar2" *ngFor="let p of data()?.quarterTrend"
+               [class.bar2--dim]="focusQuarter() !== null && focusQuarter() !== p.quarter"
+               [class.bar2--hl]="focusQuarter() === p.quarter">
             <div class="bar2__stack"><div class="bar2__fill" [style.height.%]="p.score"></div></div>
             <div class="bar2__l">Q{{ p.quarter }}</div>
             <div class="bar2__v">{{ p.score | number:'1.1-1' }}%</div>
@@ -111,12 +124,46 @@ interface DeptData {
     .bar2__fill { width:100%; background:#0f2b46; }
     .bar2__l { font-size:12px; color:var(--plat-muted); }
     .bar2__v { font-size:12px; font-weight:600; }
+    .focus { display:flex; align-items:center; gap:8px; margin-bottom:14px; padding:8px 12px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; font-size:13px; color:#1d4ed8; font-weight:600; }
+    .focus .material-symbols-rounded { font-size:18px; }
+    .focus__x { display:inline-flex; align-items:center; margin-left:auto; border:none; background:none; cursor:pointer; color:#1d4ed8; padding:2px; border-radius:4px; }
+    .focus__x:hover { background:#dbeafe; }
+    .focus__x .material-symbols-rounded { font-size:16px; }
+    .tbl th.hl { color:#1d4ed8; }
+    .tbl td.hl, .tbl th.hl { background:#eff6ff; }
+    .bar2--dim { opacity:.4; }
+    .bar2--hl .bar2__stack { box-shadow:0 0 0 2px #3b82f6; }
+    .bar2--hl .bar2__l { color:#1d4ed8; font-weight:700; }
   `],
 })
 export class DepartmentTabComponent {
   private readonly api = inject(ApiService);
   readonly cycles = inject(CycleStore);
+  readonly periods = inject(PeriodStore);
   readonly deptId = signal<number | null>(null);
+  readonly focusQuarter = signal<number | null>(null);
+  private readonly heatmapPanel = viewChild<ElementRef<HTMLElement>>('heatmapPanel');
+  private scrolledToFocus = false;
+
+  constructor() {
+    const nav = inject(DashboardNavStore);
+    const pending = nav.consumePendingDeptId();
+    if (pending !== null) this.deptId.set(pending);
+    const quarter = nav.consumePendingQuarter();
+    if (quarter !== null) this.focusQuarter.set(quarter);
+
+    effect(() => {
+      const panel = this.heatmapPanel();
+      const hasData = (this.data()?.kpiHeatmap?.length ?? 0) > 0;
+      if (this.scrolledToFocus || this.focusQuarter() === null || !panel || !hasData) return;
+      this.scrolledToFocus = true;
+      setTimeout(() => panel.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    });
+  }
+
+  clearFocus(): void {
+    this.focusQuarter.set(null);
+  }
 
   private readonly cycleObs = toObservable(this.cycles.cycleId);
   readonly departments = toSignal(
@@ -130,13 +177,13 @@ export class DepartmentTabComponent {
     { initialValue: [] as Dept[] },
   );
 
-  private readonly params = computed(() => ({ cycleId: this.cycles.cycleId(), deptId: this.deptId() }));
+  private readonly params = computed(() => ({ cycleId: this.cycles.cycleId(), deptId: this.deptId(), period: this.periods.period() }));
 
   readonly data = toSignal<DeptData | null>(
     toObservable(this.params).pipe(
-      switchMap(({ cycleId, deptId }) => {
+      switchMap(({ cycleId, deptId, period }) => {
         if (!cycleId || !deptId) return of(null);
-        return this.api.get<DeptData>(`/dashboards/department/${deptId}`, { cycleId })
+        return this.api.get<DeptData>(`/dashboards/department/${deptId}`, { cycleId, period })
           .pipe(catchError(() => of(null)));
       }),
     ),

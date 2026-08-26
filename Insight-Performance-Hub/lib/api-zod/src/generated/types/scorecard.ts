@@ -16,6 +16,7 @@ export interface Scorecard {
   approvedById?: number | null;
   approvedAt?: string | null;
   approvalComments?: string | null;
+  returnComments?: string | null;
   createdById: number;
   createdAt?: string;
   updatedAt?: string;

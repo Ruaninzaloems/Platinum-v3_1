@@ -4,8 +4,16 @@ import * as schema from "./schema";
 
 const { Pool } = pg;
 
-const connectionString =
-  process.env.APP_DATABASE_URL ?? process.env.DATABASE_URL;
+/**
+ * The monorepo (unlike the original Replit environment this was ported from)
+ * reaches Azure Postgres directly, same as every other module -- see
+ * MASTER.md section 4.2 for the firewall/dynamic-IP caveat that applies here too.
+ */
+const USE_REPLIT_BUILTIN_DB = false;
+
+const connectionString = USE_REPLIT_BUILTIN_DB
+  ? process.env.DATABASE_URL ?? process.env.APP_DATABASE_URL
+  : process.env.APP_DATABASE_URL ?? process.env.DATABASE_URL;
 
 if (!connectionString) {
   throw new Error(

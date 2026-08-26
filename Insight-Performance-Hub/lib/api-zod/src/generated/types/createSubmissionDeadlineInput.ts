@@ -13,7 +13,7 @@ export interface CreateSubmissionDeadlineInput {
    * @maximum 4
    */
   quarter: number;
-  deadlineDate: Date;
+  deadlineDate: string;
   reminderDaysBefore?: number;
   isActive?: boolean;
 }

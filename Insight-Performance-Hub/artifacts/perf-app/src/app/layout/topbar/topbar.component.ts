@@ -1,8 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
-import { RouterLink } from '@angular/router';
+import { NavigationEnd, Router, RouterLink } from '@angular/router';
+import { catchError, filter, of } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@core/services/auth.service';
+import { ApiService } from '@core/services/api.service';
+import { NotificationsService } from '@core/services/notifications.service';
+import { Cycle } from '@core/models/domain.model';
 
 @Component({
   selector: 'app-topbar',
@@ -13,7 +18,7 @@ import { AuthService } from '@core/services/auth.service';
     <header class="bar">
       <div class="bar__org">
         <span class="bar__org-name">Demo Municipality</span>
-        <span class="pill pill--info">FY 2024/2025</span>
+        <span class="pill pill--info">FY {{ financialYear() }}</span>
       </div>
       <div class="bar__search">
         <mat-icon>search</mat-icon>
@@ -22,7 +27,7 @@ import { AuthService } from '@core/services/auth.service';
       <div class="bar__right">
         <a class="iconbtn" routerLink="/notifications" aria-label="Notifications">
           <mat-icon>notifications</mat-icon>
-          <span class="iconbtn__dot"></span>
+          <span class="iconbtn__badge" *ngIf="unreadCount() > 0">{{ unreadCount() > 99 ? '99+' : unreadCount() }}</span>
         </a>
         <div class="bar__user">
           <div class="bar__user-text">
@@ -47,7 +52,7 @@ import { AuthService } from '@core/services/auth.service';
     .bar__right { display: flex; align-items: center; gap: 16px; }
     .iconbtn { position: relative; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: #475569; cursor: pointer; }
     .iconbtn:hover { background: #f1f5f9; text-decoration: none; }
-    .iconbtn__dot { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: #dc2626; border: 2px solid #fff; }
+    .iconbtn__badge { position: absolute; top: 2px; right: 0; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: #dc2626; border: 2px solid #fff; color: #fff; font-size: 10px; font-weight: 700; line-height: 1; display: grid; place-items: center; box-sizing: content-box; }
     .bar__user { display: flex; align-items: center; gap: 10px; }
     .bar__user-text { text-align: right; line-height: 1.2; }
     .bar__user-name { font-weight: 600; font-size: 14px; color: #0f172a; }
@@ -55,9 +60,32 @@ import { AuthService } from '@core/services/auth.service';
     .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #1f6feb, #0f2b46); color: #fff; font-weight: 700; font-size: 13px; display: grid; place-items: center; }
   `],
 })
-export class TopbarComponent {
+export class TopbarComponent implements OnInit {
   private readonly auth = inject(AuthService);
+  private readonly api = inject(ApiService);
+  private readonly notifications = inject(NotificationsService);
+  private readonly router = inject(Router);
+  readonly financialYear = signal('2025/2026');
   readonly displayName = this.auth.displayName;
+  readonly unreadCount = this.notifications.unreadCount;
+
+  constructor() {
+    this.router.events.pipe(
+      filter((e) => e instanceof NavigationEnd),
+      takeUntilDestroyed(),
+    ).subscribe(() => this.notifications.refresh());
+  }
+
+  ngOnInit() {
+    this.notifications.refresh();
+    this.api.get<Cycle[]>('/cycles').pipe(
+      catchError(() => of([] as Cycle[])),
+    ).subscribe((cycles) => {
+      if (!Array.isArray(cycles) || cycles.length === 0) return;
+      const open = cycles.find((c) => c.status === 'Open') ?? cycles[0];
+      if (open?.financialYearLabel) this.financialYear.set(open.financialYearLabel);
+    });
+  }
   readonly role = computed(() => this.auth.role().replace(/_/g, ' '));
   readonly initials = computed(() => {
     const name = this.auth.displayName();

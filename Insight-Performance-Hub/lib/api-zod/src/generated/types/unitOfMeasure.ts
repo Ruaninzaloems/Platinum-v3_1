@@ -10,6 +10,7 @@ export interface UnitOfMeasure {
   id: number;
   name: string;
   abbreviation: string;
+  dataTypeId?: number | null;
   cycleId: number;
   isActive: boolean;
 }

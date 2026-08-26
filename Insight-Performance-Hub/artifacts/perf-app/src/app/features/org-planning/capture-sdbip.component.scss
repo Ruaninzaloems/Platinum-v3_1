@@ -1,4 +1,3 @@
-.cycle-pick { width: 200px; margin-right: 8px; }
 
 .scorecard-grid {
   display: grid;
@@ -68,3 +67,113 @@ mat-form-field { width: 100%; }
 .plat-table th { background: #f8fafc; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
 .plat-table td.empty { text-align: center; padding: 24px; color: #94a3b8; font-style: italic; }
 .plat-table .actions { width: 110px; text-align: right; }
+
+.empty-cta { display: flex; justify-content: center; padding-bottom: 20px; }
+
+.new-sdbip-btn { white-space: nowrap; flex: 0 0 auto; }
+
+/* ── SDBIP Management panels ─────────────────────────────────────────── */
+.sdbip-panels { display: flex; flex-direction: column; gap: 14px; }
+.sdbip-panel { padding: 0; overflow: hidden; }
+.panel-head {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer;
+  &:hover { background: #f8fafc; }
+  .chev { color: #64748b; flex-shrink: 0; }
+  .panel-title h3 { margin: 0; font-size: 15px; font-weight: 700; color: #0f172a; }
+  .panel-title p { margin: 2px 0 0; font-size: 12px; color: #64748b; text-transform: capitalize; }
+  .spacer { flex: 1; }
+}
+.panel-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.panel-body { border-top: 1px solid var(--plat-border, #e2e8f0); padding: 14px 16px 16px; }
+.panel-empty { padding: 8px 0; }
+
+.returned-banner {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: #fff7ed; border: 1px solid #fdba74; border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 14px; color: #9a3412;
+  mat-icon { color: #ea580c; flex-shrink: 0; }
+  strong { font-size: 13px; }
+  p { margin: 4px 0 0; font-size: 13px; }
+  .kpi-ref { font-weight: 700; }
+}
+
+.table-wrap { overflow-x: auto; }
+.kpi-pager {
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  padding: 10px 12px; border-top: 1px solid #f1f5f9; font-size: 12px; color: #64748b;
+  .pager-range { color: #94a3b8; }
+  .pager-page { font-weight: 600; color: #475569; }
+  .pager-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border: 1px solid #e2e8f0; border-radius: 6px;
+    background: #fff; color: #475569; cursor: pointer;
+    mat-icon { font-size: 18px; width: 18px; height: 18px; }
+    &:hover:not([disabled]) { background: #f8fafc; }
+    &[disabled] { opacity: .4; cursor: default; }
+  }
+}
+.kpi-table { min-width: 760px; }
+
+/* Compact/dense KPI table */
+.kpi-table th, .kpi-table td {
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.kpi-table th {
+  font-size: 10px;
+  letter-spacing: .03em;
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+.kpi-table td .cell-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  cursor: default;
+}
+.kpi-table td.desc-col { min-width: 200px; max-width: 320px; }
+.kpi-table td:not(.desc-col):not(.actions) { max-width: 160px; }
+.kpi-table .actions {
+  width: 96px;
+  text-align: right;
+  white-space: nowrap;
+  button.mat-mdc-icon-button {
+    width: 28px; height: 28px; padding: 2px;
+    --mdc-icon-button-state-layer-size: 28px;
+    mat-icon { font-size: 18px; width: 18px; height: 18px; line-height: 18px; }
+  }
+}
+.kpi-table tr.returned-row td { background: #fff7ed; }
+.returned-chip {
+  display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px;
+  background: #ffedd5; color: #9a3412; font-size: 11px; font-weight: 700; cursor: help;
+}
+
+// Passive workflow indicators — reviewing/approving happens on the Review page
+.wait-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+  mat-icon { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
+  &.blue { background: #dbeafe; color: #1d4ed8; }
+  &.amber { background: #fef3c7; color: #b45309; }
+}
+
+.kpi-table .drag-col { width: 32px; padding-right: 0; }
+.drag-handle {
+  cursor: grab;
+  color: #94a3b8;
+  font-size: 18px; width: 18px; height: 18px; line-height: 18px;
+  vertical-align: middle;
+  &:active { cursor: grabbing; }
+}
+.cdk-drag-preview {
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.2);
+  display: table;
+  td { padding: 8px 12px; }
+}
+.cdk-drag-placeholder { opacity: 0.35; background: #eff6ff; }
+.cdk-drop-list-dragging tr.cdk-drag:not(.cdk-drag-placeholder) { transition: transform 200ms ease; }

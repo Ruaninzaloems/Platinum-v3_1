@@ -10,7 +10,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { catchError, finalize, forkJoin, of, tap } from 'rxjs';
 import { ApiService } from '@core/services/api.service';
 import { ToastService } from '@core/services/toast.service';
-import { Cycle, UnitOfMeasure } from '@core/models/domain.model';
+import { Cycle, DataType, UnitOfMeasure } from '@core/models/domain.model';
 import { PageHeaderComponent } from '@shared/components/page-header/page-header.component';
 import { StatusBadgeComponent } from '@shared/components/status-badge/status-badge.component';
 import { LoadingSpinnerComponent } from '@shared/components/loading-spinner/loading-spinner.component';
@@ -24,16 +24,22 @@ import { EmptyStateComponent } from '@shared/components/empty-state/empty-state.
     <h2 mat-dialog-title>{{ data.entity ? 'Edit' : 'Create' }} Unit of Measure</h2>
     <form (ngSubmit)="save()" #f="ngForm">
       <mat-dialog-content class="content">
+        <mat-form-field appearance="outline"><mat-label>Name</mat-label><input matInput [(ngModel)]="model.name" name="name" required placeholder="e.g. Percentage" /></mat-form-field>
         <div class="grid">
-          <mat-form-field appearance="outline"><mat-label>Abbreviation</mat-label><input matInput [(ngModel)]="model.abbreviation" name="abbr" required placeholder="e.g. %" /></mat-form-field>
-          <mat-form-field appearance="outline"><mat-label>Name</mat-label><input matInput [(ngModel)]="model.name" name="name" required placeholder="e.g. Percentage" /></mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Data Type</mat-label>
+            <mat-select [(ngModel)]="model.dataTypeId" name="dataType">
+              <mat-option [value]="null">None</mat-option>
+              <mat-option *ngFor="let dt of data.dataTypes" [value]="dt.id">{{ dt.name }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Status</mat-label>
+            <mat-select [(ngModel)]="model.isActive" name="status">
+              <mat-option [value]="true">Active</mat-option><mat-option [value]="false">Inactive</mat-option>
+            </mat-select>
+          </mat-form-field>
         </div>
-        <mat-form-field appearance="outline">
-          <mat-label>Status</mat-label>
-          <mat-select [(ngModel)]="model.isActive" name="status">
-            <mat-option [value]="true">Active</mat-option><mat-option [value]="false">Inactive</mat-option>
-          </mat-select>
-        </mat-form-field>
       </mat-dialog-content>
       <mat-dialog-actions align="end">
         <button mat-button type="button" mat-dialog-close>Cancel</button>
@@ -47,19 +53,19 @@ export class UomDialogComponent {
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
   saving = signal(false);
-  model: { name: string; abbreviation: string; cycleId: number; isActive: boolean };
+  model: { name: string; dataTypeId: number | null; cycleId: number; isActive: boolean };
   constructor(
     public ref: MatDialogRef<UomDialogComponent, UnitOfMeasure | null>,
-    @Inject(MAT_DIALOG_DATA) public data: { entity: UnitOfMeasure | null; cycleId: number },
+    @Inject(MAT_DIALOG_DATA) public data: { entity: UnitOfMeasure | null; cycleId: number; dataTypes: DataType[] },
   ) {
     const e = data.entity;
-    this.model = { name: e?.name ?? '', abbreviation: e?.abbreviation ?? '', cycleId: e?.cycleId ?? data.cycleId, isActive: e?.isActive ?? true };
+    this.model = { name: e?.name ?? '', dataTypeId: e?.dataTypeId ?? null, cycleId: e?.cycleId ?? data.cycleId, isActive: e?.isActive ?? true };
   }
   save() {
     this.saving.set(true);
     const id = this.data.entity?.id;
     const obs = id
-      ? this.api.patch<UnitOfMeasure>(`/units-of-measure/${id}`, { name: this.model.name, abbreviation: this.model.abbreviation, isActive: this.model.isActive })
+      ? this.api.patch<UnitOfMeasure>(`/units-of-measure/${id}`, { name: this.model.name, dataTypeId: this.model.dataTypeId, isActive: this.model.isActive })
       : this.api.post<UnitOfMeasure>(`/units-of-measure`, this.model);
     obs.pipe(
       tap((r) => { this.toast.success('Saved'); this.ref.close(r); }),
@@ -83,15 +89,16 @@ export class UomDialogComponent {
         <app-loading-spinner *ngIf="loading()"></app-loading-spinner>
         <ng-container *ngIf="!loading()">
           <app-empty-state *ngIf="!activeCycle()" icon="event" title="No active cycle" message="Create a performance cycle first."></app-empty-state>
-          <table *ngIf="activeCycle()" class="plat-table">
-            <thead><tr><th>Abbreviation</th><th>Name</th><th>Status</th><th class="actions">Actions</th></tr></thead>
+          <table *ngIf="activeCycle()" class="plat-table uom-table">
+            <thead><tr><th class="name-col">Name</th><th class="dt-col">Data Type</th><th class="status-col">Status</th><th class="actions">Actions</th><th class="filler"></th></tr></thead>
             <tbody>
-              <tr *ngIf="rows().length === 0"><td colspan="4" class="empty">No units defined.</td></tr>
+              <tr *ngIf="rows().length === 0"><td colspan="5" class="empty">No units defined.</td></tr>
               <tr *ngFor="let r of rows()">
-                <td class="mono">{{ r.abbreviation }}</td>
                 <td><strong>{{ r.name }}</strong></td>
+                <td class="dt-cell">{{ dataTypeName(r.dataTypeId) }}</td>
                 <td><app-status-badge [status]="r.isActive ? 'Active' : 'Inactive'"></app-status-badge></td>
-                <td class="actions"><button mat-button color="primary" (click)="open(r)"><mat-icon>edit</mat-icon> Edit</button></td>
+                <td class="actions"><button type="button" class="edit-btn" (click)="open(r)"><mat-icon>edit</mat-icon> Edit</button></td>
+                <td class="filler"></td>
               </tr>
             </tbody>
           </table>
@@ -99,21 +106,57 @@ export class UomDialogComponent {
       </div>
     </section>
   `,
+  styles: [`
+    app-page-header { display: block; max-width: 640px; }
+    app-page-header ::ng-deep .page-header { padding: 10px 16px; border-radius: 12px; }
+    app-page-header ::ng-deep .page-header__icon { width: 34px; height: 34px; border-radius: 8px; }
+    app-page-header ::ng-deep .page-header__icon mat-icon { font-size: 19px; width: 19px; height: 19px; }
+    app-page-header ::ng-deep h1 { font-size: 16px; }
+    app-page-header ::ng-deep p { font-size: 12px; margin-top: 2px; }
+    .plat-card { padding: 0; overflow: hidden; max-width: 640px; }
+    .uom-table {
+      th { padding: 6px 12px; font-size: 10px; }
+      td { padding: 4px 12px; font-size: 12px; }
+      table-layout: fixed;
+      .name-col { width: 180px; }
+      .dt-col { width: 140px; }
+      .status-col { width: 100px; }
+      th.actions, td.actions { width: 80px; text-align: left; }
+      .filler { width: auto; }
+      .dt-cell { color: #475569; }
+      td strong { font-weight: 600; }
+    }
+    .edit-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      border: none; background: transparent; color: #1d4ed8; font-size: 12px; font-weight: 600;
+      padding: 4px 8px; border-radius: 6px; cursor: pointer;
+      mat-icon { font-size: 14px; width: 14px; height: 14px; }
+      &:hover { background: #eff6ff; }
+    }
+  `],
 })
 export class UnitsOfMeasureComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly dialog = inject(MatDialog);
   loading = signal(true); rows = signal<UnitOfMeasure[]>([]);
   cycles = signal<Cycle[]>([]);
+  dataTypes = signal<DataType[]>([]);
   activeCycle = computed<Cycle | null>(() => this.cycles().find((c) => c.status === 'Open') ?? this.cycles()[0] ?? null);
+
+  dataTypeName(id: number | null | undefined): string {
+    if (id == null) return '—';
+    return this.dataTypes().find((d) => d.id === id)?.name ?? '—';
+  }
 
   ngOnInit() { this.load(); }
   load() {
     this.loading.set(true);
     forkJoin({
       cycles: this.api.get<Cycle[]>('/cycles').pipe(catchError(() => of([] as Cycle[]))),
+      dataTypes: this.api.get<DataType[]>('/data-types').pipe(catchError(() => of([] as DataType[]))),
     }).pipe(
-      tap(({ cycles }) => {
+      tap(({ cycles, dataTypes }) => {
+        this.dataTypes.set(Array.isArray(dataTypes) ? dataTypes : []);
         this.cycles.set(Array.isArray(cycles) ? cycles : []);
         const active = this.activeCycle();
         if (!active) { this.rows.set([]); this.loading.set(false); return; }
@@ -127,7 +170,7 @@ export class UnitsOfMeasureComponent implements OnInit {
   }
   open(entity: UnitOfMeasure | null) {
     const cycle = this.activeCycle(); if (!cycle) return;
-    this.dialog.open(UomDialogComponent, { data: { entity, cycleId: cycle.id }, panelClass: 'plat-dialog', autoFocus: false })
+    this.dialog.open(UomDialogComponent, { data: { entity, cycleId: cycle.id, dataTypes: this.dataTypes().filter((d) => d.isActive) }, panelClass: 'plat-dialog', autoFocus: false })
       .afterClosed().subscribe((r) => { if (r) this.load(); });
   }
 }

@@ -14,6 +14,67 @@ import {
 
 const router = Router();
 
+/**
+ * Derive a short uppercase prefix from a department name, e.g.
+ * "Budget & Support Services" -> "BSS". Used when the scorecard's own KPIs
+ * don't already carry a consistent prefix.
+ */
+function derivePrefixFromName(name: string): string {
+  const stop = new Set(["and", "of", "the", "for"]);
+  const words = name.split(/[^A-Za-z]+/).filter((w) => w && !stop.has(w.toLowerCase()));
+  if (words.length === 0) return "DEPT";
+  if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
+  return words.map((w) => w[0]).join("").slice(0, 4).toUpperCase();
+}
+
+/**
+ * Renumber a departmental scorecard's OWN (non-inherited) KPIs to
+ * "<PREFIX>-1..N" (by sortOrder, then id) so numbers stay sequential after
+ * adds/deletes. Inherited KPIs keep the organisational KPI number untouched.
+ * The prefix is the most common one already used by the scorecard's own KPIs
+ * (e.g. "BSD" from "BSD-01"), falling back to the department name's initials.
+ */
+async function renumberDeptKpis(deptScorecardId: number): Promise<void> {
+  const [sc] = await db.select().from(deptScorecardsTable).where(eq(deptScorecardsTable.id, deptScorecardId));
+  if (!sc) return;
+  const kpis = await db.select({
+    id: deptScorecardKpisTable.id,
+    kpiNumber: deptScorecardKpisTable.kpiNumber,
+    isInherited: deptScorecardKpisTable.isInherited,
+    sortOrder: deptScorecardKpisTable.sortOrder,
+  })
+    .from(deptScorecardKpisTable)
+    .where(eq(deptScorecardKpisTable.deptScorecardId, deptScorecardId))
+    .orderBy(deptScorecardKpisTable.sortOrder, deptScorecardKpisTable.id);
+  const own = kpis.filter((k) => !k.isInherited);
+  if (own.length === 0) return;
+
+  const counts = new Map<string, number>();
+  for (const k of own) {
+    const m = /^([A-Za-z]+)[-_ ]?\d+$/.exec(k.kpiNumber.trim());
+    if (m) {
+      const p = m[1].toUpperCase();
+      counts.set(p, (counts.get(p) ?? 0) + 1);
+    }
+  }
+  let prefix = "";
+  for (const [p, c] of counts) {
+    if (!prefix || c > (counts.get(prefix) ?? 0)) prefix = p;
+  }
+  if (!prefix) prefix = derivePrefixFromName(sc.departmentName);
+
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < own.length; i++) {
+      const wanted = `${prefix}-${i + 1}`;
+      if (own[i].kpiNumber !== wanted) {
+        await tx.update(deptScorecardKpisTable)
+          .set({ kpiNumber: wanted, updatedAt: new Date() })
+          .where(eq(deptScorecardKpisTable.id, own[i].id));
+      }
+    }
+  });
+}
+
 const DEPT_SC_TRANSITIONS: Record<string, Record<string, string>> = {
   Draft: { submit: "Submitted" },
   Submitted: { approve: "Approved", return: "Draft" },
@@ -66,11 +127,8 @@ router.post("/dept-scorecards/:id/transition", requirePermission("scorecard.edit
   if (parsed.data.action === "submit") {
     const kpis = await db.select().from(deptScorecardKpisTable).where(eq(deptScorecardKpisTable.deptScorecardId, id));
     if (kpis.length === 0) { res.status(400).json({ error: "Cannot submit scorecard with no KPIs" }); return; }
-    const totalWeight = kpis.reduce((s, k) => s + k.weighting, 0);
-    if (Math.abs(totalWeight - 100) > 0.01) {
-      res.status(400).json({ error: `KPI weightings must total 100%. Current: ${totalWeight.toFixed(2)}%` });
-      return;
-    }
+    // Note: KPI weighting validation intentionally removed here — weighting is
+    // managed at IPMS (individual) level, not on OPMS scorecards.
   }
 
   const newStatus = allowed[parsed.data.action];
@@ -123,12 +181,25 @@ router.get("/dept-scorecards/:deptScorecardId/kpis", async (req: AuthenticatedRe
 
 router.post("/dept-scorecards/:deptScorecardId/kpis", requirePermission("scorecard.edit", "*"), async (req: AuthenticatedRequest, res) => {
   const deptScorecardId = Number(req.params.deptScorecardId);
+  const [deptSc] = await db.select().from(deptScorecardsTable).where(eq(deptScorecardsTable.id, deptScorecardId));
+  if (!deptSc) { res.status(404).json({ error: "Scorecard not found" }); return; }
   const parsed = CreateDeptScorecardKpiBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.issues }); return; }
-  const [row] = await db.insert(deptScorecardKpisTable).values({
+  // New (own) KPIs always go to the end; their number is assigned by the
+  // renumbering pass below (e.g. "BSD-3"), regardless of what was submitted.
+  const existing = await db.select({ sortOrder: deptScorecardKpisTable.sortOrder })
+    .from(deptScorecardKpisTable)
+    .where(eq(deptScorecardKpisTable.deptScorecardId, deptScorecardId));
+  const nextIndex = existing.length === 0 ? 0 : Math.max(existing.length, ...existing.map((k) => k.sortOrder + 1));
+  let [row] = await db.insert(deptScorecardKpisTable).values({
     ...parsed.data,
+    kpiNumber: parsed.data.kpiNumber || "?",
     deptScorecardId,
+    sortOrder: nextIndex,
   }).returning();
+  await renumberDeptKpis(deptScorecardId);
+  const [fresh] = await db.select().from(deptScorecardKpisTable).where(eq(deptScorecardKpisTable.id, row.id));
+  if (fresh) row = fresh;
   await logAudit(req, "create", "dept_scorecard_kpi", row.id, null, row as unknown as Record<string, unknown>);
   res.status(201).json(row);
 });
@@ -139,7 +210,11 @@ router.patch("/dept-kpis/:id", requirePermission("scorecard.edit", "*"), async (
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const parsed = UpdateDeptKpiBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.issues }); return; }
-  const [row] = await db.update(deptScorecardKpisTable).set({ ...parsed.data, updatedAt: new Date() }).where(eq(deptScorecardKpisTable.id, id)).returning();
+  const updates: Record<string, unknown> = { ...parsed.data, updatedAt: new Date() };
+  if (updates.customFields == null) delete updates.customFields;
+  // KPI numbers are managed automatically (inherited: org number; own: PREFIX-N).
+  delete updates.kpiNumber;
+  const [row] = await db.update(deptScorecardKpisTable).set(updates).where(eq(deptScorecardKpisTable.id, id)).returning();
   await logAudit(req, "update", "dept_scorecard_kpi", id, existing as unknown as Record<string, unknown>, row as unknown as Record<string, unknown>);
   res.json(row);
 });
@@ -150,6 +225,7 @@ router.delete("/dept-kpis/:id", requirePermission("scorecard.edit", "*"), async 
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (existing.isInherited) { res.status(400).json({ error: "Cannot delete inherited KPIs" }); return; }
   await db.delete(deptScorecardKpisTable).where(eq(deptScorecardKpisTable.id, id));
+  await renumberDeptKpis(existing.deptScorecardId);
   await logAudit(req, "delete", "dept_scorecard_kpi", id, existing as unknown as Record<string, unknown>);
   res.status(204).send();
 });

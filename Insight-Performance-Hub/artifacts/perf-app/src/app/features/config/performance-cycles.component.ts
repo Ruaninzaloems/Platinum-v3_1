@@ -28,7 +28,7 @@ interface CycleForm { financialYearLabel: string; startDate: string; endDate: st
       <mat-dialog-content class="content">
         <mat-form-field appearance="outline">
           <mat-label>Financial Year Label</mat-label>
-          <input matInput [(ngModel)]="model.financialYearLabel" name="label" required placeholder="e.g. 2024/2025" />
+          <input matInput [(ngModel)]="model.financialYearLabel" name="label" required placeholder="e.g. 2025/2026" />
         </mat-form-field>
         <div class="grid">
           <mat-form-field appearance="outline">
@@ -43,7 +43,6 @@ interface CycleForm { financialYearLabel: string; startDate: string; endDate: st
         <mat-form-field appearance="outline">
           <mat-label>Status</mat-label>
           <mat-select [(ngModel)]="model.status" name="status">
-            <mat-option value="Draft">Draft</mat-option>
             <mat-option value="Open">Open</mat-option>
             <mat-option value="Closed">Closed</mat-option>
             <mat-option value="Archived">Archived</mat-option>
@@ -72,7 +71,7 @@ export class CycleDialogComponent {
       financialYearLabel: c?.financialYearLabel ?? '',
       startDate: c?.startDate?.split('T')[0] ?? '',
       endDate: c?.endDate?.split('T')[0] ?? '',
-      status: c?.status ?? 'Draft',
+      status: c?.status && c.status !== 'Draft' ? c.status : 'Open',
     };
   }
   save() {

@@ -10,7 +10,9 @@ const __dirname = path.dirname(__filename);
 // which helps cold start times without risking some
 // packages that are not bundle compatible
 const allowlist = [
+  "@google-cloud/storage",
   "@google/generative-ai",
+  "google-auth-library",
   "axios",
   "connect-pg-simple",
   "cors",
@@ -33,6 +35,7 @@ const allowlist = [
   "uuid",
   "ws",
   "xlsx",
+  "xlsx-js-style",
   "zod",
   "zod-validation-error",
 ];

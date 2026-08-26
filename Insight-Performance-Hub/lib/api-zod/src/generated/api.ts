@@ -60,11 +60,11 @@ export const ListRolesResponse = zod.array(ListRolesResponseItem);
 export const ListCyclesResponseItem = zod.object({
   id: zod.number(),
   financialYearLabel: zod.string(),
-  startDate: zod.date(),
-  endDate: zod.date(),
+  startDate: zod.string().date(),
+  endDate: zod.string().date(),
   status: zod.enum(["Draft", "Open", "Closed", "Archived"]),
-  createdAt: zod.date(),
-  updatedAt: zod.date(),
+  createdAt: zod.string().datetime({}),
+  updatedAt: zod.string().datetime({}),
 });
 export const ListCyclesResponse = zod.array(ListCyclesResponseItem);
 
@@ -75,8 +75,8 @@ export const createCycleBodyStatusDefault = `Draft`;
 
 export const CreateCycleBody = zod.object({
   financialYearLabel: zod.string(),
-  startDate: zod.date(),
-  endDate: zod.date(),
+  startDate: zod.string().date(),
+  endDate: zod.string().date(),
   status: zod
     .enum(["Draft", "Open", "Closed", "Archived"])
     .default(createCycleBodyStatusDefault),
@@ -92,11 +92,11 @@ export const GetCycleParams = zod.object({
 export const GetCycleResponse = zod.object({
   id: zod.number(),
   financialYearLabel: zod.string(),
-  startDate: zod.date(),
-  endDate: zod.date(),
+  startDate: zod.string().date(),
+  endDate: zod.string().date(),
   status: zod.enum(["Draft", "Open", "Closed", "Archived"]),
-  createdAt: zod.date(),
-  updatedAt: zod.date(),
+  createdAt: zod.string().datetime({}),
+  updatedAt: zod.string().datetime({}),
 });
 
 /**
@@ -108,19 +108,19 @@ export const UpdateCycleParams = zod.object({
 
 export const UpdateCycleBody = zod.object({
   financialYearLabel: zod.string().optional(),
-  startDate: zod.date().optional(),
-  endDate: zod.date().optional(),
+  startDate: zod.string().date().optional(),
+  endDate: zod.string().date().optional(),
   status: zod.enum(["Draft", "Open", "Closed", "Archived"]).optional(),
 });
 
 export const UpdateCycleResponse = zod.object({
   id: zod.number(),
   financialYearLabel: zod.string(),
-  startDate: zod.date(),
-  endDate: zod.date(),
+  startDate: zod.string().date(),
+  endDate: zod.string().date(),
   status: zod.enum(["Draft", "Open", "Closed", "Archived"]),
-  createdAt: zod.date(),
-  updatedAt: zod.date(),
+  createdAt: zod.string().datetime({}),
+  updatedAt: zod.string().datetime({}),
 });
 
 /**
@@ -203,6 +203,7 @@ export const ListUnitsOfMeasureResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
   abbreviation: zod.string(),
+  dataTypeId: zod.number().nullish(),
   cycleId: zod.number(),
   isActive: zod.boolean(),
 });
@@ -213,11 +214,15 @@ export const ListUnitsOfMeasureResponse = zod.array(
 /**
  * @summary Create a unit of measure
  */
+export const createUnitOfMeasureBodyAbbreviationDefault = ``;
 export const createUnitOfMeasureBodyIsActiveDefault = true;
 
 export const CreateUnitOfMeasureBody = zod.object({
   name: zod.string(),
-  abbreviation: zod.string(),
+  abbreviation: zod
+    .string()
+    .default(createUnitOfMeasureBodyAbbreviationDefault),
+  dataTypeId: zod.number().nullish(),
   cycleId: zod.number(),
   isActive: zod.boolean().default(createUnitOfMeasureBodyIsActiveDefault),
 });
@@ -232,6 +237,7 @@ export const UpdateUnitOfMeasureParams = zod.object({
 export const UpdateUnitOfMeasureBody = zod.object({
   name: zod.string().optional(),
   abbreviation: zod.string().optional(),
+  dataTypeId: zod.number().nullish(),
   isActive: zod.boolean().optional(),
 });
 
@@ -239,6 +245,7 @@ export const UpdateUnitOfMeasureResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
   abbreviation: zod.string(),
+  dataTypeId: zod.number().nullish(),
   cycleId: zod.number(),
   isActive: zod.boolean(),
 });
@@ -415,6 +422,65 @@ export const UpdateScorecardTypeResponse = zod.object({
 });
 
 /**
+ * @summary List national key performance areas
+ */
+export const ListNationalKpasResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+  description: zod.string(),
+  isActive: zod.boolean(),
+  sortOrder: zod.number(),
+});
+export const ListNationalKpasResponse = zod.array(ListNationalKpasResponseItem);
+
+/**
+ * @summary Create a national KPA
+ */
+export const createNationalKpaBodyDescriptionDefault = ``;
+export const createNationalKpaBodyIsActiveDefault = true;
+export const createNationalKpaBodySortOrderDefault = 0;
+
+export const CreateNationalKpaBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+  description: zod.string().default(createNationalKpaBodyDescriptionDefault),
+  isActive: zod.boolean().default(createNationalKpaBodyIsActiveDefault),
+  sortOrder: zod.number().default(createNationalKpaBodySortOrderDefault),
+});
+
+/**
+ * @summary Delete a national KPA
+ */
+export const DeleteNationalKpaParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Update a national KPA
+ */
+export const UpdateNationalKpaParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateNationalKpaBody = zod.object({
+  name: zod.string().optional(),
+  code: zod.string().optional(),
+  description: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+  sortOrder: zod.number().optional(),
+});
+
+export const UpdateNationalKpaResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+  description: zod.string(),
+  isActive: zod.boolean(),
+  sortOrder: zod.number(),
+});
+
+/**
  * @summary List NKPA weightings
  */
 export const ListNkpaWeightingsQueryParams = zod.object({
@@ -486,7 +552,7 @@ export const ListSubmissionDeadlinesResponseItem = zod.object({
   id: zod.number(),
   cycleId: zod.number(),
   quarter: zod.number().min(1).max(listSubmissionDeadlinesResponseQuarterMax),
-  deadlineDate: zod.date(),
+  deadlineDate: zod.string().date(),
   reminderDaysBefore: zod.number(),
   isActive: zod.boolean(),
 });
@@ -505,7 +571,7 @@ export const createSubmissionDeadlineBodyIsActiveDefault = true;
 export const CreateSubmissionDeadlineBody = zod.object({
   cycleId: zod.number(),
   quarter: zod.number().min(1).max(createSubmissionDeadlineBodyQuarterMax),
-  deadlineDate: zod.date(),
+  deadlineDate: zod.string().date(),
   reminderDaysBefore: zod
     .number()
     .default(createSubmissionDeadlineBodyReminderDaysBeforeDefault),
@@ -520,7 +586,7 @@ export const UpdateSubmissionDeadlineParams = zod.object({
 });
 
 export const UpdateSubmissionDeadlineBody = zod.object({
-  deadlineDate: zod.date().optional(),
+  deadlineDate: zod.string().date().optional(),
   reminderDaysBefore: zod.number().optional(),
   isActive: zod.boolean().optional(),
 });
@@ -531,7 +597,7 @@ export const UpdateSubmissionDeadlineResponse = zod.object({
   id: zod.number(),
   cycleId: zod.number(),
   quarter: zod.number().min(1).max(updateSubmissionDeadlineResponseQuarterMax),
-  deadlineDate: zod.date(),
+  deadlineDate: zod.string().date(),
   reminderDaysBefore: zod.number(),
   isActive: zod.boolean(),
 });
@@ -605,6 +671,212 @@ export const UpdateReportFieldResponse = zod.object({
 export const DeleteReportFieldParams = zod.object({
   id: zod.coerce.number(),
 });
+
+/**
+ * @summary List SDBIP field configurations
+ */
+export const ListSdbipFieldConfigsQueryParams = zod.object({
+  sdbipType: zod
+    .enum([
+      "original",
+      "revised",
+      "departmental",
+      "quarterly",
+      "midyear",
+      "annual",
+    ])
+    .optional(),
+});
+
+export const ListSdbipFieldConfigsResponseItem = zod.object({
+  id: zod.number(),
+  sdbipType: zod.enum([
+    "original",
+    "revised",
+    "departmental",
+    "quarterly",
+    "midyear",
+    "annual",
+  ]),
+  fieldKind: zod.enum(["primary", "custom"]),
+  fieldKey: zod.string(),
+  fieldLabel: zod.string(),
+  fieldType: zod.enum([
+    "text",
+    "number",
+    "date",
+    "boolean",
+    "textarea",
+    "select",
+    "alphanumeric",
+    "percent",
+  ]),
+  isIncluded: zod.boolean(),
+  isRequired: zod.boolean(),
+  isLocked: zod.boolean(),
+  sortOrder: zod.number(),
+});
+export const ListSdbipFieldConfigsResponse = zod.array(
+  ListSdbipFieldConfigsResponseItem,
+);
+
+/**
+ * @summary Replace field configuration for an SDBIP type
+ */
+export const SaveSdbipFieldConfigsParams = zod.object({
+  sdbipType: zod.enum([
+    "original",
+    "revised",
+    "departmental",
+    "quarterly",
+    "midyear",
+    "annual",
+  ]),
+});
+
+export const saveSdbipFieldConfigsBodyFieldsItemFieldTypeDefault = `text`;
+export const saveSdbipFieldConfigsBodyFieldsItemIsIncludedDefault = true;
+export const saveSdbipFieldConfigsBodyFieldsItemIsRequiredDefault = false;
+export const saveSdbipFieldConfigsBodyFieldsItemIsLockedDefault = false;
+export const saveSdbipFieldConfigsBodyFieldsItemSortOrderDefault = 0;
+
+export const SaveSdbipFieldConfigsBody = zod.object({
+  fields: zod.array(
+    zod.object({
+      fieldKind: zod.enum(["primary", "custom"]),
+      fieldKey: zod.string(),
+      fieldLabel: zod.string(),
+      fieldType: zod
+        .enum([
+          "text",
+          "number",
+          "date",
+          "boolean",
+          "textarea",
+          "select",
+          "alphanumeric",
+          "percent",
+        ])
+        .default(saveSdbipFieldConfigsBodyFieldsItemFieldTypeDefault),
+      isIncluded: zod
+        .boolean()
+        .default(saveSdbipFieldConfigsBodyFieldsItemIsIncludedDefault),
+      isRequired: zod
+        .boolean()
+        .default(saveSdbipFieldConfigsBodyFieldsItemIsRequiredDefault),
+      isLocked: zod
+        .boolean()
+        .default(saveSdbipFieldConfigsBodyFieldsItemIsLockedDefault),
+      sortOrder: zod
+        .number()
+        .default(saveSdbipFieldConfigsBodyFieldsItemSortOrderDefault),
+    }),
+  ),
+});
+
+export const SaveSdbipFieldConfigsResponseItem = zod.object({
+  id: zod.number(),
+  sdbipType: zod.enum([
+    "original",
+    "revised",
+    "departmental",
+    "quarterly",
+    "midyear",
+    "annual",
+  ]),
+  fieldKind: zod.enum(["primary", "custom"]),
+  fieldKey: zod.string(),
+  fieldLabel: zod.string(),
+  fieldType: zod.enum([
+    "text",
+    "number",
+    "date",
+    "boolean",
+    "textarea",
+    "select",
+    "alphanumeric",
+    "percent",
+  ]),
+  isIncluded: zod.boolean(),
+  isRequired: zod.boolean(),
+  isLocked: zod.boolean(),
+  sortOrder: zod.number(),
+});
+export const SaveSdbipFieldConfigsResponse = zod.array(
+  SaveSdbipFieldConfigsResponseItem,
+);
+
+/**
+ * @summary Count KPIs holding data for each configured field
+ */
+export const GetSdbipFieldUsageParams = zod.object({
+  sdbipType: zod.enum(["original", "revised", "departmental"]),
+});
+
+export const GetSdbipFieldUsageResponse = zod.object({
+  usage: zod.record(zod.string(), zod.number()),
+});
+
+/**
+ * @summary List KPI rating thresholds (seeded with National Treasury defaults)
+ */
+export const ListKpiRatingThresholdsResponseItem = zod.object({
+  id: zod.number(),
+  level: zod.number(),
+  label: zod.string(),
+  descriptor: zod.string(),
+  minPct: zod.number().nullable(),
+  maxPct: zod.number().nullable(),
+});
+export const ListKpiRatingThresholdsResponse = zod.array(
+  ListKpiRatingThresholdsResponseItem,
+);
+
+/**
+ * @summary Replace the KPI rating threshold bands
+ */
+export const saveKpiRatingThresholdsBodyThresholdsItemDescriptorDefault = ``;
+
+export const SaveKpiRatingThresholdsBody = zod.object({
+  thresholds: zod.array(
+    zod.object({
+      level: zod.number(),
+      label: zod.string(),
+      descriptor: zod
+        .string()
+        .default(saveKpiRatingThresholdsBodyThresholdsItemDescriptorDefault),
+      minPct: zod.number().nullish(),
+      maxPct: zod.number().nullish(),
+    }),
+  ),
+});
+
+export const SaveKpiRatingThresholdsResponseItem = zod.object({
+  id: zod.number(),
+  level: zod.number(),
+  label: zod.string(),
+  descriptor: zod.string(),
+  minPct: zod.number().nullable(),
+  maxPct: zod.number().nullable(),
+});
+export const SaveKpiRatingThresholdsResponse = zod.array(
+  SaveKpiRatingThresholdsResponseItem,
+);
+
+/**
+ * @summary Reset rating thresholds to National Treasury defaults
+ */
+export const ResetKpiRatingThresholdsResponseItem = zod.object({
+  id: zod.number(),
+  level: zod.number(),
+  label: zod.string(),
+  descriptor: zod.string(),
+  minPct: zod.number().nullable(),
+  maxPct: zod.number().nullable(),
+});
+export const ResetKpiRatingThresholdsResponse = zod.array(
+  ResetKpiRatingThresholdsResponseItem,
+);
 
 /**
  * @summary List competency requirements
@@ -699,7 +971,7 @@ export const ListAuditLogsResponse = zod.object({
       oldValue: zod.string().nullish(),
       newValue: zod.string().nullish(),
       cycleId: zod.number().nullish(),
-      timestamp: zod.date(),
+      timestamp: zod.string().datetime({}),
     }),
   ),
   total: zod.number(),
@@ -719,7 +991,7 @@ export const ListNotificationsResponseItem = zod.object({
   message: zod.string(),
   type: zod.enum(["reminder", "escalation", "info", "warning"]),
   isRead: zod.boolean(),
-  createdAt: zod.date(),
+  createdAt: zod.string().datetime({}),
 });
 export const ListNotificationsResponse = zod.array(
   ListNotificationsResponseItem,
@@ -739,7 +1011,7 @@ export const MarkNotificationReadResponse = zod.object({
   message: zod.string(),
   type: zod.enum(["reminder", "escalation", "info", "warning"]),
   isRead: zod.boolean(),
-  createdAt: zod.date(),
+  createdAt: zod.string().datetime({}),
 });
 
 /**
@@ -822,6 +1094,7 @@ export const ListScorecardsResponseItem = zod.object({
   approvedById: zod.number().nullish(),
   approvedAt: zod.string().nullish(),
   approvalComments: zod.string().nullish(),
+  returnComments: zod.string().nullish(),
   createdById: zod.number(),
   createdAt: zod.string().optional(),
   updatedAt: zod.string().optional(),
@@ -857,6 +1130,7 @@ export const GetScorecardResponse = zod.object({
   approvedById: zod.number().nullish(),
   approvedAt: zod.string().nullish(),
   approvalComments: zod.string().nullish(),
+  returnComments: zod.string().nullish(),
   createdById: zod.number(),
   createdAt: zod.string().optional(),
   updatedAt: zod.string().optional(),
@@ -885,6 +1159,7 @@ export const UpdateScorecardResponse = zod.object({
   approvedById: zod.number().nullish(),
   approvedAt: zod.string().nullish(),
   approvalComments: zod.string().nullish(),
+  returnComments: zod.string().nullish(),
   createdById: zod.number(),
   createdAt: zod.string().optional(),
   updatedAt: zod.string().optional(),
@@ -912,9 +1187,52 @@ export const TransitionScorecardResponse = zod.object({
   approvedById: zod.number().nullish(),
   approvedAt: zod.string().nullish(),
   approvalComments: zod.string().nullish(),
+  returnComments: zod.string().nullish(),
   createdById: zod.number(),
   createdAt: zod.string().optional(),
   updatedAt: zod.string().optional(),
+});
+
+/**
+ * @summary List quarter targets for all KPIs in a scorecard
+ */
+export const ListScorecardQuarterTargetsParams = zod.object({
+  scorecardId: zod.coerce.number(),
+});
+
+export const ListScorecardQuarterTargetsResponseItem = zod.object({
+  id: zod.number(),
+  kpiId: zod.number(),
+  quarter: zod.number(),
+  targetValue: zod.string(),
+  targetStatus: zod.enum(["active", "na", "on_hold"]).optional(),
+  budgetValue: zod.number().nullish(),
+  evidenceExpected: zod.string().nullish(),
+  isApprovedBaseline: zod.boolean(),
+  baselineTargetValue: zod.string().nullish(),
+  baselineBudgetValue: zod.number().nullish(),
+  revisionReason: zod.string().nullish(),
+  revisedAt: zod.string().nullish(),
+  createdAt: zod.string().optional(),
+  updatedAt: zod.string().optional(),
+});
+export const ListScorecardQuarterTargetsResponse = zod.array(
+  ListScorecardQuarterTargetsResponseItem,
+);
+
+/**
+ * @summary Export a scorecard's KPI table as xlsx, pdf or docx
+ */
+export const ExportScorecardParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const exportScorecardQueryFormatDefault = `xlsx`;
+
+export const ExportScorecardQueryParams = zod.object({
+  format: zod
+    .enum(["xlsx", "pdf", "docx"])
+    .default(exportScorecardQueryFormatDefault),
 });
 
 /**
@@ -947,6 +1265,8 @@ export const ListScorecardKpisResponseItem = zod.object({
   kpiGroupId: zod.number().nullish(),
   status: zod.string(),
   isCumulative: zod.boolean(),
+  customFields: zod.record(zod.string(), zod.unknown()).nullish(),
+  returnComments: zod.string().nullish(),
   sortOrder: zod.number(),
   createdAt: zod.string().optional(),
   updatedAt: zod.string().optional(),
@@ -982,6 +1302,7 @@ export const CreateScorecardKpiBody = zod.object({
   dataTypeId: zod.number().optional(),
   kpiGroupId: zod.number().optional(),
   isCumulative: zod.boolean().optional(),
+  customFields: zod.record(zod.string(), zod.unknown()).nullish(),
 });
 
 /**
@@ -1058,6 +1379,8 @@ export const GetScorecardKpiResponse = zod.object({
   kpiGroupId: zod.number().nullish(),
   status: zod.string(),
   isCumulative: zod.boolean(),
+  customFields: zod.record(zod.string(), zod.unknown()).nullish(),
+  returnComments: zod.string().nullish(),
   sortOrder: zod.number(),
   createdAt: zod.string().optional(),
   updatedAt: zod.string().optional(),
@@ -1090,6 +1413,7 @@ export const UpdateScorecardKpiBody = zod.object({
   dataTypeId: zod.number().optional(),
   kpiGroupId: zod.number().optional(),
   isCumulative: zod.boolean().optional(),
+  customFields: zod.record(zod.string(), zod.unknown()).nullish(),
 });
 
 export const UpdateScorecardKpiResponse = zod.object({
@@ -1115,6 +1439,8 @@ export const UpdateScorecardKpiResponse = zod.object({
   kpiGroupId: zod.number().nullish(),
   status: zod.string(),
   isCumulative: zod.boolean(),
+  customFields: zod.record(zod.string(), zod.unknown()).nullish(),
+  returnComments: zod.string().nullish(),
   sortOrder: zod.number(),
   createdAt: zod.string().optional(),
   updatedAt: zod.string().optional(),
@@ -1162,6 +1488,8 @@ export const TransitionScorecardKpiResponse = zod.object({
   kpiGroupId: zod.number().nullish(),
   status: zod.string(),
   isCumulative: zod.boolean(),
+  customFields: zod.record(zod.string(), zod.unknown()).nullish(),
+  returnComments: zod.string().nullish(),
   sortOrder: zod.number(),
   createdAt: zod.string().optional(),
   updatedAt: zod.string().optional(),
@@ -1179,6 +1507,7 @@ export const ListQuarterTargetsResponseItem = zod.object({
   kpiId: zod.number(),
   quarter: zod.number(),
   targetValue: zod.string(),
+  targetStatus: zod.enum(["active", "na", "on_hold"]).optional(),
   budgetValue: zod.number().nullish(),
   evidenceExpected: zod.string().nullish(),
   isApprovedBaseline: zod.boolean(),
@@ -1205,6 +1534,7 @@ export const UpsertQuarterTargetsBody = zod.object({
     zod.object({
       quarter: zod.number(),
       targetValue: zod.string(),
+      targetStatus: zod.enum(["active", "na", "on_hold"]).optional(),
       budgetValue: zod.number().optional(),
       evidenceExpected: zod.string().optional(),
       revisionReason: zod.string().optional(),
@@ -1217,6 +1547,7 @@ export const UpsertQuarterTargetsResponseItem = zod.object({
   kpiId: zod.number(),
   quarter: zod.number(),
   targetValue: zod.string(),
+  targetStatus: zod.enum(["active", "na", "on_hold"]).optional(),
   budgetValue: zod.number().nullish(),
   evidenceExpected: zod.string().nullish(),
   isApprovedBaseline: zod.boolean(),
@@ -1559,11 +1890,13 @@ export const GenerateSdbipFromKpisBody = zod.object({
 export const ListAllActualsQueryParams = zod.object({
   status: zod.coerce.string().optional(),
   reviewLevel: zod.coerce.string().optional(),
+  periodType: zod.enum(["quarterly", "mid_year", "annual"]).optional(),
 });
 
 export const ListAllActualsResponseItem = zod.object({
   id: zod.number(),
   kpiId: zod.number(),
+  periodType: zod.string().optional(),
   quarter: zod.number(),
   actualValue: zod.string(),
   commentary: zod.string().nullish(),
@@ -1599,9 +1932,14 @@ export const ListKpiActualsParams = zod.object({
   kpiId: zod.coerce.number(),
 });
 
+export const ListKpiActualsQueryParams = zod.object({
+  periodType: zod.enum(["quarterly", "mid_year", "annual"]).optional(),
+});
+
 export const ListKpiActualsResponseItem = zod.object({
   id: zod.number(),
   kpiId: zod.number(),
+  periodType: zod.string().optional(),
   quarter: zod.number(),
   actualValue: zod.string(),
   commentary: zod.string().nullish(),
@@ -1637,7 +1975,11 @@ export const CreateKpiActualParams = zod.object({
   kpiId: zod.coerce.number(),
 });
 
+export const createKpiActualBodyQualitativeScorePctMin = 0;
+export const createKpiActualBodyQualitativeScorePctMax = 200;
+
 export const CreateKpiActualBody = zod.object({
+  periodType: zod.enum(["quarterly", "mid_year", "annual"]).optional(),
   quarter: zod.number(),
   actualValue: zod.string(),
   commentary: zod.string().optional(),
@@ -1651,6 +1993,11 @@ export const CreateKpiActualBody = zod.object({
   overperformanceReason: zod.string().optional(),
   budgetImplication: zod.string().optional(),
   analysisNotes: zod.string().optional(),
+  qualitativeScorePct: zod
+    .number()
+    .min(createKpiActualBodyQualitativeScorePctMin)
+    .max(createKpiActualBodyQualitativeScorePctMax)
+    .nullish(),
   lateOverrideReason: zod.string().optional(),
 });
 
@@ -1660,6 +2007,9 @@ export const CreateKpiActualBody = zod.object({
 export const UpdateKpiActualParams = zod.object({
   id: zod.coerce.number(),
 });
+
+export const updateKpiActualBodyQualitativeScorePctMin = 0;
+export const updateKpiActualBodyQualitativeScorePctMax = 200;
 
 export const UpdateKpiActualBody = zod.object({
   actualValue: zod.string().optional(),
@@ -1674,11 +2024,17 @@ export const UpdateKpiActualBody = zod.object({
   overperformanceReason: zod.string().optional(),
   budgetImplication: zod.string().optional(),
   analysisNotes: zod.string().optional(),
+  qualitativeScorePct: zod
+    .number()
+    .min(updateKpiActualBodyQualitativeScorePctMin)
+    .max(updateKpiActualBodyQualitativeScorePctMax)
+    .nullish(),
 });
 
 export const UpdateKpiActualResponse = zod.object({
   id: zod.number(),
   kpiId: zod.number(),
+  periodType: zod.string().optional(),
   quarter: zod.number(),
   actualValue: zod.string(),
   commentary: zod.string().nullish(),
@@ -1721,6 +2077,7 @@ export const TransitionKpiActualBody = zod.object({
 export const TransitionKpiActualResponse = zod.object({
   id: zod.number(),
   kpiId: zod.number(),
+  periodType: zod.string().optional(),
   quarter: zod.number(),
   actualValue: zod.string(),
   commentary: zod.string().nullish(),
@@ -1757,11 +2114,13 @@ export const ListKpiEvidenceParams = zod.object({
 
 export const ListKpiEvidenceQueryParams = zod.object({
   quarter: zod.coerce.number().optional(),
+  periodType: zod.enum(["quarterly", "mid_year", "annual"]).optional(),
 });
 
 export const ListKpiEvidenceResponseItem = zod.object({
   id: zod.number(),
   kpiId: zod.number(),
+  periodType: zod.string().optional(),
   quarter: zod.number(),
   fileName: zod.string(),
   fileSize: zod.number(),
@@ -1786,12 +2145,39 @@ export const UploadKpiEvidenceParams = zod.object({
 });
 
 export const UploadKpiEvidenceBody = zod.object({
+  periodType: zod.enum(["quarterly", "mid_year", "annual"]).optional(),
   quarter: zod.number(),
   fileName: zod.string(),
   fileSize: zod.number(),
   mimeType: zod.string(),
   documentType: zod.string().optional(),
   description: zod.string().optional(),
+  filePath: zod
+    .string()
+    .optional()
+    .describe("Object storage path returned by the upload-url flow"),
+});
+
+/**
+ * @summary Request a presigned URL for uploading an evidence file
+ */
+export const RequestEvidenceUploadUrlResponse = zod.object({
+  uploadURL: zod.string(),
+  objectPath: zod.string(),
+});
+
+/**
+ * @summary Download an evidence file
+ */
+export const DownloadEvidenceParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Delete an evidence document
+ */
+export const DeleteEvidenceParams = zod.object({
+  id: zod.coerce.number(),
 });
 
 /**
@@ -1809,6 +2195,7 @@ export const VerifyEvidenceBody = zod.object({
 export const VerifyEvidenceResponse = zod.object({
   id: zod.number(),
   kpiId: zod.number(),
+  periodType: zod.string().optional(),
   quarter: zod.number(),
   fileName: zod.string(),
   fileSize: zod.number(),
@@ -2014,6 +2401,7 @@ export const InheritKpisFromOrgResponseItem = zod.object({
   weighting: zod.number(),
   unitOfMeasureId: zod.number().nullish(),
   isCumulative: zod.boolean().optional(),
+  customFields: zod.record(zod.string(), zod.unknown()).nullish(),
   isInherited: zod.boolean().optional(),
   sortOrder: zod.number().optional(),
   createdAt: zod.string().optional(),
@@ -2045,6 +2433,7 @@ export const ListDeptScorecardKpisResponseItem = zod.object({
   weighting: zod.number(),
   unitOfMeasureId: zod.number().nullish(),
   isCumulative: zod.boolean().optional(),
+  customFields: zod.record(zod.string(), zod.unknown()).nullish(),
   isInherited: zod.boolean().optional(),
   sortOrder: zod.number().optional(),
   createdAt: zod.string().optional(),
@@ -2074,6 +2463,7 @@ export const CreateDeptScorecardKpiBody = zod.object({
   weighting: zod.number().optional(),
   unitOfMeasureId: zod.number().optional(),
   isCumulative: zod.boolean().optional(),
+  customFields: zod.record(zod.string(), zod.unknown()).nullish(),
 });
 
 /**
@@ -2095,6 +2485,7 @@ export const UpdateDeptKpiBody = zod.object({
   weighting: zod.number().optional(),
   unitOfMeasureId: zod.number().optional(),
   isCumulative: zod.boolean().optional(),
+  customFields: zod.record(zod.string(), zod.unknown()).nullish(),
 });
 
 export const UpdateDeptKpiResponse = zod.object({
@@ -2112,6 +2503,7 @@ export const UpdateDeptKpiResponse = zod.object({
   weighting: zod.number(),
   unitOfMeasureId: zod.number().nullish(),
   isCumulative: zod.boolean().optional(),
+  customFields: zod.record(zod.string(), zod.unknown()).nullish(),
   isInherited: zod.boolean().optional(),
   sortOrder: zod.number().optional(),
   createdAt: zod.string().optional(),
@@ -2512,8 +2904,93 @@ export const GetTrendlineResponse = zod.object({
         notAchieved: zod.number().optional(),
         total: zod.number().optional(),
         periodChange: zod.number().optional(),
+        score: zod
+          .number()
+          .nullish()
+          .describe(
+            "Weighted organisational average score for the quarter; null when no data captured",
+          ),
+        target: zod
+          .number()
+          .optional()
+          .describe("Target score for the quarter (percent)"),
       }),
     )
+    .optional(),
+});
+
+/**
+ * @summary Get organisational scorecard status breakdown per NKPA and department
+ */
+export const GetOrgScorecardQueryParams = zod.object({
+  cycleId: zod.coerce.number(),
+  quarter: zod.coerce.number().optional(),
+});
+
+export const GetOrgScorecardResponse = zod.object({
+  byNkpa: zod
+    .array(
+      zod
+        .object({
+          targetsSet: zod.number().optional(),
+          achieved: zod.number().optional(),
+          partiallyAchieved: zod.number().optional(),
+          notAchieved: zod.number().optional(),
+          overAchieved: zod.number().optional(),
+          onHold: zod.number().optional(),
+          notApplicable: zod.number().optional(),
+          unableToAssess: zod.number().optional(),
+        })
+        .and(
+          zod.object({
+            name: zod.string().optional(),
+          }),
+        ),
+    )
+    .optional(),
+  nkpaTotal: zod
+    .object({
+      targetsSet: zod.number().optional(),
+      achieved: zod.number().optional(),
+      partiallyAchieved: zod.number().optional(),
+      notAchieved: zod.number().optional(),
+      overAchieved: zod.number().optional(),
+      onHold: zod.number().optional(),
+      notApplicable: zod.number().optional(),
+      unableToAssess: zod.number().optional(),
+    })
+    .optional(),
+  byDepartment: zod
+    .array(
+      zod
+        .object({
+          targetsSet: zod.number().optional(),
+          achieved: zod.number().optional(),
+          partiallyAchieved: zod.number().optional(),
+          notAchieved: zod.number().optional(),
+          overAchieved: zod.number().optional(),
+          onHold: zod.number().optional(),
+          notApplicable: zod.number().optional(),
+          unableToAssess: zod.number().optional(),
+        })
+        .and(
+          zod.object({
+            name: zod.string().optional(),
+          }),
+        ),
+    )
+    .optional(),
+  departmentTotal: zod
+    .object({
+      targetsSet: zod.number().optional(),
+      achieved: zod.number().optional(),
+      partiallyAchieved: zod.number().optional(),
+      notAchieved: zod.number().optional(),
+      overAchieved: zod.number().optional(),
+      onHold: zod.number().optional(),
+      notApplicable: zod.number().optional(),
+      unableToAssess: zod.number().optional(),
+    })
     .optional(),
 });
 
@@ -2609,6 +3086,22 @@ export const GetEvidenceComplianceResponse = zod.object({
       }),
     )
     .optional(),
+});
+
+/**
+ * @summary Get municipal health composite score
+ */
+export const GetMunicipalHealthQueryParams = zod.object({
+  cycleId: zod.coerce.number(),
+});
+
+export const GetMunicipalHealthResponse = zod.object({
+  performance: zod.number().optional(),
+  evidenceCompliance: zod.number().optional(),
+  workflowEfficiency: zod.number().optional(),
+  composite: zod.number().optional(),
+  band: zod.string().optional(),
+  hasData: zod.boolean().optional(),
 });
 
 /**

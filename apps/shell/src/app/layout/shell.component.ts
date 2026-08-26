@@ -1099,8 +1099,11 @@ export class ShellComponent implements OnInit, OnDestroy {
     }
   ];
 
-  // Mirror of the React perf-app sidebar (Insight-Performance-Hub/artifacts/perf-app/src/layout/Sidebar.tsx).
-  // Order, labels and routes match exactly so the iframe loads the matching React page for every link.
+  // Mirror of perf-app's own sidebar (a standalone Angular app, not React —
+  // Insight-Performance-Hub/artifacts/perf-app/src/app/layout/sidebar/sidebar.component.ts).
+  // Order, labels and routes match exactly so the iframe loads the matching page for every link.
+  // As of 2026-08-26 (PerformanceSync.md Pass 2) this nav is in sync with the vendored perf-app
+  // copy, including "Revised SDBIP" — re-check this comment if the two ever drift again.
   insightsNav: InsightsNavEntry[] = [
     { kind: 'link', label: 'Dashboard', icon: 'dashboard', route: '/dashboard' },
     { kind: 'group', title: 'Original SDBIP', icon: 'business', items: [

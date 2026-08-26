@@ -5,10 +5,12 @@
  * Organisational Performance Management API
  * OpenAPI spec version: 0.1.0
  */
+import type { UpsertQuarterTargetsInputTargetsItemTargetStatus } from "./upsertQuarterTargetsInputTargetsItemTargetStatus";
 
 export type UpsertQuarterTargetsInputTargetsItem = {
   quarter: number;
   targetValue: string;
+  targetStatus?: UpsertQuarterTargetsInputTargetsItemTargetStatus;
   budgetValue?: number;
   evidenceExpected?: string;
   revisionReason?: string;

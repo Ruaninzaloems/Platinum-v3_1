@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { catchError, finalize, of, tap } from 'rxjs';
@@ -9,6 +10,7 @@ import { PageHeaderComponent } from '@shared/components/page-header/page-header.
 import { LoadingSpinnerComponent } from '@shared/components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '@shared/components/empty-state/empty-state.component';
 import { ToastService } from '@core/services/toast.service';
+import { NotificationsService } from '@core/services/notifications.service';
 
 @Component({
   selector: 'app-notification-centre',
@@ -33,7 +35,12 @@ import { ToastService } from '@core/services/toast.service';
                   <span class="time">{{ relTime(n.createdAt) }}</span>
                 </div>
                 <p>{{ n.message }}</p>
-                <button *ngIf="!n.isRead" mat-button color="primary" (click)="markRead(n)">Mark as read</button>
+                <div class="actions">
+                  <button *ngIf="n.link" mat-button color="primary" (click)="openLink(n)">
+                    <mat-icon>open_in_new</mat-icon> View
+                  </button>
+                  <button *ngIf="!n.isRead" mat-button color="primary" (click)="markRead(n)">Mark as read</button>
+                </div>
               </div>
             </div>
           </div>
@@ -59,11 +66,15 @@ import { ToastService } from '@core/services/toast.service';
     h4.read { color: #475569; }
     .time { font-size: 12px; color: #94a3b8; white-space: nowrap; }
     p { margin: 4px 0 6px; color: #475569; font-size: 13px; line-height: 1.5; }
+    .actions { display: flex; gap: 8px; align-items: center; }
+    .actions mat-icon { font-size: 16px; width: 16px; height: 16px; }
   `],
 })
 export class NotificationCentreComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
+  private readonly notifications = inject(NotificationsService);
   loading = signal(true);
   items = signal<AppNotification[]>([]);
 
@@ -76,9 +87,24 @@ export class NotificationCentreComponent implements OnInit {
       finalize(() => this.loading.set(false)),
     ).subscribe();
   }
+  openLink(n: AppNotification) {
+    if (!n.link) return;
+    if (!n.isRead) {
+      this.api.post(`/notifications/${n.id}/read`, {}).pipe(catchError(() => of(null))).subscribe(() => this.notifications.refresh());
+    }
+    const [path, query] = n.link.split('?');
+    const queryParams: Record<string, string> = {};
+    if (query) {
+      for (const pair of query.split('&')) {
+        const [k, v] = pair.split('=');
+        if (k) queryParams[decodeURIComponent(k)] = decodeURIComponent(v ?? '');
+      }
+    }
+    this.router.navigate([path], { queryParams });
+  }
   markRead(n: AppNotification) {
     this.api.post(`/notifications/${n.id}/read`, {}).pipe(
-      tap(() => this.load()),
+      tap(() => { this.load(); this.notifications.refresh(); }),
       catchError((e) => { this.toast.error('Could not mark as read', e?.error?.message ?? e?.message); return of(null); }),
     ).subscribe();
   }

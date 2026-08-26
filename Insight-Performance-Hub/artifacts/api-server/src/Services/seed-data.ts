@@ -3,7 +3,9 @@ import {
   usersTable,
   performanceCyclesTable,
   kpiGroupsTable,
+  nationalKpasTable,
   unitsOfMeasureTable,
+  kpiDataTypesTable,
   nkpaWeightingsTable,
   scorecardsTable,
   scorecardKpisTable,
@@ -16,7 +18,46 @@ import {
 } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 
+const CANONICAL_DATA_TYPES = [
+  { name: "Numeric", code: "numeric" },
+  { name: "Percentage", code: "percentage" },
+  { name: "Currency", code: "currency" },
+  { name: "Date", code: "date" },
+  { name: "Text", code: "text" },
+  { name: "Boolean", code: "boolean" },
+];
+
+const UNIT_NAME_TO_DATA_TYPE_CODE: Record<string, string> = {
+  Percentage: "percentage",
+  Number: "numeric",
+  Rand: "currency",
+  Days: "numeric",
+  Report: "text",
+  Date: "date",
+};
+
+export async function ensureKpiDataTypes() {
+  const existing = await db.select().from(kpiDataTypesTable);
+  const byCode = new Map(existing.map((d) => [d.code, d]));
+  for (const dt of CANONICAL_DATA_TYPES) {
+    if (!byCode.has(dt.code)) {
+      const [row] = await db.insert(kpiDataTypesTable).values({ ...dt, isActive: true }).returning();
+      byCode.set(row.code, row);
+    }
+  }
+  const units = await db.select().from(unitsOfMeasureTable);
+  for (const u of units) {
+    if (u.dataTypeId != null) continue;
+    const code = UNIT_NAME_TO_DATA_TYPE_CODE[u.name];
+    const dt = code ? byCode.get(code) : undefined;
+    if (dt) {
+      await db.update(unitsOfMeasureTable).set({ dataTypeId: dt.id }).where(eq(unitsOfMeasureTable.id, u.id));
+    }
+  }
+}
+
 export async function seedDemoData() {
+  await ensureKpiDataTypes();
   const [existingCycle] = await db
     .select()
     .from(performanceCyclesTable)
@@ -88,6 +129,23 @@ async function insertDemoData(db: Parameters<Parameters<typeof import("@workspac
     "Good Governance & Public Participation",
   ];
 
+  const nkpaDescriptions = [
+    "Provision of basic services such as water, sanitation, electricity and refuse removal.",
+    "Initiatives that stimulate and support local economic growth and job creation.",
+    "Building institutional capacity, skills development and organisational transformation.",
+    "Sound financial management, budgeting and viability of the municipality.",
+    "Transparent governance, accountability and community participation.",
+  ];
+  for (let i = 0; i < nkpaNames.length; i++) {
+    await db.insert(nationalKpasTable).values({
+      name: nkpaNames[i],
+      code: `NKPA${i + 1}`,
+      description: nkpaDescriptions[i],
+      isActive: true,
+      sortOrder: i,
+    });
+  }
+
   const groupIds: Record<string, number> = {};
   for (let i = 0; i < nkpaNames.length; i++) {
     const [g] = await db
@@ -113,10 +171,17 @@ async function insertDemoData(db: Parameters<Parameters<typeof import("@workspac
     });
   }
 
-  const [uomPct] = await db.insert(unitsOfMeasureTable).values({ name: "Percentage", abbreviation: "%", cycleId, isActive: true }).returning();
-  const [uomNum] = await db.insert(unitsOfMeasureTable).values({ name: "Number", abbreviation: "#", cycleId, isActive: true }).returning();
-  const [uomRand] = await db.insert(unitsOfMeasureTable).values({ name: "Rand", abbreviation: "R", cycleId, isActive: true }).returning();
-  const [uomDays] = await db.insert(unitsOfMeasureTable).values({ name: "Days", abbreviation: "d", cycleId, isActive: true }).returning();
+  const [dtNumeric] = await db.insert(kpiDataTypesTable).values({ name: "Numeric", code: "numeric", isActive: true }).returning();
+  const [dtPct] = await db.insert(kpiDataTypesTable).values({ name: "Percentage", code: "percentage", isActive: true }).returning();
+  const [dtCur] = await db.insert(kpiDataTypesTable).values({ name: "Currency", code: "currency", isActive: true }).returning();
+  await db.insert(kpiDataTypesTable).values({ name: "Date", code: "date", isActive: true });
+  await db.insert(kpiDataTypesTable).values({ name: "Text", code: "text", isActive: true });
+  await db.insert(kpiDataTypesTable).values({ name: "Boolean", code: "boolean", isActive: true });
+
+  const [uomPct] = await db.insert(unitsOfMeasureTable).values({ name: "Percentage", abbreviation: "%", dataTypeId: dtPct.id, cycleId, isActive: true }).returning();
+  const [uomNum] = await db.insert(unitsOfMeasureTable).values({ name: "Number", abbreviation: "#", dataTypeId: dtNumeric.id, cycleId, isActive: true }).returning();
+  const [uomRand] = await db.insert(unitsOfMeasureTable).values({ name: "Rand", abbreviation: "R", dataTypeId: dtCur.id, cycleId, isActive: true }).returning();
+  const [uomDays] = await db.insert(unitsOfMeasureTable).values({ name: "Days", abbreviation: "d", dataTypeId: dtNumeric.id, cycleId, isActive: true }).returning();
 
   const [orgScorecard] = await db
     .insert(scorecardsTable)

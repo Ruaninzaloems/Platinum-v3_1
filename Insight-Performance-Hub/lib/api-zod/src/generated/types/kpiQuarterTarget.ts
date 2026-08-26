@@ -5,12 +5,14 @@
  * Organisational Performance Management API
  * OpenAPI spec version: 0.1.0
  */
+import type { KpiQuarterTargetTargetStatus } from "./kpiQuarterTargetTargetStatus";
 
 export interface KpiQuarterTarget {
   id: number;
   kpiId: number;
   quarter: number;
   targetValue: string;
+  targetStatus?: KpiQuarterTargetTargetStatus;
   budgetValue?: number | null;
   evidenceExpected?: string | null;
   isApprovedBaseline: boolean;

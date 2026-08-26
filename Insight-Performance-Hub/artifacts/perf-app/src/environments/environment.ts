@@ -1,6 +1,10 @@
 export const environment = {
   production: false,
-  apiBaseUrl: '/api',
+  // Root-relative '/api' resolves against the shell's own origin (the iframe's
+  // proxy-through to :8080 is invisible to the browser) and would hit the
+  // shell's default /api rule (Assets, :3000) instead of this module's own
+  // api-server. Must stay '/insights-app/api' -- see PerformanceSync.md.
+  apiBaseUrl: '/insights-app/api',
   appName: 'Platinum Performance Management',
   version: '1.0.0',
   /**

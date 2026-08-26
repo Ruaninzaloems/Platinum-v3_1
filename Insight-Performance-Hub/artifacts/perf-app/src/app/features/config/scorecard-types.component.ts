@@ -28,10 +28,6 @@ import { LoadingSpinnerComponent } from '@shared/components/loading-spinner/load
           <mat-form-field appearance="outline"><mat-label>Name</mat-label><input matInput [(ngModel)]="model.name" name="name" required /></mat-form-field>
         </div>
         <mat-form-field appearance="outline">
-          <mat-label>Description</mat-label>
-          <textarea matInput [(ngModel)]="model.description" name="desc" rows="3"></textarea>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
           <mat-label>Status</mat-label>
           <mat-select [(ngModel)]="model.isActive" name="status">
             <mat-option [value]="true">Active</mat-option><mat-option [value]="false">Inactive</mat-option>
@@ -79,13 +75,12 @@ export class ScorecardTypeDialogComponent {
       <div class="plat-card">
         <app-loading-spinner *ngIf="loading()"></app-loading-spinner>
         <table *ngIf="!loading()" class="plat-table">
-          <thead><tr><th>Code</th><th>Name</th><th>Description</th><th>Status</th><th class="actions">Actions</th></tr></thead>
+          <thead><tr><th>Code</th><th>Name</th><th>Status</th><th class="actions">Actions</th></tr></thead>
           <tbody>
-            <tr *ngIf="rows().length === 0"><td colspan="5" class="empty">No scorecard types defined.</td></tr>
+            <tr *ngIf="rows().length === 0"><td colspan="4" class="empty">No scorecard types defined.</td></tr>
             <tr *ngFor="let r of rows()">
               <td class="mono">{{ r.code }}</td>
               <td><strong>{{ r.name }}</strong></td>
-              <td class="muted">{{ r.description || '—' }}</td>
               <td><app-status-badge [status]="r.isActive ? 'Active' : 'Inactive'"></app-status-badge></td>
               <td class="actions"><button mat-button color="primary" (click)="open(r)"><mat-icon>edit</mat-icon> Edit</button></td>
             </tr>
@@ -94,6 +89,18 @@ export class ScorecardTypeDialogComponent {
       </div>
     </section>
   `,
+  styles: [`
+    .plat-page { max-width: 860px; gap: 14px; }
+    .plat-table { font-size: 13px; }
+    .plat-table th { padding: 9px 16px; }
+    .plat-table td { padding: 8px 16px; }
+    .plat-table .empty { padding: 20px; }
+    :host ::ng-deep app-page-header .page-header { padding: 12px 16px; border-radius: 12px; }
+    :host ::ng-deep app-page-header .page-header__icon { width: 36px; height: 36px; }
+    :host ::ng-deep app-page-header .page-header__icon mat-icon { font-size: 20px; width: 20px; height: 20px; }
+    :host ::ng-deep app-page-header h1 { font-size: 17px; }
+    :host ::ng-deep app-page-header p { font-size: 13px; margin-top: 2px; }
+  `],
 })
 export class ScorecardTypesComponent implements OnInit {
   private readonly api = inject(ApiService);

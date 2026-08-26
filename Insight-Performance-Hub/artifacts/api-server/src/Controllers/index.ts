@@ -23,6 +23,10 @@ import competencyTemplatesRouter from "./competency-templates";
 import aiInsightsRouter from "./ai-insights";
 import integrationsRouter from "./integrations";
 import workflowConfigRouter from "./workflow-config";
+import sdbipFieldConfigsRouter from "./sdbip-field-configs";
+import kpiRatingThresholdsRouter from "./kpi-rating-thresholds";
+import departmentsRouter from "./departments";
+import scorecardExportRouter from "./scorecard-export";
 
 const router: IRouter = Router();
 
@@ -35,6 +39,7 @@ router.use(deadlinesRouter);
 router.use(auditRouter);
 router.use(notificationsRouter);
 router.use(scorecardsRouter);
+router.use(scorecardExportRouter);
 router.use(monthActivitiesRouter);
 router.use(sdbipRouter);
 router.use(actualsRouter);
@@ -50,5 +55,8 @@ router.use(competencyTemplatesRouter);
 router.use(aiInsightsRouter);
 router.use(integrationsRouter);
 router.use(workflowConfigRouter);
+router.use(sdbipFieldConfigsRouter);
+router.use(kpiRatingThresholdsRouter);
+router.use(departmentsRouter);
 
 export default router;

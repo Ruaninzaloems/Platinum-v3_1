@@ -13,4 +13,11 @@ export type TrendlineDataQuartersItem = {
   notAchieved?: number;
   total?: number;
   periodChange?: number;
+  /**
+   * Weighted organisational average score for the quarter; null when no data captured
+   * @nullable
+   */
+  score?: number | null;
+  /** Target score for the quarter (percent) */
+  target?: number;
 };

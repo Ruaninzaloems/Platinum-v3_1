@@ -1,0 +1,99 @@
+<!-- ── Approve Detail View ───────────────────────────────────────────────── -->
+<section class="plat-page" *ngIf="selectedScorecardId() && selectedScorecard() as sc; else listView">
+  <div class="detail-head">
+    <div class="left">
+      <button mat-button type="button" (click)="back()"><mat-icon>arrow_back</mat-icon> Back to Queue</button>
+      <div>
+        <h2 class="title">Approve Revised: {{ sc.name }}</h2>
+        <p class="sub">
+          <span class="badge tone-amber">Mid-Year Revision</span>
+          Status: <span class="badge" [ngClass]="statusTone[sc.status] || 'tone-slate'">{{ sc.status }}</span>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary-grid">
+    <div class="plat-card stat"><div class="lbl">Total KPIs</div><div class="val">{{ kpis().length }}</div></div>
+    <div class="plat-card stat"><div class="lbl">Approved</div><div class="val green">{{ approvedKpis().length }}</div></div>
+    <div class="plat-card stat"><div class="lbl">Pending Approval</div><div class="val amber">{{ reviewedKpis().length }}</div></div>
+  </div>
+
+  <div class="bulk-row" *ngIf="reviewedKpis().length">
+    <button mat-flat-button color="primary" type="button" [disabled]="processing()" (click)="approveAllKpis()">
+      <mat-icon>check_circle</mat-icon> Approve All Reviewed KPIs ({{ reviewedKpis().length }})
+    </button>
+  </div>
+
+  <div class="plat-card">
+    <h3 class="card-title">Revised KPI Approval</h3>
+    <p class="card-desc">Review baseline changes and approve each revised KPI.</p>
+    <div class="kpi-list">
+      <app-revision-kpi-approval-card
+        *ngFor="let kpi of kpis(); trackBy: trackById"
+        [kpi]="kpi"
+        [responsibleName]="getUserName(kpi.responsiblePostId)"
+        [processing]="processing()"
+        (approve)="approveKpi(kpi.id)">
+      </app-revision-kpi-approval-card>
+      <p class="empty-msg" *ngIf="!kpis().length">No KPIs found.</p>
+    </div>
+  </div>
+
+  <div class="plat-card decision-card approve">
+    <h3 class="card-title"><mat-icon class="inline-icon">verified_user</mat-icon> Final Revised SDBIP Approval</h3>
+    <p class="card-desc">
+      {{ allKpisApproved()
+        ? 'All revised KPIs approved. Approving the scorecard will update baselines with the new targets.'
+        : reviewedKpis().length + ' KPI(s) still pending approval.' }}
+    </p>
+    <mat-form-field appearance="outline">
+      <mat-label>Approval Comments (Optional)</mat-label>
+      <textarea matInput rows="3" [ngModel]="approvalComments()" (ngModelChange)="approvalComments.set($event)" placeholder="Add approval comments..."></textarea>
+    </mat-form-field>
+    <div class="dc-actions">
+      <button mat-flat-button color="primary" type="button" [disabled]="!allKpisApproved() || processing()" (click)="approveScorecard()">
+        <mat-icon>workspace_premium</mat-icon> Approve Revised SDBIP
+      </button>
+      <button mat-stroked-button color="warn" type="button" [disabled]="processing()" (click)="openReturnDialog()">
+        <mat-icon>cancel</mat-icon> Return to Draft
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ── Queue List View ───────────────────────────────────────────────────── -->
+<ng-template #listView>
+  <section class="plat-page">
+    <app-page-header title="Approve Revised SDBIP" subtitle="Approve revised scorecards to finalize the mid-year SDBIP revision. New targets will be baselined upon approval." icon="verified" tone="green">
+      <mat-form-field appearance="outline" class="cycle-pick">
+        <mat-label>Performance Cycle</mat-label>
+        <mat-select [ngModel]="effectiveCycleId()" (ngModelChange)="onCycle($event)">
+          <mat-option *ngFor="let c of cycles()" [value]="c.id">{{ c.financialYearLabel }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </app-page-header>
+
+    <div class="plat-card empty-card" *ngIf="!scorecards().length">
+      <mat-icon>find_in_page</mat-icon>
+      <h3>No Revised Scorecards Pending Approval</h3>
+      <p>Reviewed revised scorecards will appear here.</p>
+    </div>
+
+    <div class="list-cards" *ngIf="scorecards().length">
+      <div *ngFor="let sc of scorecards(); trackBy: trackById" class="plat-card list-row" (click)="openScorecard(sc)">
+        <div>
+          <div class="lr-name">
+            <h3>{{ sc.name }}</h3>
+            <span class="badge tone-amber">Revised</span>
+          </div>
+          <p class="lr-meta">Revision of an approved SDBIP · Created {{ sc.createdAt | date:'mediumDate' }} by {{ getUserName(sc.createdById) }}</p>
+        </div>
+        <div class="lr-actions">
+          <span class="badge" [ngClass]="statusTone[sc.status] || 'tone-slate'">{{ sc.status }}</span>
+          <button mat-stroked-button type="button"><mat-icon>verified_user</mat-icon> Approve</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</ng-template>

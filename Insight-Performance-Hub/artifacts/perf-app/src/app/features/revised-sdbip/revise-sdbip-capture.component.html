@@ -1,0 +1,258 @@
+<ng-container *ngIf="detailScorecard() as sc; else listView">
+
+  <!-- ── Revision Detail (KPI table + audit trail) ───────────────────────── -->
+  <section class="plat-page">
+    <div class="detail-head">
+      <div class="left">
+        <button mat-button type="button" (click)="backToList()"><mat-icon>arrow_back</mat-icon> Back</button>
+        <div>
+          <h2 class="title">{{ sc.name }}</h2>
+          <p class="sub">Revised SDBIP · Total Weighting: {{ totalWeighting().toFixed(1) }}%</p>
+        </div>
+        <span class="badge" [ngClass]="statusTone[sc.status] || 'tone-slate'">{{ sc.status }}</span>
+      </div>
+      <div class="actions" *ngIf="isDraft()">
+        <button mat-stroked-button type="button" (click)="openNewKpi()"><mat-icon>add</mat-icon> Add New KPI</button>
+        <button mat-flat-button color="primary" type="button" (click)="handleSubmitForReview()"><mat-icon>send</mat-icon> Submit for Review</button>
+      </div>
+    </div>
+
+    <div class="plat-card notice" *ngIf="isDraft()">
+      <mat-icon>info</mat-icon>
+      <p>This is a separate revision of the approved SDBIP — the original stays approved and unchanged. Edit copied KPIs or add new ones; one overall revision reason is captured when you submit the revised SDBIP for review.</p>
+    </div>
+
+    <mat-tab-group class="plat-tabs" [disableRipple]="true" animationDuration="150ms" [selectedIndex]="tabIndex()" (selectedIndexChange)="tabIndex.set($event)">
+      <mat-tab label="KPIs ({{ kpis().length }})">
+        <div class="plat-card">
+          <h3 class="card-title">Revised SDBIP KPIs</h3>
+          <p class="card-desc">
+            {{ isDraft() ? 'Click a KPI to revise its details and quarterly targets.' : 'This revision is locked while under review or after approval.' }}
+          </p>
+
+          <div class="filter-panel" *ngIf="kpis().length > 0">
+            <div class="filter-grid">
+              <div class="filter-row">
+                <label>Indicator</label>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                  <input matInput placeholder="Type to search..." [ngModel]="filterQ()" (ngModelChange)="filterQ.set($event)" />
+                </mat-form-field>
+              </div>
+              <div class="filter-row">
+                <label>Department</label>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                  <mat-select placeholder="-- All Departments --" [ngModel]="filterDept()" (ngModelChange)="filterDept.set($event)">
+                    <mat-option [value]="null">-- All Departments --</mat-option>
+                    <mat-option *ngFor="let d of deptOptions()" [value]="d">{{ d }}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+              <div class="filter-row">
+                <label>Responsible Person</label>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                  <mat-select placeholder="-- All Persons --" panelClass="person-select-panel" [ngModel]="filterResp()" (ngModelChange)="filterResp.set($event)">
+                    <mat-select-trigger>{{ respTriggerLabel() }}</mat-select-trigger>
+                    <mat-option [value]="null">-- All Persons --</mat-option>
+                    <mat-option *ngFor="let u of respOptions()" [value]="u.id">
+                      <span class="person-opt">
+                        <span class="person-name">{{ u.displayName }}</span>
+                        <span class="person-title" *ngIf="u.jobTitle">{{ u.jobTitle }}</span>
+                      </span>
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+            </div>
+            <p class="shown-line">{{ filteredKpis().length }} of {{ kpis().length }} KPI{{ kpis().length === 1 ? '' : 's' }} shown</p>
+          </div>
+
+          <div class="table-wrap" *ngIf="kpis().length > 0; else noKpis">
+            <table class="plat-table kpi-table">
+              <thead>
+                <tr>
+                  <th *ngFor="let col of columns(); trackBy: trackByKey">{{ col.label }}</th>
+                  <th>Revision</th>
+                  <th class="actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let k of filteredKpis(); trackBy: trackById" class="clickable-row" (click)="openKpi(k)">
+                  <td *ngFor="let col of columns(); trackBy: trackByKey" [class.desc-col]="col.key === 'description'">
+                    <span class="cell-clamp" [title]="cellValue(k, col.key)">{{ cellValue(k, col.key) }}</span>
+                  </td>
+                  <td>
+                    <span class="badge tone-blue" *ngIf="isNewKpi(k)">New</span>
+                    <span class="badge tone-amber" *ngIf="isRevisedKpi(k)">Revised</span>
+                    <span class="badge tone-slate" *ngIf="!isNewKpi(k) && !isRevisedKpi(k)">Unchanged</span>
+                  </td>
+                  <td class="actions">
+                    <button mat-stroked-button type="button" (click)="$event.stopPropagation(); openKpi(k)">
+                      <mat-icon>{{ isDraft() ? 'edit' : 'visibility' }}</mat-icon> {{ isDraft() ? 'Revise' : 'View' }}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="empty-msg" *ngIf="filteredKpis().length === 0">No KPIs match the current filters.</p>
+          </div>
+          <ng-template #noKpis>
+            <p class="empty-msg">No KPIs found on this revision.</p>
+          </ng-template>
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Revision Audit Trail ({{ revisionLogs().length }})">
+        <div class="plat-card" *ngIf="revisionLogs().length; else noLogs">
+          <div class="audit-head">
+            <div>
+              <h3 class="card-title"><mat-icon class="inline-icon">history</mat-icon> Revision Audit Trail</h3>
+              <p class="card-desc">{{ revisionLogs().length }} revision event(s) recorded</p>
+            </div>
+            <div class="audit-export" *ngIf="auditRows().length">
+              <button type="button" class="export-btn" [disabled]="exporting()" (click)="exportAudit('xlsx')">
+                <span class="fmt-icon excel">X</span> Excel
+              </button>
+              <button type="button" class="export-btn" [disabled]="exporting()" (click)="exportAudit('pdf')">
+                <span class="fmt-icon pdf">P</span> PDF
+              </button>
+              <button type="button" class="export-btn" [disabled]="exporting()" (click)="exportAudit('docx')">
+                <span class="fmt-icon word">W</span> Word
+              </button>
+            </div>
+          </div>
+
+          <div class="table-wrap audit-wrap" *ngIf="auditRows().length">
+            <table class="plat-table kpi-table audit-table">
+              <thead>
+                <tr>
+                  <th>Revision No.</th>
+                  <th>KPI Ref No.</th>
+                  <th class="desc-th">KPI Description</th>
+                  <th>Field Changed</th>
+                  <th>Previous Value</th>
+                  <th>New Value</th>
+                  <th>Change Type</th>
+                  <th>Reason for Change</th>
+                  <th>Changed By</th>
+                  <th>Changed Date &amp; Time</th>
+                  <th>Submitted By</th>
+                  <th>Approved By</th>
+                  <th>Approval Date</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of auditRows(); trackBy: trackById">
+                  <td>Rev {{ revisionNo() }}</td>
+                  <td>{{ row.kpiRef }}</td>
+                  <td class="desc-col"><span class="cell-clamp" [title]="row.kpiDesc">{{ row.kpiDesc }}</span></td>
+                  <td>{{ row.field }}</td>
+                  <td><span class="cell-clamp val-old" [title]="row.oldValue">{{ row.oldValue }}</span></td>
+                  <td><span class="cell-clamp val-new" [title]="row.newValue">{{ row.newValue }}</span></td>
+                  <td>
+                    <span class="badge" [ngClass]="{
+                      'tone-green': row.changeType === 'Added',
+                      'tone-blue': row.changeType === 'Modified',
+                      'tone-red': row.changeType === 'Deleted'
+                    }">{{ row.changeType }}</span>
+                  </td>
+                  <td><span class="cell-clamp" [title]="row.reason">{{ row.reason || '—' }}</span></td>
+                  <td>{{ row.changedBy }}</td>
+                  <td class="nowrap">
+                    <span class="dt">{{ row.changedAt | date:'d MMM y' }}
+                      <span class="dt-time">{{ row.changedAt | date:'HH:mm' }}</span>
+                    </span>
+                  </td>
+                  <td>{{ submittedBy() || '—' }}</td>
+                  <td>{{ approvedByName() || '—' }}</td>
+                  <td class="nowrap">{{ detailScorecard()?.approvedAt ? (detailScorecard()?.approvedAt | date:'d MMM y') : '—' }}</td>
+                  <td><span class="badge tone-outline">{{ auditStatus() }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="card-desc" *ngIf="!auditRows().length">No KPI-level changes recorded yet — amendments made to KPIs will appear here.</p>
+
+          <h4 class="audit-sub" *ngIf="workflowLogs().length">Workflow Events</h4>
+          <div class="timeline">
+            <div *ngFor="let log of workflowLogs()" class="tl-item">
+              <div class="tl-dot"><mat-icon>schedule</mat-icon></div>
+              <div class="tl-body">
+                <div class="tl-head">
+                  <span class="badge tone-outline">{{ revisionLabels[log.revisionType] || log.revisionType }}</span>
+                  <span class="tl-date">{{ log.createdAt | date:'medium' }}</span>
+                </div>
+                <p class="tl-user"><strong>{{ log.userName }}</strong></p>
+                <p class="tl-field" *ngIf="log.fieldName">
+                  <strong>{{ log.fieldName }}:</strong>
+                  <span class="old" *ngIf="log.oldValue">{{ log.oldValue }}</span>
+                  <span *ngIf="log.oldValue && log.newValue"> → </span>
+                  <span class="new" *ngIf="log.newValue">{{ log.newValue }}</span>
+                </p>
+                <p class="tl-new" *ngIf="!log.fieldName && log.newValue">{{ log.newValue }}</p>
+                <p class="tl-reason" *ngIf="log.revisionReason">Reason: {{ log.revisionReason }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <ng-template #noLogs>
+          <div class="plat-card empty-card">
+            <mat-icon>history</mat-icon>
+            <h3>No Revision History</h3>
+            <p>Changes made during this revision will be recorded here.</p>
+          </div>
+        </ng-template>
+      </mat-tab>
+    </mat-tab-group>
+  </section>
+
+</ng-container>
+
+<!-- ── Scorecard List View ─────────────────────────────────────────────────── -->
+<ng-template #listView>
+  <section class="plat-page">
+    <app-page-header title="Revise SDBIP" subtitle="Create a revision of an approved SDBIP. The original stays approved; changes are captured on a separate revised copy." icon="refresh" tone="orange">
+      <mat-form-field appearance="outline" class="cycle-pick">
+        <mat-label>Performance Cycle</mat-label>
+        <mat-select [ngModel]="effectiveCycleId()" (ngModelChange)="onCycle($event)">
+          <mat-option *ngFor="let c of cycles()" [value]="c.id">{{ c.financialYearLabel }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </app-page-header>
+
+    <div class="plat-card empty-card" *ngIf="!originals().length">
+      <mat-icon>refresh</mat-icon>
+      <h3>No Approved SDBIPs Available for Revision</h3>
+      <p>Approved organisational SDBIPs will appear here for mid-year revision.</p>
+    </div>
+
+    <div class="sc-list" *ngIf="originals().length">
+      <div *ngFor="let sc of originals(); trackBy: trackById" class="plat-card sc-row">
+        <div>
+          <h3 class="sc-name">{{ sc.name }}</h3>
+          <p class="sc-meta">
+            <ng-container *ngIf="sc.approvedAt">Approved on {{ sc.approvedAt | date:'mediumDate' }} · </ng-container>
+            Created by {{ getUserName(sc.createdById) }}
+          </p>
+        </div>
+        <div class="sc-actions">
+          <ng-container *ngIf="revisionFor(sc) as rev; else noRevision">
+            <span class="badge" [ngClass]="statusTone[rev.status] || 'tone-slate'">Revision: {{ rev.status }}</span>
+            <button mat-flat-button color="primary" type="button" *ngIf="rev.status === 'Draft'" (click)="openScorecard(rev)">
+              <mat-icon>arrow_forward</mat-icon> Continue Revision
+            </button>
+            <button mat-stroked-button type="button" *ngIf="rev.status !== 'Draft'" (click)="openScorecard(rev)">
+              <mat-icon>visibility</mat-icon> View Revision
+            </button>
+          </ng-container>
+          <ng-template #noRevision>
+            <span class="badge tone-green">Approved</span>
+            <button mat-flat-button color="primary" type="button" [disabled]="reopening() === sc.id" (click)="confirmReopen(sc)">
+              <mat-icon>add</mat-icon> {{ reopening() === sc.id ? 'Creating Revision…' : 'New Revision' }}
+            </button>
+          </ng-template>
+        </div>
+      </div>
+    </div>
+  </section>
+</ng-template>

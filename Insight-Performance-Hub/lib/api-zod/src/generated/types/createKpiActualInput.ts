@@ -5,8 +5,10 @@
  * Organisational Performance Management API
  * OpenAPI spec version: 0.1.0
  */
+import type { CreateKpiActualInputPeriodType } from "./createKpiActualInputPeriodType";
 
 export interface CreateKpiActualInput {
+  periodType?: CreateKpiActualInputPeriodType;
   quarter: number;
   actualValue: string;
   commentary?: string;
@@ -20,5 +22,10 @@ export interface CreateKpiActualInput {
   overperformanceReason?: string;
   budgetImplication?: string;
   analysisNotes?: string;
+  /**
+   * @minimum 0
+   * @maximum 200
+   */
+  qualitativeScorePct?: number | null;
   lateOverrideReason?: string;
 }

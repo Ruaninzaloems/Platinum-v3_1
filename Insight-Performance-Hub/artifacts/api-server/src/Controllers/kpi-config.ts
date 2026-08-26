@@ -6,6 +6,7 @@ import {
   kpiDataTypesTable,
   progressStatusesTable,
   scorecardTypesTable,
+  nationalKpasTable,
 } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import {
@@ -14,6 +15,7 @@ import {
   CreateDataTypeBody, UpdateDataTypeBody, UpdateDataTypeParams,
   CreateProgressStatusBody, UpdateProgressStatusBody, UpdateProgressStatusParams,
   CreateScorecardTypeBody, UpdateScorecardTypeBody, UpdateScorecardTypeParams,
+  CreateNationalKpaBody, UpdateNationalKpaBody, UpdateNationalKpaParams, DeleteNationalKpaParams,
   ListKpiGroupsQueryParams, ListUnitsOfMeasureQueryParams, ListProgressStatusesQueryParams,
 } from "@workspace/api-zod";
 import { requirePermission } from "../Middleware/auth";
@@ -168,6 +170,45 @@ router.patch("/scorecard-types/:id", requirePermission("config.update", "*"), as
     const [st] = await db.update(scorecardTypesTable).set(body).where(eq(scorecardTypesTable.id, id)).returning();
     await logAudit(req, "update", "scorecard_type", st.id, existing, st);
     res.json(st);
+  } catch (err) { next(err); }
+});
+
+router.get("/national-kpas", async (_req, res, next) => {
+  try {
+    const kpas = await db.select().from(nationalKpasTable).orderBy(nationalKpasTable.sortOrder, nationalKpasTable.id);
+    res.json(kpas);
+  } catch (err) { next(err); }
+});
+
+router.post("/national-kpas", requirePermission("config.create", "*"), async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const body = CreateNationalKpaBody.parse(req.body);
+    const [kpa] = await db.insert(nationalKpasTable).values(body).returning();
+    await logAudit(req, "create", "national_kpa", kpa.id, null, kpa);
+    res.status(201).json(kpa);
+  } catch (err) { next(err); }
+});
+
+router.patch("/national-kpas/:id", requirePermission("config.update", "*"), async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { id } = UpdateNationalKpaParams.parse(req.params);
+    const body = UpdateNationalKpaBody.parse(req.body);
+    const [existing] = await db.select().from(nationalKpasTable).where(eq(nationalKpasTable.id, id));
+    if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+    const [kpa] = await db.update(nationalKpasTable).set(body).where(eq(nationalKpasTable.id, id)).returning();
+    await logAudit(req, "update", "national_kpa", kpa.id, existing, kpa);
+    res.json(kpa);
+  } catch (err) { next(err); }
+});
+
+router.delete("/national-kpas/:id", requirePermission("config.delete", "*"), async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { id } = DeleteNationalKpaParams.parse(req.params);
+    const [existing] = await db.select().from(nationalKpasTable).where(eq(nationalKpasTable.id, id));
+    if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+    await logAudit(req, "delete", "national_kpa", id, existing, null);
+    await db.delete(nationalKpasTable).where(eq(nationalKpasTable.id, id));
+    res.status(204).end();
   } catch (err) { next(err); }
 });
 

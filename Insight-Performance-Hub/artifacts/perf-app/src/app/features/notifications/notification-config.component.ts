@@ -17,6 +17,14 @@ import { StatusBadgeComponent } from '@shared/components/status-badge/status-bad
 import { LoadingSpinnerComponent } from '@shared/components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '@shared/components/empty-state/empty-state.component';
 
+const MFMA_EVENT_TYPE = 'mfma.deadline';
+const KNOWN_EVENT_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: MFMA_EVENT_TYPE, label: 'MFMA statutory deadlines' },
+];
+function eventTypeLabel(eventType: string): string {
+  return KNOWN_EVENT_OPTIONS.find((o) => o.value === eventType)?.label ?? eventType;
+}
+
 @Component({
   selector: 'app-notification-config-dialog',
   standalone: true,
@@ -25,7 +33,15 @@ import { EmptyStateComponent } from '@shared/components/empty-state/empty-state.
     <h2 mat-dialog-title>{{ data.entity ? 'Edit' : 'Create' }} Notification Rule</h2>
     <form (ngSubmit)="save()" #f="ngForm">
       <mat-dialog-content class="content">
-        <mat-form-field appearance="outline"><mat-label>Event Type</mat-label><input matInput [(ngModel)]="model.eventType" name="event" required placeholder="e.g. submission.due" /></mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Event</mat-label>
+          <mat-select [(ngModel)]="eventChoice" name="eventChoice" required (selectionChange)="onEventChoiceChange()">
+            <mat-option *ngFor="let opt of eventOptions" [value]="opt.value">{{ opt.label }}</mat-option>
+            <mat-option value="__custom__">Custom event type…</mat-option>
+          </mat-select>
+          <mat-hint *ngIf="eventChoice === MFMA_EVENT">Reminder lead time for statutory MFMA deadlines (e.g. SDBIP approval, annual report tabling).</mat-hint>
+        </mat-form-field>
+        <mat-form-field *ngIf="eventChoice === '__custom__'" appearance="outline"><mat-label>Custom Event Type</mat-label><input matInput [(ngModel)]="model.eventType" name="event" required placeholder="e.g. submission.due" /></mat-form-field>
         <div class="grid">
           <mat-form-field appearance="outline"><mat-label>Days Before</mat-label><input matInput type="number" [(ngModel)]="model.daysBefore" name="dbefore" /></mat-form-field>
           <mat-form-field appearance="outline">
@@ -52,6 +68,9 @@ export class NotificationConfigDialogComponent {
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
   saving = signal(false);
+  readonly MFMA_EVENT = MFMA_EVENT_TYPE;
+  readonly eventOptions = KNOWN_EVENT_OPTIONS;
+  eventChoice: string;
   model: { cycleId: number; eventType: string; daysBefore: number; isEmail: boolean; isInApp: boolean; isActive: boolean };
   constructor(
     public ref: MatDialogRef<NotificationConfigDialogComponent, NotificationConfig | null>,
@@ -66,8 +85,16 @@ export class NotificationConfigDialogComponent {
       isInApp: e?.isInApp ?? true,
       isActive: e?.isActive ?? true,
     };
+    const known = KNOWN_EVENT_OPTIONS.some((o) => o.value === this.model.eventType);
+    this.eventChoice = this.model.eventType ? (known ? this.model.eventType : '__custom__') : MFMA_EVENT_TYPE;
+    if (!this.model.eventType && this.eventChoice === MFMA_EVENT_TYPE) this.model.eventType = MFMA_EVENT_TYPE;
+  }
+  onEventChoiceChange() {
+    this.model.eventType = this.eventChoice === '__custom__' ? '' : this.eventChoice;
   }
   save() {
+    if (this.eventChoice !== '__custom__') this.model.eventType = this.eventChoice;
+    if (!this.model.eventType) return;
     this.saving.set(true);
     const id = this.data.entity?.id;
     const obs = id ? this.api.patch<NotificationConfig>(`/notification-configs/${id}`, this.model) : this.api.post<NotificationConfig>(`/notification-configs`, this.model);
@@ -98,7 +125,7 @@ export class NotificationConfigDialogComponent {
             <tbody>
               <tr *ngIf="rows().length === 0"><td colspan="5" class="empty">No notification rules configured.</td></tr>
               <tr *ngFor="let r of rows()">
-                <td class="mono">{{ r.eventType }}</td>
+                <td><span *ngIf="isKnown(r.eventType); else rawType">{{ label(r.eventType) }}</span><ng-template #rawType><span class="mono">{{ r.eventType }}</span></ng-template></td>
                 <td>{{ r.daysBefore }}</td>
                 <td>
                   <span *ngIf="r.isEmail" class="chan">Email</span>
@@ -122,6 +149,9 @@ export class NotificationConfigComponent implements OnInit {
   loading = signal(true); rows = signal<NotificationConfig[]>([]);
   cycles = signal<Cycle[]>([]);
   activeCycle = computed<Cycle | null>(() => this.cycles().find((c) => c.status === 'Open') ?? this.cycles()[0] ?? null);
+
+  isKnown(eventType: string) { return KNOWN_EVENT_OPTIONS.some((o) => o.value === eventType); }
+  label(eventType: string) { return eventTypeLabel(eventType); }
 
   ngOnInit() { this.load(); }
   load() {

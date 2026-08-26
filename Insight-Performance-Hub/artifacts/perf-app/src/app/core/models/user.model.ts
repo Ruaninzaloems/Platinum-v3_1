@@ -5,6 +5,7 @@ export interface User {
   email: string;
   role: string;
   departmentId: number | null;
+  jobTitle?: string | null;
   isActive: boolean;
   permissions: string[];
 }
@@ -35,6 +36,9 @@ export const PATH_SECTION_MAP: Array<[string, string]> = [
   ['/departmental', 'Departmental'],
   ['/individual', 'Individual'],
   ['/actuals', 'Actuals & Evidence'],
+  ['/mid-year', 'Actuals & Evidence'],
+  ['/annual', 'Actuals & Evidence'],
+  ['/bulk-upload', 'Configuration'],
   ['/moderation', 'Moderation'],
   ['/dashboards', 'Dashboard'],
   ['/reports', 'Reports'],

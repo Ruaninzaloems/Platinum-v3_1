@@ -3,109 +3,136 @@
     <div class="detail-head">
       <div class="left">
         <button mat-button (click)="back()"><mat-icon>arrow_back</mat-icon> Back to Queue</button>
-        <div class="title-block">
-          <h2>Review: {{ selectedScorecard()!.name }}</h2>
-          <p>
-            Created by {{ userName(selectedScorecard()!.createdById) }}
-            · <app-status-badge [status]="selectedScorecard()!.status"></app-status-badge>
-          </p>
-        </div>
       </div>
     </div>
 
-    <div class="stats-grid">
-      <div class="plat-card stat"><div class="stat-label">Total KPIs</div><div class="stat-value">{{ kpis().length }}</div></div>
-      <div class="plat-card stat"><div class="stat-label">Reviewed</div><div class="stat-value tone-amber">{{ reviewedKpis().length }}</div></div>
-      <div class="plat-card stat"><div class="stat-label">Pending Review</div><div class="stat-value tone-blue">{{ submittedKpis().length }}</div></div>
-    </div>
-
-    <div class="plat-card">
-      <div class="card-head">
-        <h3>KPI Review</h3>
-        <p>Review each KPI individually, then mark the entire scorecard as reviewed.</p>
-      </div>
-      <div class="kpi-list">
-        <div *ngIf="kpis().length === 0" class="empty">No KPIs found for this scorecard.</div>
-        <div *ngFor="let k of kpis(); trackBy: trackById" class="kpi-card">
-          <div class="kpi-row">
-            <div class="kpi-body">
-              <div class="kpi-meta-top">
-                <span class="kpi-num">{{ k.kpiNumber }}</span>
-                <app-status-badge [status]="k.status"></app-status-badge>
-              </div>
-              <div class="kpi-desc">{{ k.description }}</div>
-              <div class="kpi-meta">
-                <span>Weight: {{ k.weighting }}%</span>
-                <span>Annual Target: {{ k.annualTarget }}</span>
-                <span *ngIf="k.baseline">Baseline: {{ k.baseline }}</span>
-                <span>Responsible: {{ userName(k.responsiblePostId) }}</span>
-              </div>
-              <div *ngIf="k.strategicObjective" class="kpi-strategic">Strategic Objective: {{ k.strategicObjective }}</div>
-            </div>
-            <button mat-button (click)="toggleExpand(k)">{{ expanded()[k.id] ? 'Collapse' : 'Expand' }}</button>
-          </div>
-
-          <div *ngIf="expanded()[k.id]" class="kpi-expand">
-            <div class="targets-row" *ngIf="kpiTargets()[k.id]?.length">
-              <div *ngFor="let q of [1,2,3,4]" class="qcell">
-                <div class="qlbl">Q{{ q }}</div>
-                <div class="qval">{{ targetForQuarter(k.id, q)?.targetValue || '—' }}</div>
-                <div *ngIf="targetForQuarter(k.id, q)?.budgetValue != null" class="qbudget">
-                  Budget: R{{ targetForQuarter(k.id, q)!.budgetValue!.toLocaleString() }}
-                </div>
-              </div>
-            </div>
-
-            <ng-container *ngIf="k.status === 'Submitted'">
-              <mat-form-field appearance="outline" class="comment">
-                <mat-label>Review comments for this KPI</mat-label>
-                <textarea matInput rows="2" [ngModel]="kpiComments[k.id] || ''" (ngModelChange)="setComment(k.id, $event)"></textarea>
-              </mat-form-field>
-              <div class="kpi-actions">
-                <button mat-flat-button color="primary" [disabled]="isProcessing()" (click)="reviewKpi(k.id, 'review')">
-                  <mat-icon>check_circle</mat-icon> Mark Reviewed
-                </button>
-                <button mat-stroked-button color="warn" [disabled]="isProcessing()" (click)="reviewKpi(k.id, 'return')">
-                  <mat-icon>cancel</mat-icon> Return
-                </button>
-              </div>
-            </ng-container>
-
-            <div *ngIf="k.status === 'Reviewed'" class="status-line tone-amber">
-              <mat-icon>check_circle</mat-icon> Reviewed
-            </div>
-            <div *ngIf="k.status === 'Approved'" class="status-line tone-green">
-              <mat-icon>check_circle</mat-icon> Approved
-            </div>
+    <div class="plat-card sc-card">
+      <div class="sc-head">
+        <div class="sc-title">
+          <mat-icon class="sc-icon" [class.lock-icon]="isLocked()">{{ isLocked() ? 'lock' : 'schedule' }}</mat-icon>
+          <div>
+            <h3>{{ selectedScorecard()!.name }}</h3>
+            <p class="sc-sub">{{ cycleLabel() }} &nbsp; Type: Original &nbsp; v1 &nbsp; <strong>{{ kpis().length }} KPI{{ kpis().length === 1 ? '' : 's' }}</strong></p>
           </div>
         </div>
+        <div class="sc-head-right">
+          <span *ngIf="isLocked()" class="locked-badge">Locked</span>
+          <button type="button" class="icon-btn" (click)="collapsed.set(!collapsed())" [title]="collapsed() ? 'Expand' : 'Collapse'">
+            <mat-icon>{{ collapsed() ? 'expand_more' : 'expand_less' }}</mat-icon>
+          </button>
+        </div>
       </div>
+
+      <ng-container *ngIf="!collapsed()">
+        <div *ngIf="isLocked()" class="locked-banner">
+          <span class="lb-text"><mat-icon>lock</mat-icon> SDBIP is locked down. KPI review is complete. Actuals capture is now open.</span>
+          <button type="button" mat-stroked-button class="unlock-btn" [disabled]="isProcessing()" (click)="reopenForRevision()">New Revision</button>
+        </div>
+
+        <div class="filter-panel">
+          <div class="filter-grid">
+          <div class="filter-row">
+            <label>Indicator</label>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <input matInput placeholder="Type to search..." [ngModel]="filterQ()" (ngModelChange)="filterQ.set($event)" />
+            </mat-form-field>
+          </div>
+          <div class="filter-row">
+            <label>Department</label>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-select placeholder="-- All Departments --" [ngModel]="filterDept()" (ngModelChange)="filterDept.set($event)">
+                <mat-option [value]="null">-- All Departments --</mat-option>
+                <mat-option *ngFor="let d of deptOptions()" [value]="d">{{ d }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <div class="filter-row">
+            <label>Responsible Person</label>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-select placeholder="-- All Persons --" panelClass="person-select-panel" [ngModel]="filterResp()" (ngModelChange)="filterResp.set($event)">
+                <mat-select-trigger>{{ respTriggerLabel() }}</mat-select-trigger>
+                <mat-option [value]="null">-- All Persons --</mat-option>
+                <mat-option *ngFor="let u of respOptions()" [value]="u.id">
+                  <span class="person-opt">
+                    <span class="person-name">{{ u.displayName }}</span>
+                    <span class="person-title" *ngIf="u.jobTitle">{{ u.jobTitle }}</span>
+                  </span>
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <div class="filter-row">
+            <label>Status</label>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-select placeholder="-- All Statuses --" [ngModel]="filterStatus()" (ngModelChange)="filterStatus.set($event)">
+                <mat-option [value]="null">-- All Statuses --</mat-option>
+                <mat-option *ngFor="let s of statusOptions()" [value]="s">{{ statusLabel(s) }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          </div>
+          <p class="shown-line">{{ filteredKpis().length }} of {{ kpis().length }} KPI{{ kpis().length === 1 ? '' : 's' }} shown</p>
+        </div>
+
+        <div class="review-line">
+          <span *ngIf="!isLocked()">{{ submittedKpis().length }} KPI{{ submittedKpis().length === 1 ? '' : 's' }} to review</span>
+          <span *ngIf="isLocked()">{{ kpis().length }} KPI{{ kpis().length === 1 ? '' : 's' }} to review</span>
+          <span class="pending-chip" *ngIf="submittedKpis().length > 0">{{ submittedKpis().length }} Pending</span>
+          <span class="approved-chip" *ngIf="approvedKpis().length > 0">{{ approvedKpis().length }} Approved</span>
+        </div>
+
+        <div class="table-wrap">
+          <table class="review-table">
+            <thead>
+              <tr>
+                <th class="kpa-col">KPA</th>
+                <th class="wide">Indicator</th>
+                <th class="kpa-col">Department</th>
+                <th class="unit-col">Unit</th>
+                <th class="at-col">Annual Target</th>
+                <th class="q-col">Q1</th>
+                <th class="q-col">Q2</th>
+                <th class="q-col">Q3</th>
+                <th class="q-col">Q4</th>
+                <th class="status-col">Status</th>
+                <th class="actions-col">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngIf="filteredKpis().length === 0">
+                <td colspan="11" class="empty-row">No KPIs match the current filters.</td>
+              </tr>
+              <tr *ngFor="let k of filteredKpis(); trackBy: trackById">
+                <td class="kpa">{{ kpaOf(k) || '—' }}</td>
+                <td class="wide">{{ k.description }}</td>
+                <td class="kpa">{{ deptOf(k) || '—' }}</td>
+                <td class="unit">{{ uomAbbr(k.unitOfMeasureId) }}</td>
+                <td class="strong">{{ k.annualTarget }}</td>
+                <td class="muted">{{ qTarget(k, 1) }}</td>
+                <td class="muted">{{ qTarget(k, 2) }}</td>
+                <td class="muted">{{ qTarget(k, 3) }}</td>
+                <td class="muted">{{ qTarget(k, 4) }}</td>
+                <td><span class="status-pill" [class.pending]="k.status === 'Submitted'" [class.done]="k.status !== 'Submitted'">{{ statusLabel(k.status) }}</span></td>
+                <td class="actions-col">
+                  <div class="row-actions">
+                    <button type="button" class="icon-btn" title="View KPI" (click)="viewKpi(k)"><mat-icon>visibility</mat-icon></button>
+                    <ng-container *ngIf="canReviewKpi(k)">
+                      <button type="button" class="pill-btn approve" [disabled]="isProcessing()" (click)="approveKpi(k)"><mat-icon>check_circle</mat-icon> Approve</button>
+                      <button type="button" class="pill-btn reject" [disabled]="isProcessing()" (click)="rejectKpi(k)"><mat-icon>cancel</mat-icon> Reject</button>
+                    </ng-container>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </ng-container>
     </div>
 
-    <div class="plat-card decision-card amber" *ngIf="selectedScorecard()!.status === 'Submitted'">
-      <div class="card-head">
-        <h3><mat-icon>fact_check</mat-icon> Scorecard Review Decision</h3>
-        <p>{{ allKpisReviewed()
-          ? 'All KPIs have been reviewed. You may now mark the scorecard as Reviewed.'
-          : (submittedKpis().length + ' KPI(s) still pending review. Review all KPIs before marking the scorecard.') }}</p>
-      </div>
-      <mat-form-field appearance="outline">
-        <mat-label>Review Comments (Optional)</mat-label>
-        <textarea matInput rows="3" [(ngModel)]="reviewComments" placeholder="Add any overall review comments..."></textarea>
-      </mat-form-field>
-      <div class="decision-actions">
-        <button mat-flat-button color="primary" [disabled]="!allKpisReviewed() || isProcessing()" (click)="reviewScorecard()">
-          <mat-icon>check_circle</mat-icon> Mark as Reviewed
-        </button>
-        <button mat-stroked-button color="warn" [disabled]="isProcessing()" (click)="returnScorecard()">
-          <mat-icon>cancel</mat-icon> Return to Draft
-        </button>
-      </div>
-    </div>
   </ng-container>
 
   <ng-template #queue>
-    <app-page-header title="Review SDBIP" subtitle="PMS Manager — review submitted scorecards before forwarding for Director approval." icon="fact_check" tone="orange">
+    <app-page-header title="SDBIP Review" subtitle="Approve or reject individual KPIs per SDBIP" icon="fact_check" tone="orange">
       <mat-form-field *ngIf="cycles().length > 0" appearance="outline" class="cycle-pick" subscriptSizing="dynamic">
         <mat-label>Cycle</mat-label>
         <mat-select [ngModel]="effectiveCycleId()" (ngModelChange)="selectCycle($event)">
@@ -121,11 +148,19 @@
         <div *ngFor="let sc of scorecards(); trackBy: trackById" class="plat-card queue-card" (click)="openScorecard(sc)">
           <div class="qc-body">
             <h3>{{ sc.name }}</h3>
-            <p>Created by {{ userName(sc.createdById) }} · {{ formatDate(sc.createdAt) }}</p>
+            <p>Type: Original</p>
           </div>
           <div class="qc-right">
-            <app-status-badge [status]="sc.status"></app-status-badge>
-            <button mat-stroked-button color="primary"><mat-icon>visibility</mat-icon> Review</button>
+            <button *ngIf="sc.status === 'Reviewed'" mat-flat-button class="approve-sc-btn"
+                    [disabled]="isProcessing()"
+                    (click)="$event.stopPropagation(); approveScorecard(sc)">
+              <mat-icon>check_circle</mat-icon> Approve
+            </button>
+            <span *ngIf="sc.status === 'Approved'" class="locked-badge">Locked</span>
+            <app-status-badge *ngIf="sc.status !== 'Approved'" [status]="sc.status"></app-status-badge>
+            <button mat-stroked-button color="primary">
+              <mat-icon>visibility</mat-icon> {{ sc.status === 'Approved' ? 'View' : 'Review' }}
+            </button>
           </div>
         </div>
       </div>

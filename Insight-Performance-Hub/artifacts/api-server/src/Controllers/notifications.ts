@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { notificationsTable, notificationConfigsTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import {
   MarkNotificationReadParams,
   CreateNotificationConfigBody, UpdateNotificationConfigBody, UpdateNotificationConfigParams,
@@ -18,13 +18,14 @@ router.get("/notifications", async (req: AuthenticatedRequest, res, next) => {
     const userId = req.user!.id;
     const notifications = await db.select().from(notificationsTable)
       .where(eq(notificationsTable.userId, userId))
-      .orderBy(notificationsTable.id);
+      .orderBy(desc(notificationsTable.id));
     res.json(notifications.map((n) => ({
       id: n.id,
       userId: n.userId,
       title: n.title,
       message: n.message,
       type: n.type,
+      link: n.link ?? undefined,
       isRead: n.isRead,
       createdAt: n.createdAt.toISOString(),
     })));
@@ -44,6 +45,7 @@ router.post("/notifications/:id/read", async (req: AuthenticatedRequest, res, ne
       title: n.title,
       message: n.message,
       type: n.type,
+      link: n.link ?? undefined,
       isRead: n.isRead,
       createdAt: n.createdAt.toISOString(),
     });

@@ -30,6 +30,7 @@ export interface UnitOfMeasure {
   cycleId: number;
   name: string;
   abbreviation: string;
+  dataTypeId?: number | null;
   isActive: boolean;
 }
 
@@ -49,6 +50,15 @@ export interface ScorecardType {
   name: string;
   description?: string;
   isActive: boolean;
+}
+
+export interface NationalKpa {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  sortOrder: number;
 }
 
 export interface SubmissionDeadline {
@@ -251,11 +261,14 @@ export interface Scorecard {
   name: string;
   cycleId: number;
   scorecardType: string;
+  parentScorecardId?: number | null;
   departmentId?: number | null;
   status: ScorecardStatus | string;
   approvedById?: number | null;
   approvedAt?: string | null;
   approvalComments?: string | null;
+  returnComments?: string | null;
+  fieldConfigSnapshot?: SdbipFieldConfig[] | null;
   createdById: number;
   createdAt: string;
   updatedAt: string;
@@ -284,9 +297,26 @@ export interface ScorecardKpi {
   kpiGroupId?: number | null;
   status: ScorecardStatus | string;
   isCumulative: boolean;
+  customFields?: Record<string, string | number | boolean | null> | null;
+  returnComments?: string | null;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export type SdbipConfigType = 'original' | 'revised' | 'departmental' | 'quarterly' | 'midyear' | 'annual';
+
+export interface SdbipFieldConfig {
+  id: number;
+  sdbipType: SdbipConfigType;
+  fieldKind: 'primary' | 'custom';
+  fieldKey: string;
+  fieldLabel: string;
+  fieldType: 'text' | 'number' | 'date' | 'boolean' | 'textarea' | 'select' | 'alphanumeric' | 'percent';
+  isIncluded: boolean;
+  isRequired: boolean;
+  isLocked: boolean;
+  sortOrder: number;
 }
 
 export interface KpiQuarterTarget {

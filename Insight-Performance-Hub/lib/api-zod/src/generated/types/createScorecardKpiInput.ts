@@ -5,6 +5,7 @@
  * Organisational Performance Management API
  * OpenAPI spec version: 0.1.0
  */
+import type { CreateScorecardKpiInputCustomFields } from "./createScorecardKpiInputCustomFields";
 
 export interface CreateScorecardKpiInput {
   kpiNumber: string;
@@ -26,4 +27,5 @@ export interface CreateScorecardKpiInput {
   dataTypeId?: number;
   kpiGroupId?: number;
   isCumulative?: boolean;
+  customFields?: CreateScorecardKpiInputCustomFields;
 }

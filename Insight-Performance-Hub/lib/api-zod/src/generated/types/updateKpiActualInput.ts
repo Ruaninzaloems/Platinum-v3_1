@@ -19,4 +19,9 @@ export interface UpdateKpiActualInput {
   overperformanceReason?: string;
   budgetImplication?: string;
   analysisNotes?: string;
+  /**
+   * @minimum 0
+   * @maximum 200
+   */
+  qualitativeScorePct?: number | null;
 }
