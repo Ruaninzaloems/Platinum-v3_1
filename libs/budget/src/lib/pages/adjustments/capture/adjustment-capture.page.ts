@@ -771,7 +771,7 @@ export class AdjustmentCapturePage implements OnInit, OnDestroy {
     };
 
     const req = this.planProjectId
-      ? this.http.put(`/api/ems/plan-project/plan-project/${this.planProjectId}`, { ...payload, Project_ID: this.planProjectId })
+      ? this.http.put(`/budget-app/api/ems/plan-project/plan-project/${this.planProjectId}`, { ...payload, Project_ID: this.planProjectId })
       : this.http.post<any>('/budget-app/api/ems/plan-project/plan-project', { ...payload, Project_ID: 0 });
 
     req.subscribe({

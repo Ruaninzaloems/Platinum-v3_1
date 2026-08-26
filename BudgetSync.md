@@ -398,6 +398,74 @@ non-fatal (`[budget] Startup DB init/seed failed (non-fatal, API continues)`), s
 requires a Budget-specific restart — it self-recovers once the IP is whitelisted, unlike Overtime (see
 `MASTER.md` §4.2 for that asymmetry).
 
+### Sixth pass (2026-08-25): standalone hadn't changed, but found 44 live bare-`/api` calls the earlier passes missed
+
+Ran via `Platinum-v3-sync`'s automated queue (see that project's `CLAUDE.md`), not manually. **Standalone
+had zero frontend changes and zero backend feature changes** since the 2026-08-19 status above (confirmed
+via `git log --since=2026-08-19` on the standalone — only 2 commits, both a standalone-only Azure port-bind
+fix superseded by monorepo's own already-better port logic; see the Program.cs entry below). Every one of
+the 6 differing backend files and the ~49 flagged-different frontend files (out of 95 common files) reduced
+to already-known, already-correct adaptations once diffed line-by-line — **except** one real, live bug:
+
+- **44 bare `/api/...` HTTP calls across 4 files** were still routing to the shell's default `/api` proxy
+  target (`localhost:3000` — the **Assets** backend, confirmed via `apps/shell/proxy.conf.json`) instead of
+  Budget's own `localhost:3001` via `/budget-app/api`. This is the exact bug class documented above under
+  "The real root cause of dashboard shows no data" — evidently the standing `grep -rn "'/api'" libs/budget`
+  check from every prior pass only ever caught the bare-no-trailing-slash `'/api'` string (the
+  `api.service.ts` base-URL bug), not the far more common `` `/api/... ``-with-trailing-content pattern
+  inside individual page files that bypass `ApiService`/`ConstantsApiService` and call `this.http` directly.
+  Affected: `pages/projects/capture/project-capture.page.ts` (18 calls — GET/POST/PUT/DELETE across
+  IDP links, funding lines, project items, and the project-by-name lookup), `pages/projects/grid/
+  project-budgets-grid.page.ts` (11 calls — PATCH on inline-edit fields, PUT/DELETE on SCOA
+  item/costing/region/fund/function child records, POST ensure-project-item), `pages/projects/grid/
+  project-capture-dialog.component.ts` (2 calls), `pages/adjustments/capture/adjustment-capture.page.ts`
+  (1 call — the PUT branch of the project-capture ternary, which had NOT been fixed even though its sibling
+  POST branch on the very next line had been). **Practical impact**: creating/editing an existing Plan
+  Project, the entire Projects Grid inline-edit flow (SCOA item/costing/region/fund/function editing,
+  budget-amount/months/grap-segment/credit-debit patches), and IDP-link management were all silently
+  hitting the Assets backend (404 or wrong data) rather than Budget's. Fixed with a scoped
+  `` s|`/api/|`/budget-app/api/|g `` across exactly those 4 files (verified no other `` `/api/ `` or
+  `'/api/` usages remained anywhere in the live `libs/budget/src/lib` tree afterward — 2 more instances
+  found only in `services/api.service.ts` / `services/constants-api.service.ts`, which are **dead, unused
+  duplicates** of `core/services/api.service.ts` / `core/services/constants-api.service.ts`, see below —
+  left as-is since fixing dead code has no effect).
+  **Checklist correction for every future sync**: the bare-`/api` grep must be
+  `grep -rE "\.(get|post|put|delete|patch)(<[^>]*>)?\(\`?'?/api/"` (covers all 5 HTTP verbs including
+  `patch`, and both backtick-template and plain-string call syntax), not just the narrower `'/api'` and
+  `'/api/` checks used previously — those miss most real instances.
+- **Newly discovered dead code, not fixed (flagged only)**: `libs/budget/src/lib/services/` and
+  `libs/budget/src/lib/models/` (flat, no `core/` prefix) are a **stale orphaned duplicate** of
+  `core/services/`/`core/models/` — `services/api.service.ts` is dated 2026-04-22 (pre-dates the `core/`
+  reorg), missing methods the real `core/services/api.service.ts` has (e.g. `getProjects` has no
+  pagination), and has **zero import references anywhere in `pages/`/`features/`** (confirmed via repo-wide
+  grep). Same for `models/budget.models.ts` vs `core/models/budget.models.ts`. Not part of the live app,
+  not synced from standalone (standalone has no `core/` split, so there's no meaningful "standalone version"
+  of this duplication to diff against) — flagged for a future cleanup decision (delete `services/`+`models/`
+  top-level folders) rather than acted on, consistent with how the stale `BUDGET-APP/platinum-budget-ui`
+  copy is already handled above.
+- **`Program.cs`** (backend) — standalone's 2026-08-24 commits (`e3af6b5` "Fix API startup port to match
+  Azure App Service probe", `ba0ad1f` "Fix build break: rename port variable to avoid CS0136 collision")
+  landed a simpler port-binding fix (`WEBSITES_PORT ?? PORT ?? "8080"`, no separate local-dev fallback) for
+  the same underlying Azure Oryx-ignores-`WEBSITES_PORT` problem the monorepo already solved more
+  thoroughly (see the existing "Dynamic port binding" entry above — `WEBSITE_SITE_NAME` detection +
+  `PORT` ?? 8080/3001, with a comment explaining Oryx's behavior). **Monorepo's version is a superset,
+  correctly kept as-is** — no action, but noting it here so a future sync doesn't mistake this for a gap.
+- No nav-array changes needed — standalone had no frontend commits since the fifth pass, and a structural
+  read of `budgetNavGroups` confirmed all previously-fixed groups (Virements, Adjustments, mSCOA Strings,
+  Project Budgets Grid) are still intact.
+- Re-ran the `.tab-content` global-CSS-leak standing check (`grep -rn "\.tab-content\s*{" libs/budget` +
+  a template-usage grep for `class="tab-content"` with no matching rule) — all 4 previously-fixed
+  files still carry their `display: block` override, no new page introduces the class without one.
+
+**Verification**: `dotnet build -c Release BUDGET-APP/PlatinumBudget.Api` (0 errors, built to a scratch
+dir — the normal output was locked by an already-running dev instance on :3001, same as the Overtime sync
+hit on :8099); `tsc --noEmit -p apps/shell/tsconfig.app.json` (0 errors); confirmed via
+`apps/shell/proxy.conf.json` that `/budget-app/api/*` → rewritten to `/api/*` → forwarded to `:3001`
+(Budget's own backend, confirmed live: `GET /api/health/db` → `{"status":"ok","db":"Budget","connected":true}`,
+and `GET /api/ems/plan-project/plan-project?pageSize=5` — the exact endpoint the PUT-branch bug was on —
+returned `200`) versus bare `/api` → `:3000` (Assets), concretely confirming both the bug's real impact
+and the fix's correctness without needing to click through the actual shell UI.
+
 ---
 
 ## General principles (apply to every module, every sync — carried over from the general playbook)

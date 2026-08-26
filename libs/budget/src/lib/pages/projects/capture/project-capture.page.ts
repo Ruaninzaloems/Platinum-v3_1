@@ -526,7 +526,7 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
 
   private loadIdpItems() {
     const fy = this.form.financialYear || '2025/2026';
-    this.http.get<any[]>(`/api/constants/idp-items/with-path`, { params: { financialYear: fy } }).subscribe({
+    this.http.get<any[]>(`/budget-app/api/constants/idp-items/with-path`, { params: { financialYear: fy } }).subscribe({
       next: items => { this.idpItems = items; this.cdr.detectChanges(); },
       error: () => {
         this.constantsApi.getIdpItems(fy, 5).subscribe(items => {
@@ -539,7 +539,7 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
   private loadProject() {
     if (!this.projectId) return;
     this.loading = true;
-    this.http.get<any>(`/api/ems/plan-project/plan-project/${this.projectId}`).subscribe({
+    this.http.get<any>(`/budget-app/api/ems/plan-project/plan-project/${this.projectId}`).subscribe({
       next: (p: any) => {
         this.planProjectId = p.project_ID ?? p.Project_ID ?? this.projectId;
         const scoaId = p.scoaProjectID ?? p.ScoaProjectID ?? null;
@@ -574,7 +574,7 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
     const finYear = this.form.financialYear;
     if (!name || !finYear) return;
     this.http.get<{ project_ID: number; Project_ID?: number }>(
-      `/api/ems/plan-project/plan-project/by-name`,
+      `/budget-app/api/ems/plan-project/plan-project/by-name`,
       { params: { finYear, name } }
     ).subscribe({
       next: (m: any) => { this.planProjectId = m?.Project_ID ?? m?.project_ID ?? null; },
@@ -584,7 +584,7 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
 
   loadIdpLinks() {
     if (!this.projectId) return;
-    this.http.get<IdpLink[]>(`/api/projects/${this.projectId}/idp-links`).subscribe({
+    this.http.get<IdpLink[]>(`/budget-app/api/projects/${this.projectId}/idp-links`).subscribe({
       next: links => { this.idpLinks = links; this.idpLoadError = false; },
       error: () => { this.idpLoadError = true; }
     });
@@ -602,7 +602,7 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
       longitude: this.newIdpLink.longitude,
       latitude: this.newIdpLink.latitude
     };
-    this.http.post<any>(`/api/projects/${this.projectId}/idp-links`, body).subscribe({
+    this.http.post<any>(`/budget-app/api/projects/${this.projectId}/idp-links`, body).subscribe({
       next: () => {
         this.newIdpLink = { idpItemId: null, percentage: null, longitude: null, latitude: null };
         this.loadIdpLinks();
@@ -621,7 +621,7 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
       longitude: this.editingIdpLink.longitude,
       latitude: this.editingIdpLink.latitude
     };
-    this.http.put(`/api/projects/${this.projectId}/idp-links/${this.editingIdpLink.id}`, body).subscribe({
+    this.http.put(`/budget-app/api/projects/${this.projectId}/idp-links/${this.editingIdpLink.id}`, body).subscribe({
       next: () => { this.editingIdpLink = null; this.loadIdpLinks(); }
     });
   }
@@ -629,7 +629,7 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
   deleteIdpLink(link: IdpLink) {
     if (!this.projectId || !link.id) return;
     if (!confirm('Delete this IDP link?')) return;
-    this.http.delete(`/api/projects/${this.projectId}/idp-links/${link.id}`).subscribe({
+    this.http.delete(`/budget-app/api/projects/${this.projectId}/idp-links/${link.id}`).subscribe({
       next: () => this.loadIdpLinks()
     });
   }
@@ -655,7 +655,7 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
 
   loadFundingLines() {
     if (!this.projectId) return;
-    this.http.get<any[]>(`/api/projects/${this.projectId}/funding`).subscribe({
+    this.http.get<any[]>(`/budget-app/api/projects/${this.projectId}/funding`).subscribe({
       next: lines => {
         const yrs = this.mtrefYears;
         this.fundingLines = lines.map(l => {
@@ -696,7 +696,7 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
         { finYear: yrs[2], amount: this.newFunding.y3 ?? 0 }
       ]
     };
-    this.http.post<any>(`/api/projects/${this.projectId}/funding`, body).subscribe({
+    this.http.post<any>(`/budget-app/api/projects/${this.projectId}/funding`, body).subscribe({
       next: () => {
         this.newFunding = { scoaFundId: null, y1: null, y2: null, y3: null };
         this.loadFundingLines();
@@ -718,7 +718,7 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
         { finYear: yrs[2], amount: this.editingFunding.y3 ?? 0 }
       ]
     };
-    this.http.put(`/api/projects/${this.projectId}/funding/${this.editingFunding.id}`, body).subscribe({
+    this.http.put(`/budget-app/api/projects/${this.projectId}/funding/${this.editingFunding.id}`, body).subscribe({
       next: () => { this.editingFunding = null; this.loadFundingLines(); }
     });
   }
@@ -726,14 +726,14 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
   deleteFundingLine(line: FundingLine) {
     if (!this.projectId || !line.id) return;
     if (!confirm('Delete this funding line?')) return;
-    this.http.delete(`/api/projects/${this.projectId}/funding/${line.id}`).subscribe({
+    this.http.delete(`/budget-app/api/projects/${this.projectId}/funding/${line.id}`).subscribe({
       next: () => this.loadFundingLines()
     });
   }
 
   loadProjectItems() {
     if (!this.projectId) return;
-    this.http.get<ProjectItem[]>(`/api/projects/${this.projectId}/items`).subscribe({
+    this.http.get<ProjectItem[]>(`/budget-app/api/projects/${this.projectId}/items`).subscribe({
       next: items => { this.projectItems = items; }
     });
   }
@@ -741,7 +741,7 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
   onNewItemFundChange(scoaFundId: number | undefined) {
     this.fundBudgetDetails = [];
     if (!scoaFundId || !this.projectId) return;
-    this.http.get<any[]>(`/api/projects/${this.projectId}/items/fund-budget/${scoaFundId}`).subscribe({
+    this.http.get<any[]>(`/budget-app/api/projects/${this.projectId}/items/fund-budget/${scoaFundId}`).subscribe({
       next: rows => { this.fundBudgetDetails = rows; }
     });
   }
@@ -749,7 +749,7 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
   onEditItemFundChange(scoaFundId: number | undefined) {
     this.editFundBudgetDetails = [];
     if (!scoaFundId || !this.projectId) return;
-    this.http.get<any[]>(`/api/projects/${this.projectId}/items/fund-budget/${scoaFundId}`).subscribe({
+    this.http.get<any[]>(`/budget-app/api/projects/${this.projectId}/items/fund-budget/${scoaFundId}`).subscribe({
       next: rows => { this.editFundBudgetDetails = rows; }
     });
   }
@@ -794,7 +794,7 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
       municipalClassification: this.newItem.municipalClassification || null,
       monthlyAmounts: this.buildMonthlyBody(this.newItem)
     };
-    this.http.post<any>(`/api/projects/${this.projectId}/items`, body).subscribe({
+    this.http.post<any>(`/budget-app/api/projects/${this.projectId}/items`, body).subscribe({
       next: () => {
         this.newItem = this.getEmptyItem();
         this.scoaItemSearchCtrl.setValue('');
@@ -847,7 +847,7 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
       municipalClassification: this.editingItem.municipalClassification || null,
       monthlyAmounts: this.buildMonthlyBody(this.editingItem)
     };
-    this.http.put(`/api/projects/${this.projectId}/items/${this.editingItem.id}`, body).subscribe({
+    this.http.put(`/budget-app/api/projects/${this.projectId}/items/${this.editingItem.id}`, body).subscribe({
       next: () => { this.editingItem = null; this.editFundBudgetDetails = []; this.loadProjectItems(); }
     });
   }
@@ -855,7 +855,7 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
   deleteProjectItem(item: ProjectItem) {
     if (!this.projectId || !item.id) return;
     if (!confirm('Delete this SCOA item?')) return;
-    this.http.delete(`/api/projects/${this.projectId}/items/${item.id}`).subscribe({
+    this.http.delete(`/budget-app/api/projects/${this.projectId}/items/${item.id}`).subscribe({
       next: () => this.loadProjectItems()
     });
   }
@@ -1065,7 +1065,7 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
     };
 
     const req = this.planProjectId
-      ? this.http.put(`/api/ems/plan-project/plan-project/${this.planProjectId}`, { ...payload, Project_ID: this.planProjectId })
+      ? this.http.put(`/budget-app/api/ems/plan-project/plan-project/${this.planProjectId}`, { ...payload, Project_ID: this.planProjectId })
       : this.http.post<any>('/budget-app/api/ems/plan-project/plan-project', { ...payload, Project_ID: 0 });
 
     req.subscribe({

@@ -541,7 +541,7 @@ export class ProjectCaptureDialogComponent implements OnInit {
 
   private loadIdpItems() {
     const fy = this.form.financialYear || '2025/2026';
-    this.http.get<any[]>(`/api/constants/idp-items/with-path`, { params: { financialYear: fy } }).subscribe({
+    this.http.get<any[]>(`/budget-app/api/constants/idp-items/with-path`, { params: { financialYear: fy } }).subscribe({
       next: items => { this.idpItems = items; this.cdr.markForCheck(); },
       error: () => {
         this.consts.getIdpItems(fy, 5).subscribe(items => { this.idpItems = items; this.cdr.markForCheck(); });
@@ -751,7 +751,7 @@ export class ProjectCaptureDialogComponent implements OnInit {
             if (!virtualId) { this.saving = false; this.saved.emit(); return; }
 
             const linkSaves = this.idpLinks.map(lnk =>
-              this.http.post(`/api/projects/${virtualId}/idp-links`, {
+              this.http.post(`/budget-app/api/projects/${virtualId}/idp-links`, {
                 idpItemId: lnk.idpItemId,
                 percentage: lnk.percentage,
                 longitude: lnk.longitude,

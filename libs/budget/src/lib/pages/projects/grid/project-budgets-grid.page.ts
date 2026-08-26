@@ -1518,7 +1518,7 @@ export class ProjectBudgetsGridPage implements OnInit {
         // Save Project Item if changed
         const saveProjectItem = () => {
           if (!piChanged) { saveBudgetAmounts(); return; }
-          this.http.patch<any>(`/api/projects/${r.original.id}/project-item`, {
+          this.http.patch<any>(`/budget-app/api/projects/${r.original.id}/project-item`, {
             constProjectItemId: r.projectItemId ?? null,
             text: r.projectItemText || null,
             finYear: r.financialYear || null
@@ -1534,7 +1534,7 @@ export class ProjectBudgetsGridPage implements OnInit {
         // Save Year 1/2/3 budget amounts if changed (step before saveMonths)
         const saveBudgetAmounts = () => {
           if (!yrChanged) { saveMonths(); return; }
-          this.http.patch(`/api/projects/items/${r.original.planProjectItemId}/budget-amounts`, {
+          this.http.patch(`/budget-app/api/projects/items/${r.original.planProjectItemId}/budget-amounts`, {
             year1: r.year1,
             year2: r.year2,
             year3: r.year3,
@@ -1548,7 +1548,7 @@ export class ProjectBudgetsGridPage implements OnInit {
         // Save GRAP / segment if changed (last step before commitRow)
         const saveGrapSegment = () => {
           if (!gsChanged) { commitRow(); return; }
-          this.http.patch(`/api/projects/items/${r.original.planProjectItemId}/grap-segment`, {
+          this.http.patch(`/budget-app/api/projects/items/${r.original.planProjectItemId}/grap-segment`, {
             grapClassification:     r.grapClassification     || null,
             grapClassificationNote: r.grapClassificationNote || null,
             mainSegmentReporting:   r.mainSegmentReporting   || null,
@@ -1568,7 +1568,7 @@ export class ProjectBudgetsGridPage implements OnInit {
             failRow(`Month total (${mnSum.toLocaleString()}) must equal Year 1 (${year1.toLocaleString()})`);
             return;
           }
-          this.http.patch(`/api/projects/items/${r.original.planProjectItemId}/months`, {
+          this.http.patch(`/budget-app/api/projects/items/${r.original.planProjectItemId}/months`, {
             month01: r.m01 !== '' ? parseFloat(r.m01) : null,
             month02: r.m02 !== '' ? parseFloat(r.m02) : null,
             month03: r.m03 !== '' ? parseFloat(r.m03) : null,
@@ -1590,7 +1590,7 @@ export class ProjectBudgetsGridPage implements OnInit {
         // Save Municipal Classification if changed (step before saveProjectItem)
         const saveMunClass = () => {
           if (!mcChanged) { saveProjectItem(); return; }
-          this.http.patch(`/api/projects/items/${r.original.planProjectItemId}/municipal-classification`,
+          this.http.patch(`/budget-app/api/projects/items/${r.original.planProjectItemId}/municipal-classification`,
             { divisionId: r.munClassId, label: r.munClassLabel })
             .subscribe({
               next: () => saveProjectItem(),
@@ -1601,7 +1601,7 @@ export class ProjectBudgetsGridPage implements OnInit {
         // Save Credit/Debit if changed (called before saveMunClass)
         const saveCreditDebit = () => {
           if (!cdChanged) { saveMunClass(); return; }
-          this.http.patch(`/api/projects/items/${r.original.planProjectItemId}/credit-debit`, { creditDebit: r.creditDebit })
+          this.http.patch(`/budget-app/api/projects/items/${r.original.planProjectItemId}/credit-debit`, { creditDebit: r.creditDebit })
             .subscribe({
               next: () => saveMunClass(),
               error: (e: any) => failRow(e?.error?.message || 'Failed to save Credit/Debit')
@@ -1613,7 +1613,7 @@ export class ProjectBudgetsGridPage implements OnInit {
           if (!itChanged) { ensureProjectItem(); return; }
           if (r.scoaItemId === null) {
             if (r.scoaItemRecordId) {
-              this.http.delete(`/api/ems/plan-project/plan-project-scoa-item/${r.scoaItemRecordId}`)
+              this.http.delete(`/budget-app/api/ems/plan-project/plan-project-scoa-item/${r.scoaItemRecordId}`)
                 .subscribe({
                   next: () => { r.scoaItemRecordId = null; ensureProjectItem(); },
                   error: (e: any) => failRow(e?.error?.message || 'Failed to clear SCOA Item')
@@ -1624,7 +1624,7 @@ export class ProjectBudgetsGridPage implements OnInit {
             return;
           }
           if (r.scoaItemRecordId) {
-            this.http.put(`/api/ems/plan-project/plan-project-scoa-item/${r.scoaItemRecordId}`, {
+            this.http.put(`/budget-app/api/ems/plan-project/plan-project-scoa-item/${r.scoaItemRecordId}`, {
               ProjectScoaItem_ID: r.scoaItemRecordId,
               ProjectID: r.original.id,
               ScoaItemID: r.scoaItemId,
@@ -1656,7 +1656,7 @@ export class ProjectBudgetsGridPage implements OnInit {
         const needsItemRow = cdChanged || mcChanged || piChanged || yrChanged || mnChanged || gsChanged;
         const ensureProjectItem = () => {
           if (!needsItemRow || (r.original.budgetLineCount ?? 0) > 0) { saveCreditDebit(); return; }
-          this.http.post(`/api/projects/${r.original.id}/ensure-project-item`, {})
+          this.http.post(`/budget-app/api/projects/${r.original.id}/ensure-project-item`, {})
             .subscribe({
               next: () => {
                 r.original = { ...r.original, budgetLineCount: 1 } as any;
@@ -1671,7 +1671,7 @@ export class ProjectBudgetsGridPage implements OnInit {
           if (!coChanged) { saveItem(); return; }
           if (r.scoaCostingId === null) {
             if (r.scoaCostingRecordId) {
-              this.http.delete(`/api/ems/plan-project/plan-project-scoa-costing/${r.scoaCostingRecordId}`)
+              this.http.delete(`/budget-app/api/ems/plan-project/plan-project-scoa-costing/${r.scoaCostingRecordId}`)
                 .subscribe({
                   next: () => { r.scoaCostingRecordId = null; saveItem(); },
                   error: (e: any) => failRow(e?.error?.message || 'Failed to clear SCOA Costing')
@@ -1682,7 +1682,7 @@ export class ProjectBudgetsGridPage implements OnInit {
             return;
           }
           if (r.scoaCostingRecordId) {
-            this.http.put(`/api/ems/plan-project/plan-project-scoa-costing/${r.scoaCostingRecordId}`, {
+            this.http.put(`/budget-app/api/ems/plan-project/plan-project-scoa-costing/${r.scoaCostingRecordId}`, {
               ProjectScoaCosting_ID: r.scoaCostingRecordId,
               ProjectID: r.original.id,
               ScoaCostingID: r.scoaCostingId,
@@ -1714,7 +1714,7 @@ export class ProjectBudgetsGridPage implements OnInit {
           if (!rgChanged) { saveCosting(); return; }
           if (r.scoaRegionId === null) {
             if (r.scoaRegionRecordId) {
-              this.http.delete(`/api/ems/plan-project/plan-project-scoa-regions/${r.scoaRegionRecordId}`)
+              this.http.delete(`/budget-app/api/ems/plan-project/plan-project-scoa-regions/${r.scoaRegionRecordId}`)
                 .subscribe({
                   next: () => { r.scoaRegionRecordId = null; saveCosting(); },
                   error: (e: any) => failRow(e?.error?.message || 'Failed to clear SCOA Region')
@@ -1725,7 +1725,7 @@ export class ProjectBudgetsGridPage implements OnInit {
             return;
           }
           if (r.scoaRegionRecordId) {
-            this.http.put(`/api/ems/plan-project/plan-project-scoa-regions/${r.scoaRegionRecordId}`, {
+            this.http.put(`/budget-app/api/ems/plan-project/plan-project-scoa-regions/${r.scoaRegionRecordId}`, {
               ProjectScoaRegion_ID: r.scoaRegionRecordId,
               ProjectID: r.original.id,
               ScoaRegionID: r.scoaRegionId,
@@ -1757,7 +1757,7 @@ export class ProjectBudgetsGridPage implements OnInit {
           if (!fdChanged) { saveRegion(); return; }
           if (r.scoaFundId === null) {
             if (r.scoaFundRecordId) {
-              this.http.delete(`/api/ems/plan-project/plan-project-scoa-funds/${r.scoaFundRecordId}`)
+              this.http.delete(`/budget-app/api/ems/plan-project/plan-project-scoa-funds/${r.scoaFundRecordId}`)
                 .subscribe({
                   next: () => { r.scoaFundRecordId = null; saveRegion(); },
                   error: (e: any) => failRow(e?.error?.message || 'Failed to clear SCOA Fund')
@@ -1768,7 +1768,7 @@ export class ProjectBudgetsGridPage implements OnInit {
             return;
           }
           if (r.scoaFundRecordId) {
-            this.http.put(`/api/ems/plan-project/plan-project-scoa-funds/${r.scoaFundRecordId}`, {
+            this.http.put(`/budget-app/api/ems/plan-project/plan-project-scoa-funds/${r.scoaFundRecordId}`, {
               ProjectScoaFund_ID: r.scoaFundRecordId,
               ProjectID: r.original.id,
               ScoaFundID: r.scoaFundId,
@@ -1801,7 +1801,7 @@ export class ProjectBudgetsGridPage implements OnInit {
         // Null = clear: DELETE existing record if one exists; otherwise no-op
         if (r.scoaFunctionId === null) {
           if (r.scoaFunctionRecordId) {
-            this.http.delete(`/api/ems/plan-project/plan-projectfunctions/${r.scoaFunctionRecordId}`)
+            this.http.delete(`/budget-app/api/ems/plan-project/plan-projectfunctions/${r.scoaFunctionRecordId}`)
               .subscribe({
                 next: () => { r.scoaFunctionRecordId = null; saveFund(); },
                 error: (e: any) => failRow(e?.error?.message || 'Failed to clear SCOA Function')
@@ -1815,7 +1815,7 @@ export class ProjectBudgetsGridPage implements OnInit {
 
         // Set/update: PUT existing record or POST new one
         if (r.scoaFunctionRecordId) {
-          this.http.put(`/api/ems/plan-project/plan-projectfunctions/${r.scoaFunctionRecordId}`, {
+          this.http.put(`/budget-app/api/ems/plan-project/plan-projectfunctions/${r.scoaFunctionRecordId}`, {
             ProjectFunction_ID: r.scoaFunctionRecordId,
             ProjectID: r.original.id,
             ScoaFunctionID: r.scoaFunctionId,
