@@ -168,6 +168,59 @@ stages:
           package: 'PAYROLL-APP'
           startUpCommand: 'node src/server/index.js'   # adjust to PAYROLL-APP's real entry
 
+  # Performance API (Insight-Performance-Hub/artifacts/api-server) - a separate
+  # pnpm workspace vendored wholesale into this repo, NOT part of the outer npm
+  # monorepo. Its own package.json blocks plain `npm install` (see the
+  # "preinstall" guard) - needs pnpm via corepack. esbuild bundles everything
+  # into one self-contained dist/index.cjs, so the deploy package is just that
+  # one file - no node_modules, no Oryx build. The frontend is NOT deployed
+  # separately - as of PerformanceSync.md "Pass 3" (2026-08-26) it's native
+  # shell code (libs/ins), built by the Shell_UI job above; the standalone
+  # perf-app under Insight-Performance-Hub/artifacts/perf-app is sync-source
+  # only, not what renders in the browser.
+  - job: Performance_API
+    displayName: 'Performance → Platinum-V3-Performace-Postgres-API'
+    pool: { vmImage: $(vmImage) }
+    steps:
+      - task: NodeTool@0
+        inputs: { versionSpec: '22.x' }
+      - script: |
+          corepack enable
+          corepack prepare pnpm@10.33.4 --activate
+        displayName: 'Install pnpm via corepack (pinned v10.33.4)'
+      - script: |
+          cd Insight-Performance-Hub
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            delete pkg.scripts.preinstall;
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+            console.log('preinstall guard removed for CI');
+          "
+        displayName: 'Remove preinstall guard (CI only)'
+      - script: |
+          cd Insight-Performance-Hub
+          pnpm install --frozen-lockfile
+        displayName: 'Install pnpm workspace dependencies'
+      - script: |
+          cd Insight-Performance-Hub
+          pnpm --filter @workspace/api-server run build
+        displayName: 'Build API (esbuild → dist/index.cjs)'
+      - script: |
+          set -e
+          mkdir -p $(Build.ArtifactStagingDirectory)/performance
+          cp Insight-Performance-Hub/artifacts/api-server/dist/index.cjs $(Build.ArtifactStagingDirectory)/performance/index.cjs
+        displayName: 'Stage build output'
+      - task: AzureWebApp@1
+        displayName: 'Deploy to Platinum-V3-Performace-Postgres-API'
+        inputs:
+          azureSubscription: $(azureSubscription)
+          appType: 'webAppLinux'
+          appName: 'Platinum-V3-Performace-Postgres-API'
+          runtimeStack: 'NODE|22-lts'
+          package: '$(Build.ArtifactStagingDirectory)/performance'
+          startUpCommand: 'node index.cjs'
+
   # POS auth + receipting API (Node/TypeScript via tsx; reads EMS_V3_* + EMS_TENANT_*
   # from this app's App Settings — see runbook). The shell proxies /pos-app/api here
   # via its POS_API_URL setting.
