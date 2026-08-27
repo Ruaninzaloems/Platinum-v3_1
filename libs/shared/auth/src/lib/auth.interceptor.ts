@@ -13,7 +13,7 @@ const FIRST_PARTY_API_PREFIXES = [
   '/payroll-app/api/',
   '/afs-app/api/',
   '/budget-app/api/',
-  '/perf-app/api/',
+  '/insights-app/api/',
 ];
 
 /** Default SCM Azure backend host. Overridable via the SCM_API_URL App Setting, which
@@ -61,6 +61,16 @@ function isOvertimeTarget(url: string): boolean {
   return OVERTIME_PREFIXES.some(p => url.startsWith(p));
 }
 
+/** The Performance module's api-server — identifies the caller via a lowercase
+ *  `x-user` header (username), same bridge shape as Overtime's X-Username. Was
+ *  previously hardcoded to a demo user when perf-app ran as a separate iframed
+ *  app; now that it's native shell code, bridge the shell's real user in. */
+const PERFORMANCE_PREFIXES = ['/insights-app/api/'];
+
+function isPerformanceTarget(url: string): boolean {
+  return PERFORMANCE_PREFIXES.some(p => url.startsWith(p));
+}
+
 /** Token for the George API: a dedicated george_token if configured, else the session token. */
 function georgeToken(fallback: string | null): string | null {
   try {
@@ -100,6 +110,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   if (isOvertimeTarget(req.url)) {
     const userName = auth.user()?.userName;
     if (userName) headers['X-Username'] = userName;
+  }
+  if (isPerformanceTarget(req.url)) {
+    const userName = auth.user()?.userName;
+    if (userName) headers['x-user'] = userName;
   }
 
   const cloned = req.clone({

@@ -1099,77 +1099,57 @@ export class ShellComponent implements OnInit, OnDestroy {
     }
   ];
 
-  // Mirror of perf-app's own sidebar (a standalone Angular app, not React —
-  // Insight-Performance-Hub/artifacts/perf-app/src/app/layout/sidebar/sidebar.component.ts).
-  // Order, labels and routes match exactly so the iframe loads the matching page for every link.
-  // As of 2026-08-26 (PerformanceSync.md Pass 2) this nav is in sync with the vendored perf-app
-  // copy, including "Revised SDBIP" — re-check this comment if the two ever drift again.
+  // As of 2026-08-26 (PerformanceSync.md Pass 4), this is a byte-for-byte mirror of
+  // perf-app's own real, current sidebar
+  // (Insight-Performance-Hub/artifacts/perf-app/src/app/layout/sidebar/sidebar.component.ts's
+  // `NAV` array) -- confirmed against BOTH the local standalone source AND the live
+  // deployed production site (platinum-performance-ui.azurewebsites.net), which are
+  // in agreement. Earlier passes had accumulated a much more elaborate, partly
+  // aspirational nav (Individual, Moderation, AI Insights, Integrations, Audit Trail,
+  // an "Approve SDBIP" link, a 13-item Configuration submenu, etc.) that never existed
+  // in perf-app's real sidebar at all -- those routes/components still exist in
+  // libs/ins (harmless, just unlinked), but showing them in nav was itself the bug the
+  // user reported ("a lot of things missing" -- really a lot of things *extra* that
+  // didn't match the real product). Re-verify against sidebar.component.ts's `NAV`
+  // constant directly if this ever needs to change again, not against libs/ins/routes.ts
+  // alone -- a route existing there does not mean the real product links to it.
   insightsNav: InsightsNavEntry[] = [
     { kind: 'link', label: 'Dashboard', icon: 'dashboard', route: '/dashboard' },
-    { kind: 'group', title: 'Original SDBIP', icon: 'business', items: [
-      { label: 'Capture SDBIP', icon: 'fact_check', route: '/org-planning/scorecards' },
-      { label: 'Review SDBIP', icon: 'find_in_page', route: '/org-planning/review-sdbip' },
-      { label: 'Approve SDBIP', icon: 'verified_user', route: '/org-planning/approve-sdbip' },
-      { label: 'Targets & Activities', icon: 'calendar_month', route: '/org-planning/quarterly-targets' },
-      { label: 'SDBIP Overview', icon: 'flag', route: '/sdbip/overview' },
+    { kind: 'group', title: 'SDBIP', icon: 'apartment', items: [
+      { label: 'Compile', icon: 'task_alt', route: '/org-planning/scorecards' },
+      { label: 'Review', icon: 'find_in_page', route: '/org-planning/review-sdbip' },
     ]},
     { kind: 'group', title: 'Revised SDBIP', icon: 'autorenew', items: [
-      { label: 'Revise SDBIP', icon: 'fact_check', route: '/revised-sdbip/capture' },
-      { label: 'Review Revised SDBIP', icon: 'find_in_page', route: '/revised-sdbip/review' },
-      { label: 'Approve Revised SDBIP', icon: 'verified_user', route: '/revised-sdbip/approve' },
+      { label: 'Compile', icon: 'task_alt', route: '/revised-sdbip/capture' },
+      { label: 'Review', icon: 'find_in_page', route: '/revised-sdbip/review' },
     ]},
-    { kind: 'group', title: 'Departmental', icon: 'groups', items: [
-      { label: 'Dept Scorecards', icon: 'fact_check', route: '/departmental/scorecards' },
-      { label: 'KPI Assignments', icon: 'flag', route: '/departmental/kpi-assignments' },
+    { kind: 'group', title: 'Departmental SDBIP', icon: 'groups', items: [
+      { label: 'Compile', icon: 'task_alt', route: '/departmental/scorecards' },
+      { label: 'Review', icon: 'find_in_page', route: '/departmental/review' },
     ]},
-    { kind: 'group', title: 'Individual', icon: 'how_to_reg', items: [
-      { label: 'My Performance', icon: 'trending_up', route: '/individual/my-performance' },
-      { label: 'Agreements', icon: 'description', route: '/individual/agreements' },
-      { label: 'Reviewer Config', icon: 'how_to_reg', route: '/individual/reviewers' },
-      { label: 'Competencies', icon: 'menu_book', route: '/individual/competencies' },
-      { label: 'Assessments', icon: 'fact_check', route: '/individual/assessments' },
+    { kind: 'group', title: 'Quarterly Actuals', icon: 'fact_check', items: [
+      { label: 'Capture', icon: 'description', route: '/actuals/submit' },
+      { label: 'Manager Review', icon: 'manage_accounts', route: '/actuals/review-line-manager' },
+      { label: 'PMS Review', icon: 'manage_accounts', route: '/actuals/review-pms-manager' },
+      { label: 'Internal Audit', icon: 'verified', route: '/actuals/review-internal-audit' },
     ]},
-    { kind: 'group', title: 'Actuals & Evidence', icon: 'fact_check', items: [
-      { label: 'Submit Actuals', icon: 'description', route: '/actuals/submit' },
-      { label: 'Review - Line Manager', icon: 'how_to_reg', route: '/actuals/review-line-manager' },
-      { label: 'Review - Director', icon: 'how_to_reg', route: '/actuals/review-director' },
-      { label: 'Review - PMS Manager', icon: 'how_to_reg', route: '/actuals/review-pms-manager' },
-      { label: 'Review - PMS Director', icon: 'how_to_reg', route: '/actuals/review-pms-director' },
-      { label: 'Review - Internal Audit', icon: 'verified_user', route: '/actuals/review-internal-audit' },
-      { label: 'Corrective Actions', icon: 'report_problem', route: '/actuals/corrective-actions' },
+    { kind: 'group', title: 'Mid-Year', icon: 'event_note', items: [
+      { label: 'Capture', icon: 'description', route: '/mid-year/capture' },
+      { label: 'Manager Review', icon: 'manage_accounts', route: '/mid-year/manager-review' },
+      { label: 'PMS Review', icon: 'manage_accounts', route: '/mid-year/pms-review' },
+      { label: 'Internal Audit', icon: 'verified', route: '/mid-year/internal-audit' },
     ]},
-    { kind: 'group', title: 'Moderation', icon: 'balance', items: [
-      { label: 'Review Queue', icon: 'playlist_add_check', route: '/moderation/queue' },
-      { label: 'Moderation Panel', icon: 'balance', route: '/moderation/panel' },
+    { kind: 'group', title: 'Annual', icon: 'calendar_month', items: [
+      { label: 'Capture', icon: 'description', route: '/annual/capture' },
+      { label: 'Manager Review', icon: 'manage_accounts', route: '/annual/manager-review' },
+      { label: 'PMS Review', icon: 'manage_accounts', route: '/annual/pms-review' },
+      { label: 'Internal Audit', icon: 'verified', route: '/annual/internal-audit' },
     ]},
-    { kind: 'group', title: 'Reports', icon: 'menu_book', items: [
-      { label: 'Report Centre', icon: 'description', route: '/reports/centre' },
-      { label: 'Standard Reports', icon: 'description', route: '/reports/standard' },
-      { label: 'Custom Reports', icon: 'bar_chart', route: '/reports/custom' },
-    ]},
-    { kind: 'link', label: 'AI Insights', icon: 'psychology', route: '/ai-insights' },
-    { kind: 'link', label: 'Integrations', icon: 'hub', route: '/integrations' },
-    { kind: 'link', label: 'Audit Trail', icon: 'shield', route: '/audit-trail' },
-    { kind: 'group', title: 'Configuration', icon: 'settings', items: [
-      { label: 'Performance Cycles', icon: 'calendar_month', route: '/config/cycles' },
-      { label: 'KPI Groups', icon: 'category', route: '/config/kpi-groups' },
-      { label: 'Units of Measure', icon: 'straighten', route: '/config/units' },
-      { label: 'Data Types', icon: 'data_object', route: '/config/data-types' },
-      { label: 'Progress Statuses', icon: 'pending', route: '/config/statuses' },
-      { label: 'Scorecard Types', icon: 'view_list', route: '/config/scorecard-types' },
-      { label: 'NKPA Weightings', icon: 'pie_chart', route: '/weightings/nkpa' },
-      { label: 'Competencies', icon: 'groups', route: '/weightings/competencies' },
-      { label: 'Submission Deadlines', icon: 'event_note', route: '/deadlines/submissions' },
-      { label: 'Report Fields', icon: 'event_busy', route: '/deadlines/report-fields' },
-      { label: 'Notification Centre', icon: 'mail_outline', route: '/notifications' },
-      { label: 'Notification Settings', icon: 'tune', route: '/notifications/config' },
-      { label: 'Indicator Technical Descriptions', icon: 'find_in_page', route: '/config/indicator-descriptions' },
-    ]},
-    { kind: 'group', title: 'Admin', icon: 'admin_panel_settings', items: [
-      { label: 'User Management', icon: 'manage_accounts', route: '/admin/users' },
-      { label: 'Role Permissions', icon: 'shield', route: '/admin/roles' },
-      { label: 'Workflow Config', icon: 'account_tree', route: '/admin/workflows' },
-    ]},
+    { kind: 'link', label: 'Reports', icon: 'menu_book', route: '/reports/centre' },
+    { kind: 'link', label: 'Bulk Upload', icon: 'upload_file', route: '/bulk-upload' },
+    { kind: 'link', label: 'Departments', icon: 'domain', route: '/admin/departments' },
+    { kind: 'link', label: 'Employees', icon: 'group', route: '/admin/users' },
+    { kind: 'link', label: 'Configuration', icon: 'settings', route: '/config' },
   ];
 
   budgetNavGroups: BudgetNavGroup[] = [

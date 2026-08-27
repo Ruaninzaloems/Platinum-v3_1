@@ -15,6 +15,18 @@ html, body {
   overflow: hidden;
 }
 
+/* Ported from Insight-Performance-Hub/artifacts/perf-app/src/styles.scss -- the
+   Performance module's dashboard components use this raw ligature-font class
+   directly (not Angular Material's <mat-icon>), so it must be defined globally
+   for the icon text (e.g. "bar_chart") to render as a glyph instead of literal text. */
+.material-symbols-rounded {
+  font-family: 'Material Symbols Rounded';
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+  font-size: 18px;
+  line-height: 1;
+  vertical-align: middle;
+}
+
 :root {
   --primary: #1a237e;
   --primary-light: #283593;

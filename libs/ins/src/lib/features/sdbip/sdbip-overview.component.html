@@ -1,0 +1,91 @@
+<section class="plat-page">
+  <app-page-header
+    title="SDBIP Management"
+    subtitle="Service Delivery and Budget Implementation Plan">
+  </app-page-header>
+
+  <div class="toolbar">
+    <mat-form-field appearance="outline" class="cycle-picker" *ngIf="cycles().length > 0">
+      <mat-label>Cycle</mat-label>
+      <mat-select [value]="effectiveCycleId()" (selectionChange)="selectCycle($event.value)">
+        <mat-option *ngFor="let c of cycles()" [value]="c.id">{{ c.financialYearLabel }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <span class="spacer"></span>
+    <button mat-flat-button color="primary" (click)="openNew()" [disabled]="!effectiveCycleId()">
+      <mat-icon>add</mat-icon> Add Item
+    </button>
+  </div>
+
+  <app-loading-spinner *ngIf="loading()"></app-loading-spinner>
+
+  <ng-container *ngIf="!loading()">
+    <!-- Generate-from-scorecards panel -->
+    <div *ngIf="scorecards().length > 0" class="plat-card gen-panel">
+      <p class="gen-label">Generate SDBIP from approved scorecards:</p>
+      <div class="gen-btns" *ngIf="approvedScorecards().length > 0; else noApproved">
+        <button mat-stroked-button color="primary" *ngFor="let sc of approvedScorecards(); trackBy: trackById"
+                (click)="generateFromScorecard(sc.id)">
+          <mat-icon>bolt</mat-icon> {{ sc.name }}
+        </button>
+      </div>
+      <ng-template #noApproved>
+        <p class="gen-empty">No approved scorecards yet</p>
+      </ng-template>
+    </div>
+
+    <!-- Status count cards -->
+    <div class="stats-grid">
+      <div class="plat-card stat" *ngFor="let s of statusCards">
+        <div class="stat-value">{{ countByStatus(s.key) }}</div>
+        <div class="stat-label">{{ s.label }}</div>
+      </div>
+    </div>
+
+    <!-- Item list -->
+    <div class="items">
+      <div *ngFor="let item of items(); trackBy: trackById" class="plat-card item">
+        <div class="item-row">
+          <div class="item-main">
+            <div class="badges">
+              <app-status-badge [status]="item.status"></app-status-badge>
+              <span class="kpi-badge" *ngIf="item.kpiId">KPI #{{ item.kpiId }}</span>
+            </div>
+            <p class="desc">{{ item.description }}</p>
+            <div class="targets">
+              <span>Q1: {{ item.q1Target || '—' }}</span>
+              <span>Q2: {{ item.q2Target || '—' }}</span>
+              <span>Q3: {{ item.q3Target || '—' }}</span>
+              <span>Q4: {{ item.q4Target || '—' }}</span>
+            </div>
+          </div>
+          <div class="item-actions">
+            <ng-container [ngSwitch]="item.status">
+              <ng-container *ngSwitchCase="'Draft'">
+                <button mat-button (click)="openEdit(item)">Edit</button>
+                <button mat-button (click)="transition(item, 'submit')">Submit</button>
+              </ng-container>
+              <button mat-button *ngSwitchCase="'Submitted'" (click)="transition(item, 'review')">Review</button>
+              <button mat-button *ngSwitchCase="'Internal Review'" (click)="transition(item, 'approve_baseline')">Approve</button>
+              <ng-container *ngSwitchCase="'Approved Baseline'">
+                <button mat-button (click)="transition(item, 'monitor')">Monitor</button>
+                <button mat-button (click)="openRevise(item)">Revise</button>
+              </ng-container>
+              <button mat-button *ngSwitchCase="'In-Year Monitoring'" (click)="openRevise(item)">Revise</button>
+              <button mat-button *ngSwitchCase="'Adjustment'" (click)="transition(item, 'approve_revision')">Approve Revision</button>
+            </ng-container>
+            <button mat-icon-button (click)="openRevisions(item)" matTooltip="Revision history" aria-label="Revision history">
+              <mat-icon>history</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <app-empty-state *ngIf="items().length === 0"
+                       icon="assignment"
+                       title="No SDBIP items yet"
+                       message="Create items manually or generate from approved scorecards">
+      </app-empty-state>
+    </div>
+  </ng-container>
+</section>

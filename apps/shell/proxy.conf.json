@@ -65,12 +65,5 @@
     "secure": true,
     "changeOrigin": true,
     "pathRewrite": { "^/george-app/api": "/api" }
-  },
-  "/perf-app": {
-    "target": "http://localhost:18156",
-    "secure": false,
-    "changeOrigin": true,
-    "ws": true,
-    "logLevel": "warn"
   }
 }
