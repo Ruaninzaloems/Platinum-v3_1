@@ -664,15 +664,18 @@ export class ShellComponent implements OnInit, OnDestroy {
     return ((u.firstName?.[0] || '') + (u.lastName?.[0] || '')).toUpperCase() || 'U';
   });
 
-  // POS, Performance and SharePoint chips are still in active development, so show
-  // them only when running locally (ng serve → isDevMode() === true) and hide them
-  // on the deployed production build (ng build → isDevMode() === false).
+  // POS and SharePoint chips are still in active development, so show them only
+  // when running locally (ng serve → isDevMode() === true) and hide them on the
+  // deployed production build (ng build → isDevMode() === false). Performance
+  // (insights) came off this list on 2026-08-27 - Pass 4 verified it renders real
+  // production data end-to-end (dashboard, FIN YEAR, nav matching the live site),
+  // so it's no longer dev-only.
   private readonly _isDev = isDevMode();
   showDevModules(): boolean { return this._isDev; }
 
-  // POS, Performance and SharePoint are still in active development — hidden on
-  // production builds regardless of access grants.
-  private readonly _devOnlyModules = new Set<string>(['pos', 'insights', 'sharepoint']);
+  // POS and SharePoint are still in active development — hidden on production
+  // builds regardless of access grants.
+  private readonly _devOnlyModules = new Set<string>(['pos', 'sharepoint']);
 
   /**
    * Whether a module chip should render: the user must have access to the
