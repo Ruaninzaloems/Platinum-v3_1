@@ -2,3 +2,27 @@
 // styling audit) - this establishes the same --platinum-* token foundation
 // every other module now uses. See libs/shared/styles/src/lib/_tokens.scss.
 @import '../../../shared/styles/src/lib/tokens';
+
+// The native port (PerformanceSync.md Pass 3) copied ~85 feature files out of
+// perf-app's features/ tree, but never ported perf-app's own src/styles.scss
+// (correctly - that file is app-bootstrap chrome, not feature code, same
+// reasoning as its login/layout/interceptor). That file is where every
+// --plat-* custom property (--plat-border, --plat-muted, --plat-surface,
+// --plat-shadow-sm/md, --plat-navy, --plat-blue, --plat-blue-100) was
+// defined. 30 ported feature files reference them across 125 call sites, and
+// most have no CSS fallback, so borders/shadows/muted text/surfaces across
+// Performance's cards, tables and dialogs have been silently invisible/unset
+// since the port. Restoring the original values here (verbatim from
+// Insight-Performance-Hub/artifacts/perf-app/src/styles.scss) is a pure bug
+// fix, not a design change - it makes these components render the way they
+// were actually authored to look.
+:root {
+  --plat-navy: #1F3A5B;
+  --plat-blue: #2563eb;
+  --plat-blue-100: #e0e7ff;
+  --plat-surface: #ffffff;
+  --plat-border: #cbd5e1;
+  --plat-muted: #64748b;
+  --plat-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --plat-shadow-md: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
