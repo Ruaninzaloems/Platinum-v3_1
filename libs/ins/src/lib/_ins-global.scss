@@ -1,0 +1,4 @@
+// Performance (ins) had no shared global stylesheet at all (see the module-
+// styling audit) - this establishes the same --platinum-* token foundation
+// every other module now uses. See libs/shared/styles/src/lib/_tokens.scss.
+@import '../../../shared/styles/src/lib/tokens';
