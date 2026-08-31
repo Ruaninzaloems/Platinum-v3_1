@@ -194,9 +194,9 @@ const MODULES: ModuleDef[] = [
     ]
   },
   {
-    key: 'insights', label: 'Performance', icon: 'insights', color: '#0f766e', bg: '#f0fdfa',
+    key: 'insights', label: 'Performance', icon: 'trending_up', color: '#0f766e', bg: '#f0fdfa',
     fields: [
-      { label: 'Insights API URL', icon: 'insights', iconColor: '#0f766e', prop: 'insightsApiUrl', hint: 'Performance & Insights API endpoint' }
+      { label: 'Insights API URL', icon: 'trending_up', iconColor: '#0f766e', prop: 'insightsApiUrl', hint: 'Performance & Insights API endpoint' }
     ]
   },
   {

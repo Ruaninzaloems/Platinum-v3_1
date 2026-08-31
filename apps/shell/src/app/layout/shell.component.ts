@@ -115,7 +115,7 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
               }
               @if (canShowModule('insights')) {
                 <button class="module-chip" [class.active]="activeModule() === 'insights'" (click)="setModule('insights')">
-                  <mat-icon class="chip-icon">insights</mat-icon><span>Performance</span>
+                  <mat-icon class="chip-icon">trending_up</mat-icon><span>Performance</span>
                 </button>
               }
               @if (canShowModule('budget')) {
@@ -444,7 +444,7 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
                   <mat-icon class="nav-icon">summarize</mat-icon><span>AFS</span>
                 </a>
                 <a class="nav-link sub-item" routerLink="/admin-settings/insights" routerLinkActive="active-link">
-                  <mat-icon class="nav-icon">insights</mat-icon><span>Performance</span>
+                  <mat-icon class="nav-icon">trending_up</mat-icon><span>Performance</span>
                 </a>
                 <a class="nav-link sub-item" routerLink="/admin-settings/overtime" routerLinkActive="active-link">
                   <mat-icon class="nav-icon">more_time</mat-icon><span>Overtime</span>
@@ -1249,7 +1249,7 @@ export class ShellComponent implements OnInit, OnDestroy {
       items: [
         { label: 'Validation', icon: 'verified', route: '/validation' },
         { label: 'Reports', icon: 'description', route: '/reports' },
-        { label: 'Analytics', icon: 'insights', route: '/analytics' }
+        { label: 'Analytics', icon: 'trending_up', route: '/analytics' }
       ]
     }
   ];

@@ -121,11 +121,17 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     setHeaders: headers,
   });
 
+  const performance = isPerformanceTarget(req.url);
+  const overtime = isOvertimeTarget(req.url);
+
   return next(cloned).pipe(
     catchError((err: HttpErrorResponse) => {
-      // A 401 from the SCM or George backend just means THEIR token is missing/invalid — it must
-      // NOT tear down the app session (that's POS-API's domain) or bounce the user to /login.
-      if (err.status === 401 && !req.url.includes('/auth/') && !george && !scm) {
+      // A 401 from SCM, George, Performance or Overtime just means THEIR own bridged-identity
+      // token/header is missing or unrecognised — those backends have no concept of the shell's
+      // session, so a 401 from them must NOT tear down the app session (that's POS-API's domain)
+      // or bounce the user to /login. Without this, clicking into Performance while its backend
+      // rejects the bridged x-user header force-logs-out the entire shell.
+      if (err.status === 401 && !req.url.includes('/auth/') && !george && !scm && !performance && !overtime) {
         // Soft teardown: don't persist the logged-out flag, so an expected upstream 401 doesn't
         // permanently suppress the auto-admin session on the next reload.
         auth.logout(false).catch(() => router.navigate(['/login']));
