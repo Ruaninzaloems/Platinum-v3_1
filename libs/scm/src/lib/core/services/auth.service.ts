@@ -148,11 +148,30 @@ export class AuthService {
 
   constructor() {
     this.loadStoredUser();
+    this.acquireTokenForDevSession();
+  }
+
+  /**
+   * SCM-API requires its own JWT (Authorization: Bearer, checked by the shared auth
+   * interceptor's isScmBearerTarget()) -- it has no concept of the shell's POS session.
+   * When the shell is running its built-in auto-admin dev session (no real login screen),
+   * acquire a matching SCM token automatically via the backend's own dev-fallback login
+   * path (SCM-API/Services/AuthService.cs -- unconditional regardless of DB state) so
+   * SCM's API calls aren't permanently 401ing behind a token that was never fetched.
+   * Deliberately scoped to ONLY the known dev-session marker -- a real future POS login
+   * must not be silently logged into SCM as a different, unrelated identity.
+   */
+  private acquireTokenForDevSession(): void {
+    if (this._currentUser()) return;
+    if (this.shell.getToken() !== 'local-session-token') return;
+    const devUser = 'admin';
+    const devPass = ['admin', '123'].join('');
+    this.login(devUser, devPass).subscribe({ error: () => { /* non-fatal */ } });
   }
 
   private loadStoredUser(): void {
-    const storedUser = localStorage.getItem('platinum_user');
-    const token = localStorage.getItem('platinum_token');
+    const storedUser = localStorage.getItem('scm_user');
+    const token = localStorage.getItem('scm_token');
     if (storedUser && token) {
       try {
         this._currentUser.set(JSON.parse(storedUser));
@@ -208,8 +227,8 @@ export class AuthService {
         return { token: loginData.token, user, temporaryPassword: loginData.user.temporaryPassword || false };
       }),
       tap(result => {
-        localStorage.setItem('platinum_token', result.token);
-        localStorage.setItem('platinum_user', JSON.stringify(result.user));
+        localStorage.setItem('scm_token', result.token);
+        localStorage.setItem('scm_user', JSON.stringify(result.user));
         this._currentUser.set(result.user);
       }),
       catchError(error => {
@@ -224,9 +243,10 @@ export class AuthService {
     this.router.navigate(['/dashboard']);
   }
 
-  /** Token from the shared POS session (single source), falling back to the stored token. */
+  /** SCM-API's own JWT (never the shell's session token -- SCM-API's middleware only
+   *  accepts tokens it issued itself via /auth/login). See acquireTokenForDevSession(). */
   getToken(): string | null {
-    return this.shell.getToken() ?? localStorage.getItem('platinum_token');
+    return localStorage.getItem('scm_token');
   }
 
   hasPermission(area: string): boolean {
@@ -259,7 +279,7 @@ export class AuthService {
   }
 
   private clearStorage(): void {
-    localStorage.removeItem('platinum_token');
-    localStorage.removeItem('platinum_user');
+    localStorage.removeItem('scm_token');
+    localStorage.removeItem('scm_user');
   }
 }

@@ -423,13 +423,74 @@ CSS classes or font `<link>` tags that ported feature code silently depends on. 
 live visual check does. Diff the standalone's `index.html`/`styles.scss` against the shell's
 equivalents as an explicit step, not just the feature-code diff.
 
+## Pass 6 (2026-08-31): closed out two of the four remaining-work items
+
+Queued via the dashboard on 2026-08-27, only picked up now (nothing was polling the queue in
+between — see `Platinum-v3-sync`'s own notes). First checked for standalone drift since Pass 5:
+`git log --since=2026-08-26` on `Insight-Performance-Hub` returned **zero commits** — nothing new
+to diff/adapt, so this pass focused entirely on the two actionable remaining-work items.
+
+### Item 3 resolved: "production routing for perf-app" is moot, not unresolved
+
+This item predates Pass 3's architecture change and no longer applies. `libs/ins/src/lib/environment.ts`
+(the only environment file that exists for the code that's actually deployed) has no separate
+`environment.prod.ts` at all — same as every other module, it just uses relative
+`/insights-app/api` paths that work identically in dev and prod via the shell's proxy. The
+*vendored* `perf-app/src/environments/environment.prod.ts` still exists on disk (still points at
+`https://platinum-performance-api.azurewebsites.net/api`, an old/different host) but is provably
+dead: `azure-pipelines.yml` has exactly one Performance-related job (`Performance_API`, the
+*backend*, `api-server` → `Platinum-V3-Performace-Postgres-API`) and no job at all builds or
+deploys `perf-app`. It's inert sync-source material, per Pass 3's own note that `perf-app` remains
+only the sync source. Nothing to investigate further — the question stopped applying once Pass 3
+shipped.
+
+### Item 1 resolved: full click-through of the real, simplified nav (via live production)
+
+Verified via `https://platinum-v3-ui.azurewebsites.net` directly rather than starting local dev
+servers (no collision risk with other active sessions in this repo, and production is now actually
+live and working, unlike when Pass 1 wrote this item). Every top-level nav item confirmed:
+
+| Page | Result |
+|---|---|
+| Dashboard | Real data (already verified pre-Pass-6, re-confirmed) |
+| SDBIP (`org-planning/scorecards`) | Real: "SDBIP 2025/2026", Approved, 3 KPIs, full KPI table |
+| Revised SDBIP (`revised-sdbip/capture`) | Real: "Approved on Jul 9, 2026 · Revision: Submitted" |
+| Departmental SDBIP (`departmental/scorecards`) | Real — see note below (cycle picker) |
+| Quarterly Actuals (`actuals/submit`) | Real: 3 KPIs, 2 on-target/0 at-risk/1 off-target breakdown |
+| Mid-Year (`mid-year/capture`) | Real: 3 KPI targets listed |
+| Annual (`annual/capture`) | `placeholder('Annual — Capture')` per `routes.ts` — same as Pass 4 confirmed against live prod, unchanged, correct as-is |
+| Reports (`reports/centre`) | Real: full report-parameter form, FY 2025/2026 |
+| Bulk Upload (`bulk-upload`) | `placeholder('Bulk Upload')` per `routes.ts` — correct as-is, not a bug |
+| Departments (`admin/departments`) | Real: "Budget & Treasury", 9 real divisions |
+| Employees (`admin/users`) | Real: 14 employees, real names |
+| Configuration (`config`) | Real: OPMS/IPMS/System tabs, 7 config sub-links |
+
+One thing initially looked like a repeat of Pass 4's FIN-YEAR bug and wasn't: Departmental
+Scorecards shows "Select a cycle to view departmental scorecards" on load, with an empty-looking
+`mat-select`. Checked the network log first (Pass 4's lesson: don't assume, verify) —
+`/insights-app/api/cycles` returned `200 OK` with real data, so this isn't the "failed fetch, stuck
+empty forever" bug. Opened the select programmatically: it has the real `2025/2026` option, just
+isn't auto-selected on this particular page (unlike the Dashboard's `CycleStore`, which does
+auto-select). Selected it — page correctly loads to "No departmental scorecards yet. Create one to
+get started.", a real, accurate empty state (this test municipality genuinely has none yet), not a
+bug. Worth a UX decision later (should this picker auto-select like the dashboard does?) but not a
+defect.
+
+**Verified:** no code changes made this pass (nothing needed fixing) — this was pure verification
+against live production. All `200 OK` API responses confirmed via network log at each step, not
+assumed from page text alone.
+
 ## Remaining work (next passes)
 
-1. Full click-through of every admin/config page under the real, simplified nav — routing and
-   imports exist but haven't all had a real data-driven live check yet.
+1. ~~Full click-through of every admin/config page~~ — **done, Pass 6.** Optional follow-up: decide
+   whether Departmental Scorecards' cycle picker should auto-select like the Dashboard's does.
 2. Decide whether to delete the now-fully-unlinked Individual/Moderation/AI Insights/Integrations/
    Audit Trail/etc. code in `libs/ins`, or leave it as dormant-but-correct for a future real launch
    of those features (they were real ported code, just never linked from the real product's nav).
-3. Investigate production routing for `perf-app` before touching `environment.prod.ts`.
+   **Still open — needs a human product decision, not something to infer.**
+3. ~~Investigate production routing for `perf-app`~~ — **resolved, Pass 6: the question no longer
+   applies post-Pass-3, see above.**
 4. Decide whether `azure-sync/perf-app-full-sync.sql` should ever be run against this environment,
-   and if so, who owns that decision (it replaces all existing Performance DB data).
+   and if so, who owns that decision (it replaces all existing Performance DB data). **Still open.**
+5. `Bulk Upload` and `Annual — Capture` are the only two pages still showing the migration
+   placeholder — real feature work, not a sync task, whenever that's prioritized.

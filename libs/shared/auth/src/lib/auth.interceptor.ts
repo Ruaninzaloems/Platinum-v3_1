@@ -81,6 +81,18 @@ function georgeToken(fallback: string | null): string | null {
 }
 
 /**
+ * Token for the SCM Azure backend: the dedicated scm_token acquired via SCM-API's own
+ * /auth/login (see @platinumv3/scm's AuthService.acquireTokenForDevSession) -- never the
+ * shell's own session token, which SCM-API's JWT middleware will always reject (it's not
+ * a token SCM-API issued). Mirrors georgeToken()'s dedicated-key-first pattern exactly.
+ */
+function scmToken(): string | null {
+  try {
+    return localStorage.getItem('scm_token');
+  } catch { return null; }
+}
+
+/**
  * Auth interceptor with explicit scoping:
  *  - withCredentials: true ONLY for first-party API calls (so the POS-API
  *    session cookie travels with same-origin requests through the shell
@@ -99,7 +111,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const headers: Record<string, string> = {};
   const scm = isScmBearerTarget(req.url);
   if (scm) {
-    const token = auth.getToken();
+    const token = scmToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
   const george = isGeorgeTarget(req.url);

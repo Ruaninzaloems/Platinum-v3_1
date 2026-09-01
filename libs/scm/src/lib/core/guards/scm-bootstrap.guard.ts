@@ -17,11 +17,11 @@ function isJwt(token: string | null): boolean {
 export const scmBootstrapGuard: CanActivateFn = () => {
   const authService = inject(AuthService);
   const router = inject(Router);
-  const token = localStorage.getItem('platinum_token');
+  const token = localStorage.getItem('scm_token');
 
   if (hasToken(token)) {
     if (!isJwt(token)) {
-      const storedUser = localStorage.getItem('platinum_user');
+      const storedUser = localStorage.getItem('scm_user');
       if (storedUser) {
         try {
           const user = JSON.parse(storedUser);
@@ -40,7 +40,7 @@ export const scmBootstrapGuard: CanActivateFn = () => {
       authService.login('admin', 'admin123').subscribe({
         next: () => {
           bootstrapInFlight = null;
-          const t = localStorage.getItem('platinum_token');
+          const t = localStorage.getItem('scm_token');
           resolve(hasToken(t));
         },
         error: () => {
