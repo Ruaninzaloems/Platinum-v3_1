@@ -47,9 +47,9 @@ console.log(`[shell] Serving Angular SPA from: ${browserDir}`);
 // Runtime config exposed to the browser SPA as window.__PLATINUM_ENV__ (injected into index.html
 // below). Lets App Settings drive front-end config that isn't served through the shell proxy —
 // notably the SCM module, which calls its Azure backend host directly.
-//   SCM_API_URL   e.g. https://rep-scm-api.azurewebsites.net   (overridable per environment)
+//   SCM_API_URL   e.g. https://platinum-scm-api.azurewebsites.net   (overridable per environment)
 const RUNTIME_ENV = {
-  SCM_API_URL: (process.env.SCM_API_URL || 'https://rep-scm-api.azurewebsites.net').trim().replace(/\/+$/, ''),
+  SCM_API_URL: (process.env.SCM_API_URL || 'https://platinum-scm-api.azurewebsites.net').trim().replace(/\/+$/, ''),
 };
 console.log(`[shell] Runtime env → SCM_API_URL=${RUNTIME_ENV.SCM_API_URL}`);
 

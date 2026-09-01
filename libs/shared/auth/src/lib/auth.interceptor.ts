@@ -18,8 +18,12 @@ const FIRST_PARTY_API_PREFIXES = [
 
 /** Default SCM Azure backend host. Overridable via the SCM_API_URL App Setting, which
  *  server.js injects as window.__PLATINUM_ENV__.SCM_API_URL (so the host can be changed
- *  on the web app without a code change). */
-const SCM_DEFAULT_URL = 'https://rep-scm-api.azurewebsites.net';
+ *  on the web app without a code change). Only used when that setting is absent, i.e.
+ *  local `ng serve` (server.js isn't in the loop there) -- must point at the same host
+ *  production actually uses (platinum-scm-api), not a stale/different deployment;
+ *  confirmed 2026-09-01 that rep-scm-api rejects the shared dev-fallback credentials
+ *  that platinum-scm-api accepts, so local dev was pointed at the wrong backend. */
+const SCM_DEFAULT_URL = 'https://platinum-scm-api.azurewebsites.net';
 
 /** The configured SCM backend host (from the injected runtime env, else the default). */
 function scmHost(): string {

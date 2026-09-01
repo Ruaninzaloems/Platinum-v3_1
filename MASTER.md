@@ -375,7 +375,7 @@ The monorepo deploys to a set of Azure App Services. Frontend is one web app; ea
 | Overtime | `Platinum-V3-Overtime-Postgres-API` | ✅ | `platinum-overtime-api.azurewebsites.net` |
 | Payroll | `Platinum-V3-Payroll-Postgres-API` | ✅ | `platinum-payroll-api.azurewebsites.net` |
 | Assets | _(referenced / deployed separately)_ | — | `platinum-assets-api.azurewebsites.net` |
-| SCM | _(external backend, own JWT)_ | — | `rep-scm-api.azurewebsites.net` |
+| SCM | _(external backend, own JWT)_ | — | `platinum-scm-api.azurewebsites.net` |
 | Insights | _(referenced / deployed separately)_ | — | `platinum-insights-api.azurewebsites.net` |
 
 ### App Settings by web app
@@ -385,7 +385,7 @@ The monorepo deploys to a set of Azure App Services. Frontend is one web app; ea
 | Setting | Purpose |
 |---|---|
 | `ASSETS_API_URL`, `POS_API_URL`, `AFS_API_URL`, `PAYROLL_API_URL`, `IDP_API_URL`, `BUDGET_API_URL`, `SCM_API_URL`, `INSIGHTS_API_URL`, `OVERTIME_API_URL` | Per-module proxy targets |
-| `SCM_API_URL` | **Also injected to the browser** as `window.__PLATINUM_ENV__.SCM_API_URL`; the SCM module + auth interceptor read it (default `https://rep-scm-api.azurewebsites.net`). Lets the SCM host be changed without a redeploy. |
+| `SCM_API_URL` | **Also injected to the browser** as `window.__PLATINUM_ENV__.SCM_API_URL`; the SCM module + auth interceptor read it (default `https://platinum-scm-api.azurewebsites.net`, only used when this setting is absent — i.e. local `ng serve`). Lets the SCM host be changed without a redeploy. |
 
 **`Platinum-V3-POS-API`** — reads `process.env` directly (no dotenv); see §11 for profiles:
 
@@ -506,8 +506,18 @@ readonly displayName = computed(() => {
 getToken() { return this.shell.getToken(); }
 ```
 
-> **SCM caveat:** SCM uses `rep-scm-api` with its own JWT; the app session token is not valid there, so SCM
-> *data* still needs a valid SCM token/bootstrap even though the nav no longer logs you out.
+> **SCM caveat (fixed 2026-09-01):** SCM uses `platinum-scm-api` with its own JWT; the app session token is
+> never valid there. This used to mean SCM data 401'd even though the nav no longer bounced you to login —
+> two bugs combined: (1) the SCM token was stored under the same `platinum_token` key the shell's own
+> session uses (a real login would have silently overwritten the shared session), and (2) the interceptor
+> read `auth.getToken()` (the shell's token) instead of the dedicated SCM one. Fixed by giving SCM its own
+> `scm_token` key (mirrors `george_token`'s pattern exactly) and pointing the interceptor at it; the SCM
+> `AuthService` constructor now also auto-acquires a token via the backend's dev-fallback login when running
+> the built-in auto-admin session (scoped strictly to that marker, not real logins). A real login's
+> `bridgeScmAuth()` (`login.component.ts`) was fixed the same way. Separately, the local-dev fallback host
+> (`SCM_API_URL` default, used only when `ng serve` has no `server.js` to inject the real one) was pointed at
+> a stale `rep-scm-api` deployment that doesn't accept the shared dev-fallback credentials — corrected to
+> `platinum-scm-api` (the same host production actually uses) in all four places it was hardcoded.
 > **Boundary:** this unifies the **frontend** identity/token; each module **backend** still validates its own
 > auth (full backend token-trust / SSO is a separate, not-yet-done change).
 

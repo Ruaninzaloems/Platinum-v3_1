@@ -374,14 +374,21 @@ export class LoginComponent implements OnInit {
   private bridgeScmAuth(username: string, password: string): void {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 4000);
-    fetch('https://rep-scm-api.azurewebsites.net/api/auth/login', {
+    const scmApiUrl =
+      (typeof globalThis !== 'undefined' && (globalThis as any).__PLATINUM_ENV__?.SCM_API_URL) ||
+      'https://platinum-scm-api.azurewebsites.net';
+    // Stored under the SCM-specific key (never 'platinum_token' -- that's the shell's own
+    // general session token key; writing the SCM JWT there would silently corrupt the
+    // shared session used by every other module). See @platinumv3/shared/auth's
+    // scmToken() and @platinumv3/scm's AuthService, which read/write this same key.
+    fetch(`${scmApiUrl.replace(/\/$/, '')}/api/auth/login`, {
       method : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body   : JSON.stringify({ username, password }),
+      body   : JSON.stringify({ userName: username, password }),
       signal : controller.signal,
     })
       .then(r => r.ok ? r.json() : null)
-      .then(resp => { const t = resp?.data?.token; if (t) localStorage.setItem('platinum_token', t); })
+      .then(resp => { const t = resp?.data?.token; if (t) localStorage.setItem('scm_token', t); })
       .catch(() => {})
       .finally(() => clearTimeout(timer));
   }
