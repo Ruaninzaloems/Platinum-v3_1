@@ -14,6 +14,18 @@ a separate explicit decision)
 See `prompts/scm.md` for the full architecture notes (dual backend, the frontend's two ways of
 reaching its API, the missing `SCM_API` pipeline job) — not duplicated here.
 
+## 🛑 Before touching any auth-related file in this module, read this
+
+Pass 3 (2026-09-01, below) fixed SCM being **completely unusable** — every real API call 401'd,
+on production and local `ng serve` both. The fix lives in `libs/scm/src/lib/core/services/auth.service.ts`,
+`libs/scm/src/lib/core/guards/scm-bootstrap.guard.ts`, `libs/shared/auth/src/lib/auth.interceptor.ts`,
+`libs/scm/src/lib/environment.ts`, `apps/shell/server.js`, and
+`apps/shell/src/app/features/login/login.component.ts`. **A future sync diffing these against
+standalone will find large, by-design differences** (standalone has no shell, no shared
+`AuthService`, no auto-admin dev session) — do not "reconcile" them back toward standalone's
+version. `prompts/scm.md` has the full preserve-list and a regression-check grep; read Pass 3
+below for the full diagnosis before touching any of these six files.
+
 ## Pass 1 (2026-08-31): confirmed scale, fixed one real routing bug, verified nav is currently consistent
 
 ### Scale confirmed by direct comparison, not estimated
@@ -173,6 +185,59 @@ folders). Flagged as a clean, low-risk, ready-to-execute cleanup for whoever pic
 No code changes this pass, so no build/typecheck was run — every finding above was confirmed via
 direct source reading and grep (backend endpoint existence, route wiring, git log, export
 surfaces), not assumed from file/folder names.
+
+## Pass 3 (2026-09-01): fixed SCM being completely unusable — every real API call was failing
+
+User reported (screenshot from the live site): "SCM Dashboard — Unable to load dashboard,
+Authentication required." Confirmed via console + `performance.getEntriesByType('resource')` that
+every one of SCM's data calls was failing with `401`, on both the live production site and local
+`ng serve`. Two independent, compounding bugs, both pre-existing (not introduced by Passes 1-2):
+
+**Bug 1 — token key collision.** `libs/scm/src/lib/core/services/auth.service.ts`'s `login()`
+stored SCM-API's own JWT under `localStorage['platinum_token']` — the exact key
+`libs/shared/auth/src/lib/auth.service.ts` (the shell-level service) uses for the general POS
+session token. A real login would have silently overwritten the shared session used by every
+other module. The shared auth interceptor's SCM-bearer logic also read `auth.getToken()` (the
+shell's own token — a hardcoded `'local-session-token'` placeholder in this environment's
+disabled-login auto-admin session) instead of the SCM-specific one, so even a successfully
+fetched SCM token was never actually sent as the `Authorization: Bearer` header.
+
+Fixed by moving SCM's token storage to a dedicated `scm_token` key (mirrors the existing
+`george_token` pattern in the same interceptor file exactly) and pointing the interceptor at it.
+Added an auto-acquire step to SCM's `AuthService` constructor, using SCM-API's own dev-fallback
+login (`admin`/`admin123`, an already-committed, pre-existing fallback in
+`SCM-API/Services/AuthService.cs` — not a new secret) — scoped strictly to the known
+`'local-session-token'` dev-session marker so a real future POS login is never silently logged
+into SCM as a different identity. Also fixed a pre-existing `scmBootstrapGuard` (already applied
+to the `dashboard` route, already calling the same dev-fallback login) which had the identical
+stale key references and would have redirected to `/login` even after a successful token fetch.
+
+**Bug 2 — wrong host in local dev.** Separately, discovered while verifying the fix locally:
+the fallback backend host used only when `server.js` isn't in the loop (i.e. `ng serve`) was
+hardcoded to `rep-scm-api.azurewebsites.net` in **four places** (the interceptor, `libs/scm`'s
+`environment.ts`, `server.js`'s own fallback, and the shell's `login.component.ts`'s
+`bridgeScmAuth()` — a third, independent, previously-undiscovered auth-bridging attempt for the
+real-login flow, which had the *same* `platinum_token` key collision as Bug 1). Confirmed live via
+curl that this host is a **different, stale deployment** from the one production actually uses
+(`platinum-scm-api.azurewebsites.net`) — it returns `401 Invalid username or password` for the
+same dev-fallback credentials the real backend accepts. This meant local dev was broken
+regardless of the Bug 1 fix. Corrected all four hardcoded defaults to the real host.
+
+**Verified end-to-end, not just compiled:** `tsc --noEmit` clean after both fixes. Live-tested
+against a running local `ng serve` (not the production site) by clicking into SCM and reading
+`performance.getEntriesByType('resource')`'s `responseStatus` on a clean page load (more reliable
+than the console-message tool, which doesn't reset its buffer per-navigation) — confirmed zero
+401s/500s and real data rendering (R45.0M total budget, R5.2M reserved, R8.5M committed, etc. on
+the Executive Overview dashboard). Committed as two commits (`c4f5596` token-key fix,
+`08c1b35` host fix) and pushed to `Dev` — triggers the `Shell_UI` production deploy per
+`azure-pipelines.yml`. Production verification of this specific fix was not re-confirmed
+post-deploy in this pass (deploy takes a few minutes) — worth a quick live check next time SCM
+comes up.
+
+Also found and left alone: `libs/scm/src/lib/core/interceptors/auth.interceptor.ts` (a second,
+entirely separate local SCM interceptor) still has the same stale key references but is
+confirmed unregistered anywhere in the app (dead code, consistent with Pass 2's other dead-code
+finding) — not fixed, not worth maintaining dead code, flagged only.
 
 ## Remaining work (next passes)
 
