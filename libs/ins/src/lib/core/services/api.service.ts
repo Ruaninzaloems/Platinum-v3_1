@@ -28,13 +28,22 @@ export class ApiService {
   get<T>(path: string, params?: ParamsLike): Observable<T> {
     // Several read stores (e.g. CycleStore) subscribe exactly once via toSignal
     // and cache the result forever, with no way for the user to trigger a
-    // manual retry -- a single transient DB blip (Azure Postgres firewall
-    // hiccup, cold connection pool) would otherwise leave a section of the UI
-    // permanently empty until a full page reload. GET is idempotent, so a
-    // couple of short, backed-off retries here is safe and covers every
-    // caller at once rather than patching each store individually.
+    // manual retry -- a transient DB blip (Azure Postgres firewall hiccup,
+    // cold connection pool) would otherwise leave a section of the UI
+    // permanently empty until a full page reload. GET is idempotent, so
+    // backed-off retries here are safe and cover every caller at once rather
+    // than patching each store individually.
+    //
+    // Widened 2026-09-02 (recurrence of the original FIN YEAR bug, see
+    // PerformanceSync.md Pass 4 and Pass 7): the original count:2/500ms-1000ms
+    // window (~1.5s total) was too short for a blip that outlasts it -- once
+    // exhausted, the store settles into catchError's empty fallback forever,
+    // same as having no retry at all. 5 attempts with exponential-ish backoff
+    // (500ms/1s/2s/4s, ~7.5s total) covers a much wider range of transient
+    // outages while staying bounded -- this does not paper over a genuinely
+    // down backend, it only buys time for a real transient blip to clear.
     return this.http.get<T>(this.url(path), { params: this.buildParams(params) }).pipe(
-      retry({ count: 2, delay: (_, attempt) => timer(attempt * 500) }),
+      retry({ count: 4, delay: (_, attempt) => timer(500 * 2 ** (attempt - 1)) }),
     );
   }
   post<T>(path: string, body?: unknown): Observable<T> {

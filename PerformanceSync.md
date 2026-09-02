@@ -480,6 +480,43 @@ defect.
 against live production. All `200 OK` API responses confirmed via network log at each step, not
 assumed from page text alone.
 
+## Pass 7 (2026-09-02): FIN YEAR bug recurred — widened the retry window instead of re-diagnosing from scratch
+
+User reported the exact Pass 4 symptom again (blank FIN YEAR dropdown on production). Checked the
+backend first rather than assuming: `curl` to both the direct backend and through the shell proxy
+both returned `200 OK` instantly with real cycle data — the database/backend is healthy right now,
+this is not a repeat of the earlier 503/auth-password incident. Live-checked the actual site
+immediately after: FIN YEAR was already showing `2025/2026` correctly — the blip in the screenshot
+had already cleared by itself.
+
+So the underlying bug is real and distinct from "backend was down": `libs/ins/src/lib/core/services/api.service.ts`'s
+`ApiService.get()` retry (added Pass 4) still had its original `count: 2` / 500ms-1000ms window
+(~1.5s total) intact — not reverted, just too narrow. `CycleStore` (`features/dashboard/tabs/cycle-picker.ts`)
+still subscribes via `toSignal(...pipe(catchError(() => of([]))))`, a one-shot subscription that
+settles permanently into the empty fallback once retries exhaust — the same structural gap Pass 4
+described, just now hit by a blip that outlasted the retry window rather than one the window
+already covered. Reloading always "fixes" it because that's a fresh subscription, not because
+anything actually recovered.
+
+**Fixed by widening `ApiService.get()`'s retry from 2 attempts (~1.5s) to 4 attempts with proper
+exponential backoff (500ms/1s/2s/4s, ~7.5s total)** — a 5x larger window that a real transient
+blip is far more likely to clear within, without changing the fundamental one-shot-subscription
+architecture (a bigger, riskier change) or risking hammering a genuinely-down backend (GET is
+idempotent, still bounded/finite, not infinite retry). This covers every store that goes through
+`ApiService.get()`, not just `CycleStore` — the same "fix once at the HTTP layer" reasoning Pass 4
+used originally.
+
+**Verified:** `tsc --noEmit` clean. Not re-tested against a real reproduced blip (the backend was
+healthy throughout this pass, same limitation Pass 4 had) — the fix is reasoned from the retry math
+and the confirmed-unchanged failure mode, not observed fixing a live failure.
+
+**Still open, now more clearly a real gap rather than a one-off:** the one-shot
+`toSignal`+`catchError` pattern has no ceiling-proof self-healing — a blip longer than ~7.5s (or a
+second occurrence right after a page load, before the user reloads) will still show this bug. If it
+recurs a third time, that's the signal to do the bigger fix: give `CycleStore` (and similarly-shaped
+stores) a way to re-fetch in the background after settling empty, not just a longer one-shot retry
+window.
+
 ## Remaining work (next passes)
 
 1. ~~Full click-through of every admin/config page~~ — **done, Pass 6.** Optional follow-up: decide
