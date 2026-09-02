@@ -1,17 +1,41 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { catchError, of } from 'rxjs';
+import { catchError, of, EMPTY, expand, map, switchMap, timer } from 'rxjs';
 import { ApiService } from '@ins-core/services/api.service';
 import { Cycle } from '@ins-core/models/domain.model';
+
+// ApiService.get() already retries the first request a few times over ~7.5s. If a cold-start /
+// DB blip outlasts that window, the request settles as a failure and - without this - the
+// dropdown would stay empty until the user manually reloads the page. These retries pick the
+// fetch back up in the background every 5s (up to 6 times, ~30s) so it self-heals instead.
+const CYCLES_RETRY_DELAY_MS = 5000;
+const CYCLES_MAX_BACKGROUND_RETRIES = 6;
+
+type CyclesFetchResult = { cycles: Cycle[]; failed: boolean };
 
 @Injectable({ providedIn: 'root' })
 export class CycleStore {
   private readonly api = inject(ApiService);
 
-  readonly cycles = toSignal(
-    this.api.get<Cycle[]>('/cycles').pipe(catchError(() => of<Cycle[]>([]))),
-    { initialValue: [] as Cycle[] },
+  private fetchCyclesOnce() {
+    return this.api.get<Cycle[]>('/cycles').pipe(
+      map((cycles): CyclesFetchResult => ({ cycles, failed: false })),
+      catchError(() => of<CyclesFetchResult>({ cycles: [], failed: true })),
+    );
+  }
+
+  private readonly result = toSignal(
+    this.fetchCyclesOnce().pipe(
+      expand((result, attempt) =>
+        result.failed && attempt < CYCLES_MAX_BACKGROUND_RETRIES
+          ? timer(CYCLES_RETRY_DELAY_MS).pipe(switchMap(() => this.fetchCyclesOnce()))
+          : EMPTY,
+      ),
+    ),
+    { initialValue: { cycles: [] as Cycle[], failed: false } as CyclesFetchResult },
   );
+
+  readonly cycles = computed(() => this.result().cycles);
 
   // `null` selection + auto=true means "use the first/open cycle by default".
   // Once the user picks anything (a real id or explicitly "Select Cycle"),

@@ -115,7 +115,7 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
               }
               @if (canShowModule('insights')) {
                 <button class="module-chip" [class.active]="activeModule() === 'insights'" (click)="setModule('insights')">
-                  <mat-icon class="chip-icon">trending_up</mat-icon><span>Performance</span>
+                  <span>Performance</span>
                 </button>
               }
               @if (canShowModule('budget')) {
