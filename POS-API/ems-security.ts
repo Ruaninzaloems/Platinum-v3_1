@@ -313,17 +313,20 @@ export async function replaceUserRoles(
           `INSERT INTO ${T_USER_ROLE} (UserID, RoleID, DelegatedByUserID, DelegationStart, DelegationExpiry)
            VALUES (@userId, @roleId, @delegatedBy, @start, @expiry)`,
         );
-
-      await tx
-        .request()
-        .input("userId", sql.Int, userId)
-        .input("roleId", sql.Int, role.roleId)
-        .input("modifiedBy", sql.Int, actorUserId)
-        .query(
-          `INSERT INTO ${T_ROLE_LOG} (UserID, RoleID, DateModified, ModifiedByUserID)
-           VALUES (@userId, @roleId, GETUTCDATE(), @modifiedBy)`,
-        );
     }
+
+    // User_UserRoleModifyLog's real schema (verified against EMS_GeorgeUAT) has no
+    // RoleID/DateModified/ModifiedByUserID columns - it's a per-user "roles were
+    // changed" marker (UserRoleModifyID, UserID, ModifyFlag bit, Created_On,
+    // Created_By), not a per-role audit trail. One row per replace, not per role.
+    await tx
+      .request()
+      .input("userId", sql.Int, userId)
+      .input("createdBy", sql.Int, actorUserId)
+      .query(
+        `INSERT INTO ${T_ROLE_LOG} (UserID, ModifyFlag, Created_On, Created_By)
+         VALUES (@userId, 1, GETUTCDATE(), @createdBy)`,
+      );
 
     await tx.commit();
   } catch (e) {
