@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
-import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { catchError, throwError } from 'rxjs';
+import { catchError, map, switchMap, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
 
 /** First-party API path prefixes that flow through the shell proxy. */
@@ -96,6 +96,31 @@ function scmToken(): string | null {
   } catch { return null; }
 }
 
+/** Full SCM API base URL (same resolution as bridgeScmAuth in login.component.ts). */
+function scmApiBaseUrl(): string {
+  return (
+    (typeof globalThis !== 'undefined' && (globalThis as any).__PLATINUM_ENV__?.SCM_API_URL) ||
+    SCM_DEFAULT_URL
+  );
+}
+
+/**
+ * SCM's JWT is short-lived (8h, see SCM-API's Jwt:ExpiryInMinutes) and was only ever
+ * fetched once, at login (bridgeScmAuth) -- any session left open longer than that
+ * permanently lost SCM access, with no recovery short of a full sign-out/sign-in
+ * (confirmed 2026-09-03: WWW-Authenticate reported "The token expired at ...").
+ * SCM-API already exposes POST /api/auth/refresh, which re-validates the (possibly
+ * expired) JWT's signature via GetPrincipalFromExpiredToken and issues a fresh one --
+ * this was simply never called from the frontend. No separate refresh-token storage
+ * needed: the endpoint takes the existing access token itself as input.
+ */
+function refreshScmToken(http: HttpClient, expiredToken: string) {
+  const url = `${scmApiBaseUrl().replace(/\/$/, '')}/api/auth/refresh`;
+  return http.post<{ data?: { token?: string } }>(url, { token: expiredToken }).pipe(
+    map((resp) => resp?.data?.token ?? null),
+  );
+}
+
 /**
  * Auth interceptor with explicit scoping:
  *  - withCredentials: true ONLY for first-party API calls (so the POS-API
@@ -111,12 +136,13 @@ function scmToken(): string | null {
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const router = inject(Router);
+  const http = inject(HttpClient);
 
   const headers: Record<string, string> = {};
   const scm = isScmBearerTarget(req.url);
-  if (scm) {
-    const token = scmToken();
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+  const scmBearerToken = scm ? scmToken() : null;
+  if (scm && scmBearerToken) {
+    headers['Authorization'] = `Bearer ${scmBearerToken}`;
   }
   const george = isGeorgeTarget(req.url);
   if (george) {
@@ -142,6 +168,20 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(cloned).pipe(
     catchError((err: HttpErrorResponse) => {
+      // A 401 from SCM with an actual (now-expired) token on hand is worth one silent
+      // refresh-and-retry before giving up — see refreshScmToken() above. Excludes the
+      // refresh call's own URL so a failing refresh can't recurse into itself.
+      if (scm && err.status === 401 && scmBearerToken && !req.url.includes('/auth/refresh')) {
+        return refreshScmToken(http, scmBearerToken).pipe(
+          switchMap((newToken) => {
+            if (!newToken) return throwError(() => err);
+            try { localStorage.setItem('scm_token', newToken); } catch { /* ignore */ }
+            const retried = req.clone({ setHeaders: { Authorization: `Bearer ${newToken}` } });
+            return next(retried);
+          }),
+          catchError(() => throwError(() => err)),
+        );
+      }
       // A 401 from SCM, George, Performance or Overtime just means THEIR own bridged-identity
       // token/header is missing or unrecognised — those backends have no concept of the shell's
       // session, so a 401 from them must NOT tear down the app session (that's POS-API's domain)
