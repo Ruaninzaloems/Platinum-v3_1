@@ -1,6 +1,24 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, catchError, forkJoin, of } from 'rxjs';
+
+/**
+ * Modules that cache the User_UserRoles/Sys_RolePermission join in memory
+ * (rather than querying it fresh per request) and expose an unguarded
+ * refresh endpoint for exactly this reason — see OVERTIME-API's
+ * AdminController ("Call this after ... changing role assignments ...
+ * without needing a full API process restart"). Without calling these, a
+ * role/permission change here is invisible for up to that module's own
+ * cache TTL (Overtime: 1-5 min depending on environment) until it expires
+ * naturally - confirmed 2026-09-03 this is exactly what made a real role
+ * change look like it "didn't take effect" for a good few minutes.
+ *
+ * Reached through the same shell proxy every module already uses -
+ * relative paths, no separate per-module URL config needed here.
+ */
+const MODULE_PERMISSION_CACHE_REFRESH_ENDPOINTS = [
+  '/overtime-app/api/admin/refresh-users',
+];
 
 /**
  * Global (cross-module) Users/Roles/Permissions admin — POS-API's new
@@ -157,5 +175,20 @@ export class UserRolesAdminService {
   /** No real backing table exists yet — expect a 501, not empty data pretending to be real. */
   getSegregationRules(): Observable<{ message: string; rules: any[] }> {
     return this.http.get<{ message: string; rules: any[] }>(`${POS_API}/segregation-rules`);
+  }
+
+  /**
+   * Best-effort: tell every module with its own in-memory permission cache to
+   * reload immediately, so a role/permission change takes effect now instead
+   * of waiting out that module's cache TTL. Failures are swallowed per-module
+   * (a module being down or not yet exposing this endpoint must never block
+   * the actual save, which has already succeeded by the time this runs).
+   */
+  refreshModulePermissionCaches(): Observable<unknown[]> {
+    return forkJoin(
+      MODULE_PERMISSION_CACHE_REFRESH_ENDPOINTS.map((url) =>
+        this.http.post(url, {}).pipe(catchError(() => of(null))),
+      ),
+    );
   }
 }

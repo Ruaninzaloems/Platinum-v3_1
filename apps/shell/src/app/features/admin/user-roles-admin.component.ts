@@ -239,7 +239,10 @@ export class UserRolesAdminComponent implements OnInit {
         ref.afterClosed().subscribe((result: RoleAssignmentInput[] | undefined) => {
           if (!result) return;
           this.svc.saveUserRoles(u.userId, result).subscribe({
-            next: () => this.loadUsers(),
+            next: () => {
+              this.loadUsers();
+              this.svc.refreshModulePermissionCaches().subscribe();
+            },
             error: (err) => this.userError.set('Saving roles failed: ' + this.msg(err)),
           });
         });
@@ -292,7 +295,10 @@ export class UserRolesAdminComponent implements OnInit {
         ref.afterClosed().subscribe((selected: number[] | undefined) => {
           if (!selected) return;
           this.svc.saveRolePermissions(r.roleId, selected).subscribe({
-            next: () => this.loadRoles(),
+            next: () => {
+              this.loadRoles();
+              this.svc.refreshModulePermissionCaches().subscribe();
+            },
             error: (err) => this.roleError.set('Saving permissions failed: ' + this.msg(err)),
           });
         });

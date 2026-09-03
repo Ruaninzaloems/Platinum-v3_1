@@ -351,6 +351,7 @@ export class LoginComponent implements OnInit {
       next: (resp) => {
         if (resp.success) {
           this.bridgeScmAuth(this.username, this.password);
+          this.refreshModulePermissionCaches();
           this.router.navigate(['/dashboard']);
         } else {
           this.errorMessage.set(resp.error || 'Invalid username or password.');
@@ -368,7 +369,22 @@ export class LoginComponent implements OnInit {
 
   continueAsAdmin(): void {
     this.auth.setLocalSession('admin');
+    this.refreshModulePermissionCaches();
     this.router.navigate(['/dashboard']);
+  }
+
+  /**
+   * Modules that cache the User_UserRoles/Sys_RolePermission join in memory
+   * instead of querying it fresh per request (see OVERTIME-API's
+   * AdminController) would otherwise keep serving whatever permission
+   * snapshot they last loaded, up to their own cache TTL (1-5 min), even for
+   * a brand-new login — a role change made just before someone logs in could
+   * still look "not applied" for several minutes. Poke each one on every
+   * login so a fresh sign-in always gets current data. Fire-and-forget, same
+   * as bridgeScmAuth: this must never block or fail the login itself.
+   */
+  private refreshModulePermissionCaches(): void {
+    fetch('/overtime-app/api/admin/refresh-users', { method: 'POST' }).catch(() => {});
   }
 
   private bridgeScmAuth(username: string, password: string): void {
