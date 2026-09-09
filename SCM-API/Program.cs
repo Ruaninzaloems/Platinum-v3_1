@@ -49,19 +49,37 @@ try
         }
     });
 
-    var jwtKey = builder.Configuration["Jwt:Key"] ?? "PlatinumSCM-Default-Key-Minimum-32-Characters-Long";
+    // Dual-accept, transitional (platform-wide "POS-API as global auth" rollout,
+    // SCM migrates last): SCM keeps validating its own existing JWT (own issuer/
+    // audience/key, own /auth/login) AND now also accepts POS-API's global JWT
+    // (issuer PlatinumPOS / audience Platinum-Suite, shared PLATINUM_JWT_SECRET)
+    // — either signature is accepted, matched against either key. SCM keeps
+    // resolving scm_perms itself from the verified NameIdentifier claim via its
+    // own SecurityRepository/DB lookup (both token shapes carry a NameIdentifier
+    // for the same real EMS_GeorgeUAT user, so this needs no change here).
+    // Retiring SCM's own /auth/login + the shell's bridgeScmAuth() in favour of
+    // POS-API's token exclusively is a separate, later cleanup milestone — not
+    // part of this rollout.
+    var scmJwtKey = builder.Configuration["Jwt:Key"] ?? "PlatinumSCM-Default-Key-Minimum-32-Characters-Long";
+    var globalJwtKey = Environment.GetEnvironmentVariable("PLATINUM_JWT_SECRET")
+        ?? "platinum-local-dev-jwt-secret-change-in-production";
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
+            options.MapInboundClaims = true; // standard "sub"/"name"/... JWT claims -> ClaimTypes.*
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,
                 ValidateAudience = true,
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
-                ValidIssuer = builder.Configuration["Jwt:Issuer"],
-                ValidAudience = builder.Configuration["Jwt:Audience"],
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+                ValidIssuers = new[] { builder.Configuration["Jwt:Issuer"], "PlatinumPOS" },
+                ValidAudiences = new[] { builder.Configuration["Jwt:Audience"], "Platinum-Suite" },
+                IssuerSigningKeys = new[]
+                {
+                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(scmJwtKey)),
+                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(globalJwtKey)),
+                },
             };
         });
     builder.Services.AddAuthorization();

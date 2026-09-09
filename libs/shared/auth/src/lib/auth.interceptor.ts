@@ -97,6 +97,32 @@ function scmToken(): string | null {
 }
 
 /**
+ * Module prefixes that have migrated onto POS-API's global auth JWT
+ * (issued at login by ems-jwt.ts, verified by that module's own backend
+ * instead of trusting an unsigned bridge header). Starts empty -- each
+ * module's prefix is added here as part of its own migration milestone
+ * (Performance -> Payroll -> Overtime -> SCM, per the global-auth plan),
+ * once that backend actually validates the JWT's signature.
+ *
+ * During a module's transition window its OLD bridge header
+ * (X-Username / x-user) keeps being sent alongside the new Authorization
+ * header -- not replaced -- so a backend rollback is a one-line revert with
+ * no shell redeploy needed. Only once a module fully enforces the JWT should
+ * its old header be removed here and its prefix added to the 401-handler's
+ * exclusion list below (a genuinely expired global session should then log
+ * the user out, since a 401 from that module now means the real thing).
+ */
+const GLOBAL_JWT_PREFIXES: string[] = [
+  '/insights-app/api/', // Performance — migrated 2026-09-08, verifies the JWT in api-server/src/Middleware/auth.ts
+  '/payroll-app/api/',  // Payroll — migrated 2026-09-09, verifies the JWT in src/server/middleware/auth.js
+  '/overtime-app/api/', // Overtime — migrated 2026-09-09, verifies the JWT in Program.cs/JwtCurrentUserService.cs
+];
+
+function isGlobalJwtTarget(url: string): boolean {
+  return GLOBAL_JWT_PREFIXES.some(p => url.startsWith(p));
+}
+
+/**
  * Auth interceptor with explicit scoping:
  *  - withCredentials: true ONLY for first-party API calls (so the POS-API
  *    session cookie travels with same-origin requests through the shell
@@ -115,7 +141,13 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const headers: Record<string, string> = {};
   const scm = isScmBearerTarget(req.url);
   if (scm) {
-    const token = scmToken();
+    // SCM-API now dual-accepts either its own token or POS-API's global JWT
+    // (see SCM-API/Program.cs's ValidIssuers/IssuerSigningKeys) — prefer the
+    // dedicated scm_token (still minted by bridgeScmAuth() at login) so
+    // scm_perms-shaped authorization keeps working exactly as before, but
+    // fall back to the global token if it's ever unset (e.g. bridgeScmAuth
+    // failed) instead of sending no Authorization header at all.
+    const token = scmToken() || auth.getGlobalToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
   const george = isGeorgeTarget(req.url);
@@ -130,6 +162,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   if (isPerformanceTarget(req.url)) {
     const userName = auth.user()?.userName;
     if (userName) headers['x-user'] = userName;
+  }
+  if (isGlobalJwtTarget(req.url)) {
+    const token = auth.getGlobalToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
   }
 
   const cloned = req.clone({

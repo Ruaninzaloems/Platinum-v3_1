@@ -154,6 +154,7 @@ OUTPUT
 | api.service base  | `/payroll-app/api` (inlined adaptation; proxy → `/api/v1`)                  |
 | Core services     | `api.service.ts`, `notification.service.ts`, `ui.service.ts`               |
 | Auth              | Handled by the shell — Payroll login/auth files are SKIPPED                 |
+| Backend auth      | **(2026-09-09)** `PAYROLL-APP/src/server/middleware/auth.js` now verifies POS-API's global JWT (shared `PLATINUM_JWT_SECRET`, issuer `PlatinumPOS`, audience `Platinum-Suite`) instead of the old fail-open logic that granted a hardcoded system/admin identity to any request with no `Authorization` header — that was a real, wide-open gap since the shell never sent Payroll a bearer token before this. The `x-user-id`-header dev shortcut now requires an explicit `PAYROLL_ALLOW_DEV_HEADER_AUTH=true` opt-in (never in production). **Do not revert `auth.js`/`config/app.js`'s `jwt.secret` back to the old fail-open shape** — this file isn't synced from the standalone source anyway (backend auth is monorepo-owned), but flagging here in case a future pass touches it. |
 | Pitfall notes     | source `.agents/memory/*.md` (zoneless, global-css trap, unified path, …)   |
 
 > Full architecture & run details: `MASTER.md`. Generic multi-module version: `MODULE-SYNC-PROMPT.md`.

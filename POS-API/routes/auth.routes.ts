@@ -5,6 +5,7 @@ import { platinumGet, platinumPost, loginWithCredentials, logoutSession, isSessi
 import { isEmsConfigured } from "../ems-db";
 import { resolveAzureUser, computeFinYear } from "../ems-azure-auth";
 import { getEffectiveModuleCodes } from "../ems-modules";
+import { issueGlobalToken } from "../ems-jwt";
 
 /**
  * Resolve the user's effective side-nav module codes and attach them to the
@@ -78,7 +79,7 @@ export function registerAuthRoutes(app: Express, httpServer: Server): void {
         };
         req.session.platinumAuth = demoSession;
         console.log(`[Auth] DEMO fast-path — instant session for ${username} on site ${site.name}`);
-        return res.json({ success: true, user: demoMatch.user, site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass } });
+        return res.json({ success: true, user: demoMatch.user, site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass }, token: issueGlobalToken(demoMatch.user) });
       }
 
       if (demoMode) {
@@ -92,7 +93,7 @@ export function registerAuthRoutes(app: Express, httpServer: Server): void {
         };
         req.session.platinumAuth = demoSession;
         console.log(`[Auth] DEMO MODE — Local session created for ${username} on site ${site.name}`);
-        res.json({ success: true, user: demoUser, site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass } });
+        res.json({ success: true, user: demoUser, site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass }, token: issueGlobalToken(demoUser) });
 
         clearLockoutCache(username);
         loginWithCredentials(username, password, dbName, siteId).then(result => {
@@ -122,6 +123,7 @@ export function registerAuthRoutes(app: Express, httpServer: Server): void {
         success: true,
         user: result.session.userData,
         site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass },
+        token: issueGlobalToken(result.session.userData, dbName || site.dbName),
       });
     } catch (e: any) {
       console.error('[Auth] Login error:', e.message);
@@ -136,7 +138,7 @@ export function registerAuthRoutes(app: Express, httpServer: Server): void {
           userData: demoUser, posCashierId: null, authMode: 'override', loggedIn: true, siteId: site.id
         };
         req.session.platinumAuth = demoSession;
-        return res.json({ success: true, user: demoUser, site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass } });
+        return res.json({ success: true, user: demoUser, site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass }, token: issueGlobalToken(demoUser) });
       }
       return res.status(503).json({ success: false, error: 'Authentication service unavailable' });
     }
@@ -207,6 +209,7 @@ export function registerAuthRoutes(app: Express, httpServer: Server): void {
         success: true,
         user: userData,
         site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass },
+        token: issueGlobalToken(userData, userDb),
       });
     } catch (e: any) {
       console.error('[Auth] createTokenAzure error:', e.message);

@@ -1,8 +1,11 @@
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using PlatinumOvertime_API.Configuration;
 using PlatinumOvertime_API.Data;
 using PlatinumOvertime_API.Mappings;
@@ -157,10 +160,42 @@ builder.Services.AddScoped<OvertimeCaptureSchemaUpgrader>();
 builder.Services.AddScoped<OvertimeChainPositionBackfillService>();
 builder.Services.AddScoped<OvertimeDivisionNameBackfillService>();
 
+// ---------- Global auth: verify POS-API's JWT (identity only) ----------
+// Same shared secret / issuer / audience as POS-API's ems-jwt.ts and every
+// other migrated module (Performance, Payroll). Signature is validated on
+// EVERY request by the authentication middleware below (UseAuthentication()),
+// not just [Authorize]-gated ones, so JwtCurrentUserService can read the
+// verified claim without requiring [Authorize] on every controller.
+var jwtKey = Environment.GetEnvironmentVariable("PLATINUM_JWT_SECRET")
+    ?? builder.Configuration["Jwt:Key"]
+    ?? "platinum-local-dev-jwt-secret-change-in-production";
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = "PlatinumPOS",
+            ValidAudience = "Platinum-Suite",
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+        };
+    });
+builder.Services.AddAuthorization();
+
 // ---------- Current-user shim (X-User-Id header → DevUserDirectory) ----------
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<DevUserDirectory>();
-builder.Services.AddScoped<ICurrentUserService, DevCurrentUserService>();
+// JwtCurrentUserService (default): trusts the verified JWT claim first, falls
+// back to the legacy unsigned header bridge only for local/testing coexistence.
+// Set "Auth:UseLegacyHeaderBridge": true to instantly roll back to the old,
+// header-only DevCurrentUserService without a code change.
+if (builder.Configuration.GetValue<bool>("Auth:UseLegacyHeaderBridge"))
+    builder.Services.AddScoped<ICurrentUserService, DevCurrentUserService>();
+else
+    builder.Services.AddScoped<ICurrentUserService, JwtCurrentUserService>();
 
 // ---------- Overtime amount + formula + assignee resolver ----------
 builder.Services.AddSingleton<FormulaEvaluator>();
@@ -302,6 +337,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 // DB connection test endpoint — verifies the Postgres (Overtime) connection.
