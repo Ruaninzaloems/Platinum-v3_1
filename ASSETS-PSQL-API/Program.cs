@@ -3,6 +3,29 @@ using AssetManagement.Middleware;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+// ---------- Global App Settings (../.env) ----------
+// Loads the monorepo-root .env (see .env.example) into this process's
+// environment before configuration binds — DbConnectionFactory reads
+// DATABASE_URL/POSTGRES_URL from here. A real environment variable (Azure
+// App Setting, CI, an explicit export) always wins.
+static void LoadRootEnv()
+{
+    var envPath = Path.Combine(Directory.GetCurrentDirectory(), "..", ".env");
+    if (!File.Exists(envPath)) return;
+    foreach (var line in File.ReadAllLines(envPath))
+    {
+        var trimmed = line.Trim();
+        if (trimmed.Length == 0 || trimmed.StartsWith('#')) continue;
+        var idx = trimmed.IndexOf('=');
+        if (idx <= 0) continue;
+        var key = trimmed[..idx].Trim();
+        var value = trimmed[(idx + 1)..].Trim();
+        if (Environment.GetEnvironmentVariable(key) is null)
+            Environment.SetEnvironmentVariable(key, value);
+    }
+}
+LoadRootEnv();
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.WebHost.ConfigureKestrel(options =>

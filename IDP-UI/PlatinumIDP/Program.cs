@@ -1,6 +1,28 @@
 using Microsoft.EntityFrameworkCore;
 using PlatinumIDP.Data;
 
+// ---------- Global App Settings (../.env) ----------
+// Loads the monorepo-root .env (see .env.example) into this process's
+// environment before configuration binds. A real environment variable
+// (Azure App Setting, CI, an explicit export) always wins.
+static void LoadRootEnv()
+{
+    var envPath = Path.Combine(Directory.GetCurrentDirectory(), "..", ".env");
+    if (!File.Exists(envPath)) return;
+    foreach (var line in File.ReadAllLines(envPath))
+    {
+        var trimmed = line.Trim();
+        if (trimmed.Length == 0 || trimmed.StartsWith('#')) continue;
+        var idx = trimmed.IndexOf('=');
+        if (idx <= 0) continue;
+        var key = trimmed[..idx].Trim();
+        var value = trimmed[(idx + 1)..].Trim();
+        if (Environment.GetEnvironmentVariable(key) is null)
+            Environment.SetEnvironmentVariable(key, value);
+    }
+}
+LoadRootEnv();
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers()
@@ -10,10 +32,14 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
     });
 
-var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+// IDP_DATABASE_URL (the global .env's collision-safe name for this module)
+// takes priority over the generic DATABASE_URL, which several other
+// modules loaded from the same shared file also read.
+var databaseUrl = Environment.GetEnvironmentVariable("IDP_DATABASE_URL")
+    ?? Environment.GetEnvironmentVariable("DATABASE_URL");
 if (string.IsNullOrEmpty(databaseUrl))
 {
-    throw new InvalidOperationException("DATABASE_URL environment variable is not set");
+    throw new InvalidOperationException("IDP_DATABASE_URL (or DATABASE_URL) environment variable is not set");
 }
 
 var dbProvider = Environment.GetEnvironmentVariable("DB_PROVIDER")?.ToLower() ?? "auto";

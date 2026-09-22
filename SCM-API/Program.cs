@@ -9,6 +9,31 @@ using SCM_API.Middleware;
 using SCM_API.Services;
 using SCM_API.Extensions;
 
+// ---------- Global App Settings (../.env) ----------
+// Loads the monorepo-root .env (see .env.example) into this process's
+// environment before configuration binds, so connection strings and the
+// shared PLATINUM_JWT_SECRET live in one file instead of duplicated across
+// every module's own config. A real environment variable (Azure App
+// Setting, CI, an explicit export) always wins — this only fills in what
+// isn't already set. No-ops in production/publish, where no .env exists.
+static void LoadRootEnv()
+{
+    var envPath = Path.Combine(Directory.GetCurrentDirectory(), "..", ".env");
+    if (!File.Exists(envPath)) return;
+    foreach (var line in File.ReadAllLines(envPath))
+    {
+        var trimmed = line.Trim();
+        if (trimmed.Length == 0 || trimmed.StartsWith('#')) continue;
+        var idx = trimmed.IndexOf('=');
+        if (idx <= 0) continue;
+        var key = trimmed[..idx].Trim();
+        var value = trimmed[(idx + 1)..].Trim();
+        if (Environment.GetEnvironmentVariable(key) is null)
+            Environment.SetEnvironmentVariable(key, value);
+    }
+}
+LoadRootEnv();
+
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .CreateBootstrapLogger();

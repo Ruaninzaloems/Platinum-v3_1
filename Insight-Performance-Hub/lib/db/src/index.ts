@@ -11,6 +11,10 @@ const { Pool } = pg;
  */
 const USE_REPLIT_BUILTIN_DB = false;
 
+// APP_DATABASE_URL is the global App Setting for this module — see the
+// monorepo-root .env.example. Locally it's loaded automatically by
+// api-server's "dev" script's `--env-file-if-exists=../../../.env` flag;
+// in Azure it's a real App Setting, same as every other env var here.
 const connectionString = USE_REPLIT_BUILTIN_DB
   ? process.env.DATABASE_URL ?? process.env.APP_DATABASE_URL
   : process.env.APP_DATABASE_URL ?? process.env.DATABASE_URL;

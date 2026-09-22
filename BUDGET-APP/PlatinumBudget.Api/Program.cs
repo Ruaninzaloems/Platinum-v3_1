@@ -2,6 +2,28 @@ using Microsoft.EntityFrameworkCore;
 using PlatinumBudget.Api.Data;
 using PlatinumBudget.Api.Services;
 
+// ---------- Global App Settings (../.env) ----------
+// Loads the monorepo-root .env (see .env.example) into this process's
+// environment before configuration binds. A real environment variable
+// (Azure App Setting, CI, an explicit export) always wins.
+static void LoadRootEnv()
+{
+    var envPath = Path.Combine(Directory.GetCurrentDirectory(), "..", ".env");
+    if (!File.Exists(envPath)) return;
+    foreach (var line in File.ReadAllLines(envPath))
+    {
+        var trimmed = line.Trim();
+        if (trimmed.Length == 0 || trimmed.StartsWith('#')) continue;
+        var idx = trimmed.IndexOf('=');
+        if (idx <= 0) continue;
+        var key = trimmed[..idx].Trim();
+        var value = trimmed[(idx + 1)..].Trim();
+        if (Environment.GetEnvironmentVariable(key) is null)
+            Environment.SetEnvironmentVariable(key, value);
+    }
+}
+LoadRootEnv();
+
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,10 +40,14 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new() { Title = "Platinum Budget Management API", Version = "v1" });
 });
 
-// DATABASE_URL (Azure App Setting / env var) takes priority; falls back to
-// ConnectionStrings:BudgetDb in appsettings (Development only — mirrors OVERTIME-API's
-// pattern) so local dev doesn't need the env var set on every restart.
-var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL")
+// BUDGET_DATABASE_URL (the global .env's collision-safe name for this module,
+// checked first so this never accidentally picks up another module's
+// DATABASE_URL when all are loaded from the same shared file) takes
+// priority; falls back to the generic DATABASE_URL, then to
+// ConnectionStrings:BudgetDb in appsettings (Development only — mirrors
+// OVERTIME-API's pattern) so local dev doesn't need any env var set at all.
+var databaseUrl = Environment.GetEnvironmentVariable("BUDGET_DATABASE_URL")
+    ?? Environment.GetEnvironmentVariable("DATABASE_URL")
     ?? builder.Configuration.GetConnectionString("BudgetDb")
     ?? "";
 string connectionString;

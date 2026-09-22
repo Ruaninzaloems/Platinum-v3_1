@@ -18,6 +18,34 @@ using PlatinumOvertime_API.Services.Interfaces;
 using PlatinumOvertime_API.Validators;
 using Serilog;
 
+// ---------- Global App Settings (../.env) ----------
+// Loads the monorepo-root .env (see .env.example) into this process's
+// environment before configuration binds — the shared PLATINUM_JWT_SECRET
+// in particular lives there. A real environment variable (Azure App
+// Setting, CI, an explicit export) always wins. NOTE: this module's own
+// database connection deliberately still resolves from
+// ConnectionStrings:OvertimeDb in appsettings(.Development).json first (see
+// below) — not from this file — since that's the verified-working local
+// setup; OVERTIME_DATABASE_URL in the global .env is a documented fallback
+// for a fresh environment that hasn't set appsettings up yet.
+static void LoadRootEnv()
+{
+    var envPath = Path.Combine(Directory.GetCurrentDirectory(), "..", ".env");
+    if (!File.Exists(envPath)) return;
+    foreach (var line in File.ReadAllLines(envPath))
+    {
+        var trimmed = line.Trim();
+        if (trimmed.Length == 0 || trimmed.StartsWith('#')) continue;
+        var idx = trimmed.IndexOf('=');
+        if (idx <= 0) continue;
+        var key = trimmed[..idx].Trim();
+        var value = trimmed[(idx + 1)..].Trim();
+        if (Environment.GetEnvironmentVariable(key) is null)
+            Environment.SetEnvironmentVariable(key, value);
+    }
+}
+LoadRootEnv();
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ---------- Serilog ----------
@@ -60,7 +88,11 @@ else
 
 static string? ResolvePostgresConnectionString()
 {
-    var url = Environment.GetEnvironmentVariable("DATABASE_URL");
+    // OVERTIME_DATABASE_URL (the global .env's collision-safe name for this
+    // module) takes priority over the generic DATABASE_URL, which several
+    // other modules loaded from the same shared file also read.
+    var url = Environment.GetEnvironmentVariable("OVERTIME_DATABASE_URL")
+        ?? Environment.GetEnvironmentVariable("DATABASE_URL");
     if (!string.IsNullOrWhiteSpace(url))
     {
         try

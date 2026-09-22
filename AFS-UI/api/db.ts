@@ -46,6 +46,10 @@ function buildPoolConfig(raw: string): ConstructorParameters<typeof Pool>[0] {
   };
 }
 
+// AZURE_POSTGRES_URL is the global App Setting for this module — see the
+// monorepo-root .env.example. Locally it's loaded automatically by the
+// "start" script's `--env-file-if-exists=../../.env` flag; in Azure it's a
+// real App Setting, same as every other env var here.
 const raw = process.env.AZURE_POSTGRES_URL || process.env.DATABASE_URL || '';
 if (!raw) {
   console.warn('[afs-api] AZURE_POSTGRES_URL / DATABASE_URL is not set — DB queries will fail');
