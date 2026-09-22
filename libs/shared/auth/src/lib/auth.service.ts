@@ -54,6 +54,15 @@ const STORAGE_TOKEN = 'platinum_token';
 const STORAGE_LOGGED_OUT = 'platinum_logged_out';
 
 /**
+ * Stamped on the instant client-side-only session setLocalSession() applies
+ * before its background real-login upgrade resolves. NOT a real signed JWT —
+ * getGlobalToken() must never hand this to a module that verifies
+ * signatures, or it gets a guaranteed, confusing 401 instead of simply
+ * omitting the header while the real token is still in flight.
+ */
+const PLACEHOLDER_LOCAL_TOKEN = 'local-session-token';
+
+/**
  * The base path that proxies to POS-API (the identity provider).
  * In dev, apps/shell/proxy.conf.json maps /pos-app/api → http://localhost:3003.
  */
@@ -158,6 +167,19 @@ export class AuthService {
   getToken(): string | null { return this._token(); }
 
   /**
+   * The global identity JWT POS-API mints at login (ems-jwt.ts,
+   * `issueGlobalToken()`), stored in the same `_token`/`platinum_token` slot
+   * `login()`/`loginAzure()` already populate from the response's `token`
+   * field — this is just a clearer name for modules migrating onto it (see
+   * GLOBAL_JWT_PREFIXES in auth.interceptor.ts) so callers don't have to know
+   * that "the token" and "the global auth JWT" are the same value.
+   */
+  getGlobalToken(): string | null {
+    const t = this._token();
+    return t && t !== PLACEHOLDER_LOCAL_TOKEN ? t : null;
+  }
+
+  /**
    * Verifies the current session against POS-API. Call from APP_INITIALIZER or
    * the auth guard to recover from page reloads when localStorage is empty.
    */
@@ -239,7 +261,20 @@ export class AuthService {
     this.router.navigate(['/dashboard']);
   }
 
-  /** Compatibility shim: legacy quick-admin path used as offline fallback. */
+  /**
+   * Compatibility shim: legacy quick-admin path used as offline fallback (and,
+   * per the constructor, the default session for every visitor since login is
+   * disabled). Applies an instant, purely client-side session synchronously
+   * (zero perceived latency, works even with POS-API unreachable) stamped
+   * with a placeholder token — NOT a real signed JWT, so it must never be
+   * sent to a module that verifies signatures (Performance, Payroll,
+   * Overtime, SCM's fallback path). In the background, tries a real POS-API
+   * demo login (admin/admin123, POS-API's DEMO_ACCOUNTS fast-path) to obtain
+   * a genuine global JWT and upgrade the session with it — mirrors the same
+   * "instant then upgrade" pattern POS-API's own demo-mode login uses. Errors
+   * are swallowed: an unreachable POS-API just means the fabricated session
+   * persists, exactly like before this upgrade existed.
+   */
   setLocalSession(username: string) {
     const user: AuthUser = {
       user_ID: 1, userName: username, firstName: 'System', lastName: 'Admin',
@@ -247,7 +282,34 @@ export class AuthService {
       cashFloat: 0, finYear: '2025', role: 'admin',
     };
     const site: SiteInfo = { id: 'george', name: 'George Municipality' };
-    this.applySession(user, site, 'local-session-token');
+    this.applySession(user, site, PLACEHOLDER_LOCAL_TOKEN);
+
+    if (username === 'admin') {
+      // Deferred to a macrotask, not called synchronously: when
+      // setLocalSession() runs from this class's own constructor (the normal
+      // case — see below), an inline http.post() here would re-enter
+      // authInterceptor's `inject(AuthService)` on the same instance before
+      // its constructor has returned, which Angular rejects as a circular
+      // dependency (NG0200). Deferring runs it after construction completes.
+      setTimeout(() => {
+        this.http.post<LoginResponse>(
+          `${POS_AUTH_BASE}/auth/login`,
+          { username: 'admin', password: 'admin123', siteId: site.id },
+          { withCredentials: true }
+        ).subscribe({
+          next: (resp) => {
+            if (resp?.success && resp.token) {
+              // Merge the real token into the already-applied session without
+              // touching user/site (avoids clobbering anything the caller or
+              // a subsequent checkAuth() already set in the meantime).
+              this._token.set(resp.token);
+              try { localStorage.setItem(STORAGE_TOKEN, resp.token); } catch {}
+            }
+          },
+          error: () => { /* POS-API unreachable — keep the placeholder session */ },
+        });
+      });
+    }
   }
 
   /** Loads the list of sites from POS-API for the login dropdown. */

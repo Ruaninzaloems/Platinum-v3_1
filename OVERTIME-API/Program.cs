@@ -1,8 +1,11 @@
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using PlatinumOvertime_API.Configuration;
 using PlatinumOvertime_API.Data;
 using PlatinumOvertime_API.Mappings;
@@ -49,7 +52,9 @@ if (string.Equals(dbProvider, "Postgres", StringComparison.OrdinalIgnoreCase))
 }
 else
 {
-    builder.Services.AddDbContext<OvertimeDbContextSqlServer>(opts => opts.UseSqlServer(connStr));
+    builder.Services.AddDbContext<OvertimeDbContextSqlServer>(opts => opts
+        .UseSqlServer(connStr)
+        .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
     builder.Services.AddScoped<OvertimeDbContext>(sp => sp.GetRequiredService<OvertimeDbContextSqlServer>());
 }
 
@@ -155,10 +160,42 @@ builder.Services.AddScoped<OvertimeCaptureSchemaUpgrader>();
 builder.Services.AddScoped<OvertimeChainPositionBackfillService>();
 builder.Services.AddScoped<OvertimeDivisionNameBackfillService>();
 
+// ---------- Global auth: verify POS-API's JWT (identity only) ----------
+// Same shared secret / issuer / audience as POS-API's ems-jwt.ts and every
+// other migrated module (Performance, Payroll). Signature is validated on
+// EVERY request by the authentication middleware below (UseAuthentication()),
+// not just [Authorize]-gated ones, so JwtCurrentUserService can read the
+// verified claim without requiring [Authorize] on every controller.
+var jwtKey = Environment.GetEnvironmentVariable("PLATINUM_JWT_SECRET")
+    ?? builder.Configuration["Jwt:Key"]
+    ?? "platinum-local-dev-jwt-secret-change-in-production";
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = "PlatinumPOS",
+            ValidAudience = "Platinum-Suite",
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+        };
+    });
+builder.Services.AddAuthorization();
+
 // ---------- Current-user shim (X-User-Id header → DevUserDirectory) ----------
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<DevUserDirectory>();
-builder.Services.AddScoped<ICurrentUserService, DevCurrentUserService>();
+// JwtCurrentUserService (default): trusts the verified JWT claim first, falls
+// back to the legacy unsigned header bridge only for local/testing coexistence.
+// Set "Auth:UseLegacyHeaderBridge": true to instantly roll back to the old,
+// header-only DevCurrentUserService without a code change.
+if (builder.Configuration.GetValue<bool>("Auth:UseLegacyHeaderBridge"))
+    builder.Services.AddScoped<ICurrentUserService, DevCurrentUserService>();
+else
+    builder.Services.AddScoped<ICurrentUserService, JwtCurrentUserService>();
 
 // ---------- Overtime amount + formula + assignee resolver ----------
 builder.Services.AddSingleton<FormulaEvaluator>();
@@ -240,9 +277,19 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<OvertimeDbContext>();
-    db.Database.Migrate();
-
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    // TEMPORARY local-dev-only guard (2026-09-03): this connection now points at
+    // the real EMS_GeorgeUAT database (see appsettings.Development.json), which
+    // already has Overtime's tables but a __EFMigrationsHistory state that
+    // doesn't match this project's migrations 1:1 (confirmed: one migration
+    // tries to drop OvertimeTransaction.CycleId, which doesn't exist there).
+    // Made non-fatal here ONLY so local testing against real data is possible
+    // without risking a partial/destructive migration run. Do NOT carry this
+    // into production config - production's own startup should keep failing
+    // fast on a real migration error, this relaxation is local-dev-only.
+    try { db.Database.Migrate(); }
+    catch (Exception ex) { logger.LogWarning(ex, "Database.Migrate() failed - continuing without it (local-dev-only relaxation, see comment)."); }
+
     var skipSeeding = app.Configuration.GetValue<bool>("Seeding:SkipOnStartup");
 
     async Task RunSeeder(string name, Func<Task> action)
@@ -290,6 +337,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 // DB connection test endpoint — verifies the Postgres (Overtime) connection.

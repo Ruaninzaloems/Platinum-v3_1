@@ -142,6 +142,7 @@ safer.)
 | `DATABASE_URL`    | Azure Postgres connection string                             |
 | `SESSION_SECRET`  | A long random string                                         |
 | `CORS_ORIGINS`    | `https://platinum-shell.azurewebsites.net`                   |
+| `PLATINUM_JWT_SECRET` | Shared HS256 signing secret for the global auth JWT POS-API issues at login (`ems-jwt.ts`). Generate once with e.g. `openssl rand -base64 48`, then set it — **identically, same value** — as an App Setting on every App Service that will verify this token as each module migrates onto it (currently: POS-API itself; module backends are added here as they migrate — see the auth-migration plan). Never commit the real value; without it set, POS-API falls back to an obviously-fake local-dev secret and refuses to start in `NODE_ENV=production`. |
 
 The sibling-spawn block is now off by default — leave
 `SPAWN_SIBLING_SERVICES` **unset** in production.
@@ -189,9 +190,24 @@ App settings:
 | `NODE_ENV`     | `production`                                |
 | `DATABASE_URL` | Azure Postgres connection string            |
 | `CORS_ORIGINS` | `https://platinum-shell.azurewebsites.net`  |
+| `PLATINUM_JWT_SECRET` | Same shared global-auth secret as POS-API (§4.2) — must match exactly. This module verifies POS-API's JWT instead of trusting the old unsigned `x-user` header. |
 
 The hardcoded `FIXED_PORT = 6800` was removed — the server now reads
 `process.env.PORT` (which Azure provides).
+
+## 6a. Global auth rollout — App Settings on every migrated module's App Service
+
+POS-API (§4.2) now issues a signed JWT at login that other modules verify instead of
+trusting an unsigned identity header. As each module migrates, its App Service needs the
+same `PLATINUM_JWT_SECRET` value (identical, not per-module):
+
+| Module      | App Service                          | Status                                          |
+|-------------|---------------------------------------|--------------------------------------------------|
+| Performance | `platinum-insights-api`               | Migrated — see §6 above                          |
+| Payroll     | (Payroll App Service — see azure-pipelines.yml) | Migrated — set `PLATINUM_JWT_SECRET`   |
+| Overtime    | `Platinum-V3-Overtime-Postgres-API`    | Migrated — set `PLATINUM_JWT_SECRET`; `Auth:UseLegacyHeaderBridge` App Setting available as an instant rollback to the old header-only behavior |
+| SCM         | (SCM-API's own App Service)           | Dual-accept — set `PLATINUM_JWT_SECRET` in addition to its existing `Jwt:Key`; SCM's own login/token keep working unchanged |
+| Assets, Budget, IDP | — | Out of scope for this rollout — these backends have no authentication at all today; wiring them up is a separate, larger initiative |
 
 ## 7. Verifying the deployment
 

@@ -10,11 +10,14 @@
     "start": "NODE_ENV=production tsx index.ts",
     "start:bundled": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@jridgewell/trace-mapping": "^0.3.25",
     "@types/compression": "^1.8.1",
+    "@types/jsonwebtoken": "^9.0.10",
     "compression": "^1.8.1",
     "concurrently": "^9.2.1",
     "connect-pg-simple": "^10.0.0",
@@ -24,6 +27,7 @@
     "exceljs": "^4.4.0",
     "express": "^5.0.1",
     "express-session": "^1.19.0",
+    "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.1.0",
     "jspdf-autotable": "^5.0.7",
     "memorystore": "^1.6.7",

@@ -462,12 +462,19 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
                 <a class="nav-link sub-item" routerLink="/admin-settings/access-management" routerLinkActive="active-link">
                   <mat-icon class="nav-icon">admin_panel_settings</mat-icon><span>Access Management</span>
                 </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/user-roles" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">group</mat-icon><span>User & Roles</span>
+                </a>
               </div>
             }
           } @else if (activeModule() === 'settings') {
             <a class="nav-link" routerLink="/settings/access-management" routerLinkActive="active-link">
               <mat-icon class="nav-icon">admin_panel_settings</mat-icon>
               @if (!sidenavCollapsed()) { <span>Access Management</span> }
+            </a>
+            <a class="nav-link" routerLink="/settings/user-roles" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">group</mat-icon>
+              @if (!sidenavCollapsed()) { <span>User & Roles</span> }
             </a>
           }
         </nav>

@@ -56,9 +56,11 @@ export const routes: Routes = [
       { path: 'sharepoint/uat-overtime', canMatch: [moduleGuard('sharepoint')], loadComponent: () => import('./features/sharepoint/uat-overtime.component').then(m => m.UatOvertimeComponent) },
       { path: 'admin-settings', canMatch: [moduleGuard('admin')], loadComponent: () => import('./features/admin/admin-settings.component').then(m => m.AdminSettingsComponent) },
       { path: 'admin-settings/access-management', canMatch: [moduleGuard('admin')], loadComponent: () => import('./features/admin/access-management.component').then(m => m.AccessManagementComponent) },
+      { path: 'admin-settings/user-roles', canMatch: [moduleGuard('admin')], loadComponent: () => import('./features/admin/user-roles-admin.component').then(m => m.UserRolesAdminComponent) },
       { path: 'admin-settings/:module', canMatch: [moduleGuard('admin')], loadComponent: () => import('./features/admin/admin-settings.component').then(m => m.AdminSettingsComponent) },
       { path: 'settings', redirectTo: 'settings/access-management', pathMatch: 'full' },
       { path: 'settings/access-management', canMatch: [moduleGuard('admin')], loadComponent: () => import('./features/admin/access-management.component').then(m => m.AccessManagementComponent) },
+      { path: 'settings/user-roles', canMatch: [moduleGuard('admin')], loadComponent: () => import('./features/admin/user-roles-admin.component').then(m => m.UserRolesAdminComponent) },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: '**', component: NotFoundComponent }
     ]
