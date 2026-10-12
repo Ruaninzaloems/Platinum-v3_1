@@ -86,8 +86,14 @@ try
     // POS-API's token exclusively is a separate, later cleanup milestone — not
     // part of this rollout.
     var scmJwtKey = builder.Configuration["Jwt:Key"] ?? "PlatinumSCM-Default-Key-Minimum-32-Characters-Long";
+    // Outside Development, a missing PLATINUM_JWT_SECRET means the global key is
+    // simply NOT accepted (SCM keeps working on its own JWT) — never fall back
+    // to the public dev literal, which would let anyone forge a global token.
     var globalJwtKey = Environment.GetEnvironmentVariable("PLATINUM_JWT_SECRET")
-        ?? "platinum-local-dev-jwt-secret-change-in-production";
+        ?? (builder.Environment.IsDevelopment() ? "platinum-local-dev-jwt-secret-change-in-production" : null);
+    var signingKeys = new List<SecurityKey> { new SymmetricSecurityKey(Encoding.UTF8.GetBytes(scmJwtKey)) };
+    if (!string.IsNullOrEmpty(globalJwtKey))
+        signingKeys.Add(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(globalJwtKey)));
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
@@ -100,11 +106,7 @@ try
                 ValidateIssuerSigningKey = true,
                 ValidIssuers = new[] { builder.Configuration["Jwt:Issuer"], "PlatinumPOS" },
                 ValidAudiences = new[] { builder.Configuration["Jwt:Audience"], "Platinum-Suite" },
-                IssuerSigningKeys = new[]
-                {
-                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(scmJwtKey)),
-                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(globalJwtKey)),
-                },
+                IssuerSigningKeys = signingKeys,
             };
         });
     builder.Services.AddAuthorization();

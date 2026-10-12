@@ -198,9 +198,15 @@ builder.Services.AddScoped<OvertimeDivisionNameBackfillService>();
 // EVERY request by the authentication middleware below (UseAuthentication()),
 // not just [Authorize]-gated ones, so JwtCurrentUserService can read the
 // verified claim without requiring [Authorize] on every controller.
+// The public dev literal is only a Development convenience. Outside
+// Development, a missing secret must FAIL CLOSED: a random per-process key means
+// no token can validate (requests fall through unauthenticated), instead of the
+// well-known literal letting anyone forge a token for any user.
 var jwtKey = Environment.GetEnvironmentVariable("PLATINUM_JWT_SECRET")
     ?? builder.Configuration["Jwt:Key"]
-    ?? "platinum-local-dev-jwt-secret-change-in-production";
+    ?? (builder.Environment.IsDevelopment()
+        ? "platinum-local-dev-jwt-secret-change-in-production"
+        : Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(48)));
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {

@@ -7,7 +7,11 @@ const config = {
     // signs with (POS-API/ems-jwt.ts) — this module now verifies THAT token
     // instead of issuing/verifying its own. JWT_SECRET is kept as a fallback
     // name only for any environment that hasn't set the new var yet.
-    secret: process.env.PLATINUM_JWT_SECRET || process.env.JWT_SECRET || 'platinum-local-dev-jwt-secret-change-in-production',
+    // The public dev literal is Development-only. In production a missing secret
+    // leaves this undefined, so jwt.verify rejects every token (fail closed)
+    // rather than accepting tokens anyone could forge with the known literal.
+    secret: process.env.PLATINUM_JWT_SECRET || process.env.JWT_SECRET ||
+      (process.env.NODE_ENV === 'production' ? undefined : 'platinum-local-dev-jwt-secret-change-in-production'),
     expiresIn: '8h',
     issuer: 'PlatinumPOS',
     audience: 'Platinum-Suite',
