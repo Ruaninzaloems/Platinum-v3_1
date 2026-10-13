@@ -75,6 +75,15 @@ function isPerformanceTarget(url: string): boolean {
   return PERFORMANCE_PREFIXES.some(p => url.startsWith(p));
 }
 
+/** The Assets module's API: the unprefixed `/api/` root (shell proxies it to ASSETS_API_URL) and
+ *  the legacy `/ASSETS-API/` path. A separately-hosted backend with its own auth, so its 401s
+ *  must not be read as the shell session expiring. `/api/auth/*` is still handled separately. */
+const ASSETS_PREFIXES = ['/api/', '/ASSETS-API/'];
+
+function isAssetsTarget(url: string): boolean {
+  return ASSETS_PREFIXES.some(p => url.startsWith(p));
+}
+
 /** Token for the George API: a dedicated george_token if configured, else the session token. */
 function georgeToken(fallback: string | null): string | null {
   try {
@@ -175,15 +184,18 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   const performance = isPerformanceTarget(req.url);
   const overtime = isOvertimeTarget(req.url);
+  const assets = isAssetsTarget(req.url);
 
   return next(cloned).pipe(
     catchError((err: HttpErrorResponse) => {
-      // A 401 from SCM, George, Performance or Overtime just means THEIR own bridged-identity
+      // A 401 from SCM, George, Performance, Overtime or Assets just means THEIR own
       // token/header is missing or unrecognised — those backends have no concept of the shell's
       // session, so a 401 from them must NOT tear down the app session (that's POS-API's domain)
       // or bounce the user to /login. Without this, clicking into Performance while its backend
-      // rejects the bridged x-user header force-logs-out the entire shell.
-      if (err.status === 401 && !req.url.includes('/auth/') && !george && !scm && !performance && !overtime) {
+      // rejects the bridged x-user header force-logs-out the entire shell. Assets is the same:
+      // its API is a separately-hosted deployment with its own authentication, and its 401s
+      // were bouncing users to /login the moment they opened the module.
+      if (err.status === 401 && !req.url.includes('/auth/') && !george && !scm && !performance && !overtime && !assets) {
         // Soft teardown: don't persist the logged-out flag, so an expected upstream 401 doesn't
         // permanently suppress the auto-admin session on the next reload.
         auth.logout(false).catch(() => router.navigate(['/login']));
