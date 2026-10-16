@@ -9,15 +9,16 @@ import { GraphService } from '@platinumv3/shared/graph';
  *
  *   Library columns written:  AFSID, description, Classification, Category, Tags
  *
- * Two independent libraries are supported, each with its own enable toggle:
- *   • 'afs'         → working-paper / general AFS documents   (default lib: UatAFS)
- *   • 'adjustments' → adjustment supporting documents         (default lib: UatAFSAdjustments)
+ * Three independent libraries are supported, each with its own enable toggle:
+ *   • 'afs'            → working-paper / general AFS documents   (default lib: UatAFS)
+ *   • 'adjustments'    → adjustment supporting documents         (default lib: UatAFSAdjustments)
+ *   • 'administration' → AFS administration documents            (default lib: UatAFSAdministration)
  *
  * Mirrors the Assets SharePointConfigService / Overtime OvertimeSharePointService.
  */
 const STORAGE_KEY = 'platinum_module_config';
 
-export type AfsSpVariant = 'afs' | 'adjustments';
+export type AfsSpVariant = 'afs' | 'adjustments' | 'administration';
 
 export interface AfsSharePointConfig {
   enabled: boolean;
@@ -49,6 +50,7 @@ const DEFAULT_CONFIGS: Record<AfsSpVariant, AfsSharePointConfig> = {
   // The Adjustments library's URL segment is "UatAFSAdjustments1" (its display title is still
   // "UatAFSAdjustments" but that name was taken, so SharePoint suffixed the URL with 1).
   adjustments: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFSAdjustments1' },
+  administration: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFSAdministration' },
 };
 
 interface AfsDocMeta {
@@ -68,6 +70,7 @@ const emptyFields = (): Record<string, string | null> =>
 const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   afs: { key: 'afsid', defaultName: 'AFSID' },
   adjustments: { key: 'adjid', defaultName: 'ADJID' },
+  administration: { key: 'afsid', defaultName: 'AFSID' },
 };
 
 @Injectable({ providedIn: 'root' })
@@ -78,17 +81,20 @@ export class AfsSharePointService {
   readonly config = signal<AfsSharePointConfig>(this.read('afs'));
   /** Adjustments library config. */
   readonly adjustmentsConfig = signal<AfsSharePointConfig>(this.read('adjustments'));
+  /** Administration library config. */
+  readonly administrationConfig = signal<AfsSharePointConfig>(this.read('administration'));
 
-  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null };
+  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, administration: null };
   private fieldsByVariant: Record<AfsSpVariant, Record<string, string | null>> = {
-    afs: emptyFields(), adjustments: emptyFields(),
+    afs: emptyFields(), adjustments: emptyFields(), administration: emptyFields(),
   };
 
   refresh(): void {
     this.config.set(this.read('afs'));
     this.adjustmentsConfig.set(this.read('adjustments'));
-    this.driveIds = { afs: null, adjustments: null };
-    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields() };
+    this.administrationConfig.set(this.read('administration'));
+    this.driveIds = { afs: null, adjustments: null, administration: null };
+    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), administration: emptyFields() };
   }
 
   isEnabled(variant: AfsSpVariant = 'afs'): boolean {
@@ -100,7 +106,9 @@ export class AfsSharePointService {
   async resolveDriveId(variant: AfsSpVariant = 'afs'): Promise<string> {
     if (this.driveIds[variant]) return this.driveIds[variant] as string;
     const cfg = this.read(variant);
-    (variant === 'adjustments' ? this.adjustmentsConfig : this.config).set(cfg);
+    (variant === 'adjustments' ? this.adjustmentsConfig
+      : variant === 'administration' ? this.administrationConfig
+      : this.config).set(cfg);
     const u = new URL(cfg.siteUrl);
     const site = await this.graph.getSiteByPath(u.hostname, u.pathname.replace(/\/$/, ''));
     const drives = await this.graph.getDrives(site.id);
@@ -404,6 +412,14 @@ export class AfsSharePointService {
             siteUrl: p.afsAdjustmentsSharePointSiteUrl || d.siteUrl,
             library: p.afsAdjustmentsSharePointLibrary || d.library,
             linkColumn: (p.afsAdjustmentsSharePointLinkColumn || '').trim() || undefined,
+          };
+        }
+        if (variant === 'administration') {
+          return {
+            enabled: p.afsAdministrationSharePointEnabled ?? d.enabled,
+            siteUrl: p.afsAdministrationSharePointSiteUrl || d.siteUrl,
+            library: p.afsAdministrationSharePointLibrary || d.library,
+            linkColumn: (p.afsAdministrationSharePointLinkColumn || '').trim() || undefined,
           };
         }
         return {
