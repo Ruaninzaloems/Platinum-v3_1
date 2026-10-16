@@ -3,6 +3,8 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { MsAuthService } from '@platinumv3/shared/auth';
 
+import { searchTerms, buildDocumentQuery, locationFromUrl, nameContainsAll } from './document-search';
+
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 
 export interface GraphUser {
@@ -63,6 +65,20 @@ export interface ListColumn {
   calculated ?: unknown;
 }
 
+/** A document returned by {@link GraphService.searchDocuments}. */
+export interface DocumentHit {
+  id                   : string;
+  driveId              : string;
+  name                 : string;
+  webUrl               : string;
+  size                 : number | null;
+  lastModifiedDateTime : string;
+  /** Human-readable "site / library / folder" location, derived from webUrl. */
+  location             : string;
+  /** True when the file NAME contains every search term (vs. a content/metadata-only match). */
+  nameMatch            : boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class GraphService {
   private http    = inject(HttpClient);
@@ -107,6 +123,57 @@ export class GraphService {
     const q = query.trim() || '*'; // '*' returns all accessible sites
     const resp = await this.get<{ value: SharePointSite[] }>(`/sites?search=${encodeURIComponent(q)}`);
     return resp.value;
+  }
+
+  /**
+   * Search DOCUMENTS (not sites) across every document library the user can reach.
+   * Pass `siteWebUrl` to limit the search to one site (all of its libraries); omit it to search
+   * every site. Uses Microsoft Graph search (POST /search/query, entityType driveItem), which
+   * needs only the Sites.Read.All / Files.Read.All scopes the app already requests.
+   *
+   * Matching is word-prefix based (the search index's behaviour): "screen" finds
+   * "Screenshot 2026…", but a fragment from the middle of a word ("shot") does not. Hits whose
+   * file NAME contains every term are returned first, then content/metadata-only matches.
+   */
+  async searchDocuments(input: string, siteWebUrl?: string | null, size = 50): Promise<DocumentHit[]> {
+    if (searchTerms(input).length === 0) return [];
+    const headers = await this.headers();
+    const body = {
+      requests: [{
+        entityTypes: ['driveItem'],
+        query: { queryString: buildDocumentQuery(input, siteWebUrl) },
+        from: 0,
+        size,
+      }],
+    };
+    let resp: any;
+    try {
+      resp = await firstValueFrom(this.http.post<any>(`${GRAPH}/search/query`, body, { headers }));
+    } catch (err: any) {
+      const msg = err?.error?.error?.message ?? err?.message ?? 'search failed';
+      throw new Error(`Document search failed (HTTP ${err?.status ?? '?'}): ${msg}`);
+    }
+
+    const hits: any[] = resp?.value?.[0]?.hitsContainers?.[0]?.hits ?? [];
+    const out: DocumentHit[] = hits
+      .map(h => h.resource)
+      .filter(r => r && r.id && r.name && !r.folder)
+      .map((r): DocumentHit => ({
+        id: r.id,
+        driveId: r.parentReference?.driveId ?? '',
+        name: r.name,
+        webUrl: r.webUrl ?? '',
+        size: r.size ?? null,
+        lastModifiedDateTime: r.lastModifiedDateTime ?? '',
+        location: locationFromUrl(r.webUrl ?? ''),
+        nameMatch: nameContainsAll(r.name, input),
+      }));
+
+    // Stable sort: name matches first, original (relevance) order otherwise preserved.
+    return out
+      .map((h, i) => ({ h, i }))
+      .sort((a, b) => Number(b.h.nameMatch) - Number(a.h.nameMatch) || a.i - b.i)
+      .map(x => x.h);
   }
 
   /** Get a specific site by ID. */

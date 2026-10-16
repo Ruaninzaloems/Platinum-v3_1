@@ -8,7 +8,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { GraphService, SharePointSite, Drive, DriveItem } from '@platinumv3/shared/graph';
+import { GraphService, SharePointSite, Drive, DriveItem, DocumentHit } from '@platinumv3/shared/graph';
 import { MsAuthService } from '@platinumv3/shared/auth';
 
 interface BreadcrumbItem { id: string; name: string; }
@@ -113,7 +113,7 @@ const PINNED_SITES: PinnedSite[] = [
             </div>
             <div class="search-box">
               <mat-icon>search</mat-icon>
-              <input type="text" placeholder="Search sites…"
+              <input type="text" placeholder="Find a site by name…"
                      [(ngModel)]="siteQuery" (input)="searchSites()">
             </div>
 
@@ -143,6 +143,74 @@ const PINNED_SITES: PinnedSite[] = [
 
           <!-- ── Main area ─────────────────────────────────────────────── -->
           <main class="main-area">
+
+            <!-- Document search (searches FILES across all libraries, not sites) -->
+            <div class="doc-search">
+              <mat-icon class="ds-icon">search</mat-icon>
+              <input type="text" class="ds-input"
+                     placeholder="Search documents across all libraries…"
+                     [ngModel]="docQuery()" (ngModelChange)="onDocQueryChange($event)"
+                     (keydown.enter)="runDocSearch()">
+              <select class="ds-scope" [ngModel]="docScope()" (ngModelChange)="onDocScopeChange($event)"
+                      aria-label="Search scope">
+                @if (selectedSite()) {
+                  <option value="site">This site ({{ selectedSite()?.displayName || selectedSite()?.name }})</option>
+                }
+                <option value="all">All sites</option>
+              </select>
+              @if (docQuery()) {
+                <button mat-icon-button (click)="clearDocSearch()" matTooltip="Clear search">
+                  <mat-icon>close</mat-icon>
+                </button>
+              }
+            </div>
+
+            @if (docSearchActive()) {
+              <!-- ── Search results ─────────────────────────────────────── -->
+              @if (docSearching()) {
+                <div class="spinner-wrap"><mat-spinner diameter="40"></mat-spinner></div>
+              } @else {
+                <div class="ds-summary">
+                  {{ docResults().length }} result{{ docResults().length === 1 ? '' : 's' }}
+                  for “{{ docQueryRan() }}” in
+                  {{ docScopeRan() === 'site' ? 'this site' : 'all sites' }}
+                  @if (docResults().length >= 50) { <span> (showing the first 50 — refine your search)</span> }
+                </div>
+                <div class="file-grid">
+                  @for (hit of docResults(); track hit.driveId + hit.id) {
+                    <div class="file-card" (dblclick)="openHit(hit)"
+                         [matTooltip]="hit.name + ' — ' + formatSize(hit.size)">
+                      <div class="file-icon"><mat-icon>{{ getFileIcon(hit.name) }}</mat-icon></div>
+                      <div class="file-meta">
+                        <div class="file-name">{{ hit.name }}</div>
+                        <div class="file-info">
+                          {{ formatSize(hit.size) }} · {{ hit.lastModifiedDateTime | date:'dd MMM yyyy' }}
+                          @if (!hit.nameMatch) { · <em>content match</em> }
+                        </div>
+                        <div class="file-loc">{{ hit.location }}</div>
+                      </div>
+                      <div class="file-actions">
+                        <button mat-icon-button matTooltip="Open in SharePoint"
+                                (click)="openHit(hit); $event.stopPropagation()">
+                          <mat-icon>open_in_new</mat-icon>
+                        </button>
+                        <button mat-icon-button matTooltip="Download"
+                                (click)="downloadHit(hit); $event.stopPropagation()">
+                          <mat-icon>download</mat-icon>
+                        </button>
+                      </div>
+                    </div>
+                  }
+                  @if (docResults().length === 0) {
+                    <div class="empty-folder">
+                      <mat-icon>search_off</mat-icon>
+                      <p>No documents found for “{{ docQueryRan() }}”.</p>
+                      <p class="ds-hint">Search matches the start of words (e.g. “screen” finds “Screenshot…”). Newly uploaded files can take a few minutes to appear.</p>
+                    </div>
+                  }
+                </div>
+              }
+            } @else {
 
             <!-- Drive picker -->
             @if (selectedSite()) {
@@ -238,6 +306,8 @@ const PINNED_SITES: PinnedSite[] = [
                   </div>
                 }
               </div>
+            }
+
             }
           </main>
         </div>
@@ -371,6 +441,23 @@ const PINNED_SITES: PinnedSite[] = [
     .file-info { font-size: .75rem; color: #94a3b8; margin-top: .15rem; }
     .file-actions { display: flex; gap: .25rem; }
 
+    /* Document search */
+    .doc-search {
+      display: flex; align-items: center; gap: .5rem;
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+      padding: .35rem .5rem .35rem .8rem;
+    }
+    .doc-search:focus-within { border-color: #3f51b5; box-shadow: 0 0 0 2px rgba(63,81,181,.15); }
+    .ds-icon { color: #94a3b8; }
+    .ds-input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font-size: .95rem; padding: .35rem 0; }
+    .ds-scope {
+      border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc;
+      font-size: .8rem; padding: .3rem .4rem; color: #334155; max-width: 240px;
+    }
+    .ds-summary { font-size: .85rem; color: #475569; }
+    .ds-hint { font-size: .8rem; max-width: 460px; text-align: center; margin: 0; }
+    .file-loc { font-size: .72rem; color: #64748b; margin-top: .1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
     .spinner-wrap { display: flex; justify-content: center; padding: 2rem; }
     .placeholder {
       flex: 1; display: flex; flex-direction: column;
@@ -398,6 +485,18 @@ export class SharepointComponent implements OnInit {
   siteQuery    = '';
   sites        = signal<SharePointSite[]>([]);
   sitesLoading = signal(false);
+
+  // ── Document search (files across all libraries) ──────────────────────────
+  docQuery      = signal('');
+  docScope      = signal<'site' | 'all'>('site');
+  docSearching  = signal(false);
+  docResults    = signal<DocumentHit[]>([]);
+  docQueryRan   = signal('');
+  docScopeRan   = signal<'site' | 'all'>('site');
+  /** True while a (non-blank) document search is shown instead of the folder view. */
+  docSearchActive = computed(() => this.docQuery().trim().length >= 2);
+  private docTimer: ReturnType<typeof setTimeout> | null = null;
+  private docSeq = 0;
 
   // ── Selected site / drive ─────────────────────────────────────────────────
   selectedSite    = signal<SharePointSite | null>(null);
@@ -475,6 +574,69 @@ export class SharepointComponent implements OnInit {
       );
     } finally {
       this.pinnedLoading.set(false);
+    }
+  }
+
+  // ── Document search ───────────────────────────────────────────────────────
+
+  onDocQueryChange(value: string): void {
+    this.docQuery.set(value ?? '');
+    if (this.docTimer) clearTimeout(this.docTimer);
+    if (!this.docSearchActive()) { this.docSeq++; this.docResults.set([]); this.docSearching.set(false); return; }
+    this.docSearching.set(true);
+    this.docTimer = setTimeout(() => this.runDocSearch(), 450); // debounce while typing
+  }
+
+  onDocScopeChange(scope: 'site' | 'all'): void {
+    this.docScope.set(scope);
+    if (this.docSearchActive()) this.runDocSearch();
+  }
+
+  async runDocSearch(): Promise<void> {
+    if (this.docTimer) { clearTimeout(this.docTimer); this.docTimer = null; }
+    const q = this.docQuery().trim();
+    if (q.length < 2) return;
+    // "This site" only makes sense once a site is selected; otherwise search everything.
+    const scope: 'site' | 'all' = this.docScope() === 'site' && this.selectedSite() ? 'site' : 'all';
+    const seq = ++this.docSeq; // ignore out-of-order responses from earlier keystrokes
+    this.docSearching.set(true);
+    try {
+      const hits = await this.graph.searchDocuments(
+        q, scope === 'site' ? this.selectedSite()!.webUrl : null
+      );
+      if (seq !== this.docSeq) return;
+      this.docResults.set(hits);
+      this.docQueryRan.set(q);
+      this.docScopeRan.set(scope);
+    } catch (e: any) {
+      if (seq !== this.docSeq) return;
+      this.docResults.set([]);
+      this.docQueryRan.set(q);
+      this.docScopeRan.set(scope);
+      this.snack.open(e?.message ?? 'Document search failed', 'Close', { duration: 6000 });
+    } finally {
+      if (seq === this.docSeq) this.docSearching.set(false);
+    }
+  }
+
+  clearDocSearch(): void {
+    this.docSeq++;
+    if (this.docTimer) { clearTimeout(this.docTimer); this.docTimer = null; }
+    this.docQuery.set('');
+    this.docResults.set([]);
+    this.docSearching.set(false);
+  }
+
+  openHit(hit: DocumentHit): void {
+    if (hit.webUrl) window.open(hit.webUrl, '_blank', 'noopener');
+  }
+
+  async downloadHit(hit: DocumentHit): Promise<void> {
+    try {
+      this.snack.open('Preparing download…', undefined, { duration: 2000 });
+      await this.graph.triggerDownload(hit.driveId, hit.id, hit.name);
+    } catch (e: any) {
+      this.snack.open('Download failed: ' + (e?.message ?? e), 'Close', { duration: 4000 });
     }
   }
 
