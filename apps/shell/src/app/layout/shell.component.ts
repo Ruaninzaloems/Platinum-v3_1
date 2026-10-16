@@ -680,9 +680,10 @@ export class ShellComponent implements OnInit, OnDestroy {
   private readonly _isDev = isDevMode();
   showDevModules(): boolean { return this._isDev; }
 
-  // POS and SharePoint are still in active development — hidden on production
-  // builds regardless of access grants.
-  private readonly _devOnlyModules = new Set<string>(['pos', 'sharepoint']);
+  // POS is still in active development — hidden on production builds regardless
+  // of access grants. (SharePoint was removed from this list so users with the
+  // SharePoint grant see it on prod; keep the dashboard's list in sync.)
+  private readonly _devOnlyModules = new Set<string>(['pos']);
 
   /**
    * Whether a module chip should render: the user must have access to the

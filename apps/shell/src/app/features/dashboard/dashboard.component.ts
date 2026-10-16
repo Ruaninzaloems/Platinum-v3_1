@@ -67,7 +67,7 @@ export class DashboardComponent {
   // POS and Performance are still in active development — hidden on production
   // builds, mirroring the side nav (shell.component.ts canShowModule).
   private readonly _isDev = isDevMode();
-  private readonly _devOnlyModules = new Set<string>(['pos', 'insights', 'sharepoint']);
+  private readonly _devOnlyModules = new Set<string>(['pos', 'insights']);
 
   modules: DashboardModule[] = [
     { name: 'Asset Management', path: '/assets', module: 'assets', icon: 'inventory_2', color: '#1a237e', description: 'GRAP-compliant asset register, verification, depreciation and disposal management.' },
