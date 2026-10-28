@@ -126,25 +126,28 @@ export class DocumentManagementService {
   private afsSp = inject(AfsSharePointService);
 
   /** The AFS entity id a document is linked to (working paper / compilation / finding / …).
-   *  The RFI and working-paper libraries link by the RFI / working-paper id itself. */
+   *  The RFI, working-paper and finding libraries link by the RFI / working-paper / finding id itself. */
   private contextId(m: UploadMetadata, variant: AfsSpVariant): string {
     if (variant === 'rfi') return (m.rfiId || '') as string;
     if (variant === 'workingPaper') return (m.workingPaperId || '') as string;
+    if (variant === 'finding') return (m.findingId || '') as string;
     return (m.workingPaperId || m.compilationId || m.findingId || m.rfiId || m.adjustmentId || '') as string;
   }
 
-  /** Adjustment documents go to the separate Adjustments library; RFI attachments and working
-   *  papers to their Working-Papers libraries (when those toggles are on); everything else to
-   *  the AFS library. */
+  /** Adjustment documents go to the separate Adjustments library; RFI attachments, finding
+   *  attachments and working papers to their Working-Papers libraries (when those toggles are
+   *  on); everything else to the AFS library. */
   private variantForUpload(m: UploadMetadata): AfsSpVariant {
     if (m.adjustmentId) return 'adjustments';
     if (m.rfiId && this.afsSp.isEnabled('rfi')) return 'rfi';
+    if (m.findingId && this.afsSp.isEnabled('finding')) return 'finding';
     if (m.workingPaperId && this.afsSp.isEnabled('workingPaper')) return 'workingPaper';
     return 'afs';
   }
   private variantForContext(contextType: string): AfsSpVariant {
     if (contextType === 'adjustment') return 'adjustments';
     if (contextType === 'rfi' && this.afsSp.isEnabled('rfi')) return 'rfi';
+    if (contextType === 'finding' && this.afsSp.isEnabled('finding')) return 'finding';
     if (contextType === 'working_paper' && this.afsSp.isEnabled('workingPaper')) return 'workingPaper';
     return 'afs';
   }
