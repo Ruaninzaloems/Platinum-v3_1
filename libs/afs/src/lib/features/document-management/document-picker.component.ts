@@ -55,13 +55,14 @@ export class DocumentPickerComponent implements OnInit {
   doSearch() {
     this.loading.set(true);
     this.loadError.set('');
-    // When AFS SharePoint storage is active (either the working-paper or the adjustments
-    // toggle), "Working Paper" documents live in the UatAFS library — list them from there
-    // (filtered client-side by the search box).
-    const spActive = this.dms.isSharePointActive('afs') || this.dms.isSharePointActive('adjustments');
+    // When AFS SharePoint storage is active (the AFS, adjustments or working-paper toggle),
+    // "Working Paper" documents live in SharePoint — the Working-Papers library when its toggle
+    // is on, otherwise UatAFS — so list them from there (filtered client-side by the search box).
+    const spActive = this.dms.isSharePointActive('afs') || this.dms.isSharePointActive('adjustments')
+      || this.dms.isSharePointActive('workingPaper');
     console.log('[DocumentPicker] doSearch — SharePoint active?', spActive);
     if (spActive) {
-      this.dms.listAllSpDocuments('afs').subscribe({
+      this.dms.listAllSpDocuments(this.dms.workingPaperVariant()).subscribe({
         next: (docs) => {
           const q = (this.searchQuery || '').toLowerCase().trim();
           this.documents.set(

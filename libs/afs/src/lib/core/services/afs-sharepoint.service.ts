@@ -9,16 +9,17 @@ import { GraphService } from '@platinumv3/shared/graph';
  *
  *   Library columns written:  AFSID, description, Classification, Category, Tags
  *
- * Three independent libraries are supported, each with its own enable toggle:
- *   • 'afs'         → working-paper / general AFS documents   (default lib: UatAFS)
- *   • 'adjustments' → adjustment supporting documents         (default lib: UatAFSAdjustments)
- *   • 'rfi'         → Working-Papers RFI attachments          (default lib: UatAFS WorkingPapers_RFI_Attachment)
+ * Four independent libraries are supported, each with its own enable toggle:
+ *   • 'afs'          → general AFS documents (and working papers when 'workingPaper' is off) (default lib: UatAFS)
+ *   • 'adjustments'  → adjustment supporting documents   (default lib: UatAFSAdjustments)
+ *   • 'rfi'          → Working-Papers RFI attachments    (default lib: UatAFS WorkingPapers_RFI_Attachment)
+ *   • 'workingPaper' → Working-Papers working papers     (default lib: UatAFS WorkingPapers-WorkingPaper)
  *
  * Mirrors the Assets SharePointConfigService / Overtime OvertimeSharePointService.
  */
 const STORAGE_KEY = 'platinum_module_config';
 
-export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi';
+export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi' | 'workingPaper';
 
 export interface AfsSharePointConfig {
   enabled: boolean;
@@ -51,6 +52,7 @@ const DEFAULT_CONFIGS: Record<AfsSpVariant, AfsSharePointConfig> = {
   // "UatAFSAdjustments" but that name was taken, so SharePoint suffixed the URL with 1).
   adjustments: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFSAdjustments1' },
   rfi: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_RFI_Attachment' },
+  workingPaper: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers-WorkingPaper' },
 };
 
 interface AfsDocMeta {
@@ -66,16 +68,17 @@ const emptyFields = (): Record<string, string | null> =>
   ({ afsid: null, description: null, classification: null, category: null, tags: null, documenttype: null, accesslevel: null });
 
 // The entity-link column differs per library: AFS uses "AFSID", the Adjustments
-// library uses "ADJID", and the RFI library also uses "AFSID" (holding the RFI id).
-// (description/Classification/Category/Tags are the same.)
+// library uses "ADJID", and the RFI / working-paper libraries also use "AFSID" (holding the
+// RFI / working-paper id). (description/Classification/Category/Tags are the same.)
 const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   afs: { key: 'afsid', defaultName: 'AFSID' },
   adjustments: { key: 'adjid', defaultName: 'ADJID' },
   rfi: { key: 'afsid', defaultName: 'AFSID' },
+  workingPaper: { key: 'afsid', defaultName: 'AFSID' },
 };
 
 /** Normalise a library title / URL segment for matching: decode %20, lowercase, drop whitespace
- *  (so "UatAFS WorkingPapers_RFI_Attachment", "UatAFS%20WorkingPapers_RFI_Attachment" and "UatAFSWorkingPapers_RFI_Attachment" all match). */
+ *  (so "UatAFS WorkingPapers", "UatAFS%20WorkingPapers" and "UatAFSWorkingPapers" all match). */
 const normLibrary = (s?: string): string => {
   let v = s || '';
   try { v = decodeURIComponent(v); } catch { /* keep as-is */ }
@@ -92,22 +95,30 @@ export class AfsSharePointService {
   readonly adjustmentsConfig = signal<AfsSharePointConfig>(this.read('adjustments'));
   /** Working-Papers RFI attachment library config. */
   readonly rfiConfig = signal<AfsSharePointConfig>(this.read('rfi'));
+  /** Working-Papers working-paper library config. */
+  readonly workingPaperConfig = signal<AfsSharePointConfig>(this.read('workingPaper'));
 
-  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null };
+  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null, workingPaper: null };
   private fieldsByVariant: Record<AfsSpVariant, Record<string, string | null>> = {
-    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(),
+    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(),
   };
 
   refresh(): void {
     this.config.set(this.read('afs'));
     this.adjustmentsConfig.set(this.read('adjustments'));
     this.rfiConfig.set(this.read('rfi'));
-    this.driveIds = { afs: null, adjustments: null, rfi: null };
-    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields() };
+    this.workingPaperConfig.set(this.read('workingPaper'));
+    this.driveIds = { afs: null, adjustments: null, rfi: null, workingPaper: null };
+    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields() };
   }
 
   private configSignal(variant: AfsSpVariant) {
-    return variant === 'adjustments' ? this.adjustmentsConfig : variant === 'rfi' ? this.rfiConfig : this.config;
+    switch (variant) {
+      case 'adjustments': return this.adjustmentsConfig;
+      case 'rfi': return this.rfiConfig;
+      case 'workingPaper': return this.workingPaperConfig;
+      default: return this.config;
+    }
   }
 
   isEnabled(variant: AfsSpVariant = 'afs'): boolean {
@@ -431,6 +442,14 @@ export class AfsSharePointService {
             siteUrl: p.afsRfiSharePointSiteUrl || d.siteUrl,
             library: p.afsRfiSharePointLibrary || d.library,
             linkColumn: (p.afsRfiSharePointLinkColumn || '').trim() || undefined,
+          };
+        }
+        if (variant === 'workingPaper') {
+          return {
+            enabled: p.afsWpSharePointEnabled ?? d.enabled,
+            siteUrl: p.afsWpSharePointSiteUrl || d.siteUrl,
+            library: p.afsWpSharePointLibrary || d.library,
+            linkColumn: (p.afsWpSharePointLinkColumn || '').trim() || undefined,
           };
         }
         return {
