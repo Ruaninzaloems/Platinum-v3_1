@@ -125,17 +125,24 @@ export class DocumentManagementService {
   private api = inject(ApiService);
   private afsSp = inject(AfsSharePointService);
 
-  /** The AFS entity id a document is linked to (working paper / compilation / finding / …). */
-  private contextId(m: UploadMetadata): string {
+  /** The AFS entity id a document is linked to (working paper / compilation / finding / …).
+   *  The RFI library links by the RFI id itself. */
+  private contextId(m: UploadMetadata, variant: AfsSpVariant): string {
+    if (variant === 'rfi') return (m.rfiId || '') as string;
     return (m.workingPaperId || m.compilationId || m.findingId || m.rfiId || m.adjustmentId || '') as string;
   }
 
-  /** Adjustment documents go to the separate Adjustments library; everything else to the AFS library. */
+  /** Adjustment documents go to the separate Adjustments library, RFI attachments to the
+   *  Working-Papers RFI library (when its toggle is on); everything else to the AFS library. */
   private variantForUpload(m: UploadMetadata): AfsSpVariant {
-    return m.adjustmentId ? 'adjustments' : 'afs';
+    if (m.adjustmentId) return 'adjustments';
+    if (m.rfiId && this.afsSp.isEnabled('rfi')) return 'rfi';
+    return 'afs';
   }
   private variantForContext(contextType: string): AfsSpVariant {
-    return contextType === 'adjustment' ? 'adjustments' : 'afs';
+    if (contextType === 'adjustment') return 'adjustments';
+    if (contextType === 'rfi' && this.afsSp.isEnabled('rfi')) return 'rfi';
+    return 'afs';
   }
 
   /**
@@ -217,7 +224,7 @@ export class DocumentManagementService {
     // (UatAFSAdjustments) when that toggle is on. Otherwise use the AFS API's local storage.
     const variant = this.variantForUpload(metadata);
     if (this.useSharePoint(variant)) {
-      return from(this.afsSp.uploadAfsDocument(this.contextId(metadata), file, {
+      return from(this.afsSp.uploadAfsDocument(this.contextId(metadata, variant), file, {
         description: metadata.description,
         classification: metadata.classificationLabel || metadata.classificationCode,
         category: metadata.category,
@@ -232,6 +239,11 @@ export class DocumentManagementService {
   /** True when AFS SharePoint storage is active for the given library variant. */
   isSharePointActive(variant: AfsSpVariant = 'afs'): boolean {
     return this.afsSp.isEnabled(variant);
+  }
+
+  /** Download a SharePoint-stored document (as shaped by spToDms) via Graph. */
+  downloadSpDocument(doc: DmsDocument): Promise<void> {
+    return this.afsSp.downloadAfsDocument((doc as any).__spItem, (doc as any).__spVariant || 'afs');
   }
 
   /** List every document in a SharePoint library (e.g. all UatAFS working papers). */

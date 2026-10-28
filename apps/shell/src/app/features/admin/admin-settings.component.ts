@@ -36,6 +36,11 @@ export interface ModuleApiConfig {
   afsAdjustmentsSharePointSiteUrl : string;
   afsAdjustmentsSharePointLibrary : string;
   afsAdjustmentsSharePointLinkColumn : string;
+  // AFS Working-Papers RFI attachment SharePoint document storage (separate library)
+  afsRfiSharePointEnabled : boolean;
+  afsRfiSharePointSiteUrl : string;
+  afsRfiSharePointLibrary : string;
+  afsRfiSharePointLinkColumn : string;
   // AFS PostgreSQL database (maps to AZURE_POSTGRES_URL read by AFS-UI/api)
   afsDbHost     : string;
   afsDbPort     : string;
@@ -87,6 +92,11 @@ const DEFAULTS: ModuleApiConfig = {
   afsAdjustmentsSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsAdjustmentsSharePointLibrary : 'UatAFSAdjustments1',
   afsAdjustmentsSharePointLinkColumn : 'ADJID',
+  // AFS Working-Papers RFI attachments → separate SharePoint library
+  afsRfiSharePointEnabled : false,
+  afsRfiSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  afsRfiSharePointLibrary : 'UatAFS WorkingPapers_RFI_Attachment',
+  afsRfiSharePointLinkColumn : 'AFSID',
   // AFS database — separate "AFS" PostgreSQL on Azure
   afsDbHost     : 'platinum-postgre-sql.postgres.database.azure.com',
   afsDbPort     : '5432',
@@ -461,7 +471,7 @@ const MODULES: ModuleDef[] = [
         <div class="config-card">
           <div class="sp-header">
             <mat-icon style="color:#0078d4">cloud</mat-icon>
-            <span>Adjustments SharePoint Configuration</span>
+            <span>Adjustment SharePoint Configuration</span>
           </div>
 
           <div class="sp-toggle-row">
@@ -519,6 +529,77 @@ const MODULES: ModuleDef[] = [
           <div class="actions" style="margin-top:0">
             <button class="btn-secondary" [disabled]="spTesting() || !cfg.afsAdjustmentsSharePointEnabled || !cfg.afsAdjustmentsSharePointSiteUrl"
                     (click)="testSharePointAfsAdjustments()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Working-Papers RFI attachment SharePoint library (separate from working-paper docs) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Working-Papers -RFI Attachment SharePoint Configuration</span>
+          </div>
+
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.afsRfiSharePointEnabled"
+                    (click)="cfg.afsRfiSharePointEnabled = !cfg.afsRfiSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.afsRfiSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for RFI attachments</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, RFI attachments are stored in the dedicated Working-Papers SharePoint library (linked by RFI id, with metadata) instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.afsRfiSharePointEnabled">
+              {{ cfg.afsRfiSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <div class="field-grid" [class.sp-disabled]="!cfg.afsRfiSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.afsRfiSharePointSiteUrl"
+                     [disabled]="!cfg.afsRfiSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.afsRfiSharePointLibrary"
+                     [disabled]="!cfg.afsRfiSharePointEnabled"
+                     placeholder="UatAFS WorkingPapers_RFI_Attachment"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatAFS WorkingPapers_RFI_Attachment</strong> (the library's title or the URL segment in its address)</div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.afsRfiSharePointLinkColumn"
+                     [disabled]="!cfg.afsRfiSharePointEnabled"
+                     placeholder="AFSID"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the RFI id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.afsRfiSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — RFI attachments use the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.afsRfiSharePointEnabled || !cfg.afsRfiSharePointSiteUrl"
+                    (click)="testSharePointAfsRfi()">
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
@@ -1016,6 +1097,20 @@ export class AdminSettingsComponent implements OnInit {
       this.spTesting.set(false);
       if (ok) {
         this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsAdjustmentsSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointAfsRfi() {
+    this.spTesting.set(true);
+    const url = this.cfg.afsRfiSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsRfiSharePointLibrary}`, 'OK', { duration: 4000 });
       } else {
         this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
       }

@@ -38,6 +38,7 @@ interface UserSuggestion {
 export class CreateRfiDialogComponent implements OnDestroy {
   private api = inject(ApiService);
   private dialog = inject(MatDialog);
+  private dms = inject(DocumentManagementService);
   private destroy$ = new Subject<void>();
   data: any = { subject: '', description: '', priority: 'Medium', assignedTo: '', dueDate: null, externalReference: '' };
   pendingFiles: File[] = [];
@@ -132,6 +133,29 @@ export class CreateRfiDialogComponent implements OnDestroy {
     const total = this.pendingFiles.length;
 
     this.pendingFiles.forEach((file, idx) => {
+      // Working-Papers RFI SharePoint library (Admin → AFS) when its toggle is on.
+      if (this.dms.isSharePointActive('rfi')) {
+        this.dms.upload(file, { rfiId, documentType: 'rfi_attachment' }).pipe(
+          takeUntil(this.destroy$),
+        ).subscribe({
+          next: () => {
+            this.fileProgress[idx] = 100;
+            this.uploadedCount++;
+          },
+          error: () => {
+            this.fileProgress[idx] = 100;
+            completed++;
+            this.uploadedCount++;
+            if (completed === total) this.finishUpload();
+          },
+          complete: () => {
+            completed++;
+            if (completed === total) this.finishUpload();
+          },
+        });
+        return;
+      }
+
       const formData = new FormData();
       formData.append('file', file);
       formData.append('contextType', 'rfi');
@@ -460,7 +484,7 @@ export class CreateRfiDialogComponent implements OnDestroy {
                                     <div style="font-size: 13px; font-weight: 500;">{{ doc.originalName || doc.fileName }}</div>
                                     <div style="font-size: 11px; color: var(--platinum-text-muted);">{{ formatFileSize(doc.fileSize) }} · {{ doc.createdAt | date:'shortDate' }}</div>
                                   </div>
-                                  <button mat-icon-button matTooltip="Download" (click)="downloadDoc(doc.id); $event.stopPropagation()">
+                                  <button mat-icon-button matTooltip="Download" (click)="downloadDoc(doc); $event.stopPropagation()">
                                     <mat-icon>download</mat-icon>
                                   </button>
                                 </div>
@@ -610,8 +634,12 @@ export class RfisComponent implements OnInit {
     });
   }
 
-  downloadDoc(docId: string) {
-    window.open(`/api/documents/${docId}/download`, '_blank');
+  downloadDoc(doc: DmsDocument) {
+    if ((doc as any).__spItem) {
+      this.dms.downloadSpDocument(doc).catch(() => alert(`Could not download ${doc.originalName || doc.fileName} from SharePoint.`));
+      return;
+    }
+    window.open(`/api/documents/${doc.id}/download`, '_blank');
   }
 
   reviewResponse(rfiId: string, responseId: string, status: 'approved' | 'rejected') {
@@ -696,6 +724,24 @@ export class RfisComponent implements OnInit {
 
     files.forEach((file, i) => {
       const idx = startIdx + i;
+      // Working-Papers RFI SharePoint library (Admin → AFS) when its toggle is on.
+      if (this.dms.isSharePointActive('rfi')) {
+        this.dms.upload(file, { rfiId, documentType: 'rfi_attachment' }).subscribe({
+          next: () => {
+            this.attachFileProgress[idx] = 100;
+            completed++;
+            checkDone();
+          },
+          error: () => {
+            this.attachFileProgress[idx] = -1;
+            failed++;
+            failedNames.push(file.name);
+            completed++;
+            checkDone();
+          },
+        });
+        return;
+      }
       const fd = new FormData();
       fd.append('file', file);
       this.api.uploadWithProgress(`/rfis/${rfiId}/attachments`, fd).subscribe({

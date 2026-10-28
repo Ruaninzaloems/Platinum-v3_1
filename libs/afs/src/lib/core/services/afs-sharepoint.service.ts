@@ -9,15 +9,16 @@ import { GraphService } from '@platinumv3/shared/graph';
  *
  *   Library columns written:  AFSID, description, Classification, Category, Tags
  *
- * Two independent libraries are supported, each with its own enable toggle:
+ * Three independent libraries are supported, each with its own enable toggle:
  *   • 'afs'         → working-paper / general AFS documents   (default lib: UatAFS)
  *   • 'adjustments' → adjustment supporting documents         (default lib: UatAFSAdjustments)
+ *   • 'rfi'         → Working-Papers RFI attachments          (default lib: UatAFS WorkingPapers_RFI_Attachment)
  *
  * Mirrors the Assets SharePointConfigService / Overtime OvertimeSharePointService.
  */
 const STORAGE_KEY = 'platinum_module_config';
 
-export type AfsSpVariant = 'afs' | 'adjustments';
+export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi';
 
 export interface AfsSharePointConfig {
   enabled: boolean;
@@ -49,6 +50,7 @@ const DEFAULT_CONFIGS: Record<AfsSpVariant, AfsSharePointConfig> = {
   // The Adjustments library's URL segment is "UatAFSAdjustments1" (its display title is still
   // "UatAFSAdjustments" but that name was taken, so SharePoint suffixed the URL with 1).
   adjustments: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFSAdjustments1' },
+  rfi: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_RFI_Attachment' },
 };
 
 interface AfsDocMeta {
@@ -64,10 +66,20 @@ const emptyFields = (): Record<string, string | null> =>
   ({ afsid: null, description: null, classification: null, category: null, tags: null, documenttype: null, accesslevel: null });
 
 // The entity-link column differs per library: AFS uses "AFSID", the Adjustments
-// library uses "ADJID". (description/Classification/Category/Tags are the same.)
+// library uses "ADJID", and the RFI library also uses "AFSID" (holding the RFI id).
+// (description/Classification/Category/Tags are the same.)
 const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   afs: { key: 'afsid', defaultName: 'AFSID' },
   adjustments: { key: 'adjid', defaultName: 'ADJID' },
+  rfi: { key: 'afsid', defaultName: 'AFSID' },
+};
+
+/** Normalise a library title / URL segment for matching: decode %20, lowercase, drop whitespace
+ *  (so "UatAFS WorkingPapers_RFI_Attachment", "UatAFS%20WorkingPapers_RFI_Attachment" and "UatAFSWorkingPapers_RFI_Attachment" all match). */
+const normLibrary = (s?: string): string => {
+  let v = s || '';
+  try { v = decodeURIComponent(v); } catch { /* keep as-is */ }
+  return v.toLowerCase().replace(/\s+/g, '');
 };
 
 @Injectable({ providedIn: 'root' })
@@ -78,17 +90,24 @@ export class AfsSharePointService {
   readonly config = signal<AfsSharePointConfig>(this.read('afs'));
   /** Adjustments library config. */
   readonly adjustmentsConfig = signal<AfsSharePointConfig>(this.read('adjustments'));
+  /** Working-Papers RFI attachment library config. */
+  readonly rfiConfig = signal<AfsSharePointConfig>(this.read('rfi'));
 
-  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null };
+  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null };
   private fieldsByVariant: Record<AfsSpVariant, Record<string, string | null>> = {
-    afs: emptyFields(), adjustments: emptyFields(),
+    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(),
   };
 
   refresh(): void {
     this.config.set(this.read('afs'));
     this.adjustmentsConfig.set(this.read('adjustments'));
-    this.driveIds = { afs: null, adjustments: null };
-    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields() };
+    this.rfiConfig.set(this.read('rfi'));
+    this.driveIds = { afs: null, adjustments: null, rfi: null };
+    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields() };
+  }
+
+  private configSignal(variant: AfsSpVariant) {
+    return variant === 'adjustments' ? this.adjustmentsConfig : variant === 'rfi' ? this.rfiConfig : this.config;
   }
 
   isEnabled(variant: AfsSpVariant = 'afs'): boolean {
@@ -100,15 +119,15 @@ export class AfsSharePointService {
   async resolveDriveId(variant: AfsSpVariant = 'afs'): Promise<string> {
     if (this.driveIds[variant]) return this.driveIds[variant] as string;
     const cfg = this.read(variant);
-    (variant === 'adjustments' ? this.adjustmentsConfig : this.config).set(cfg);
+    this.configSignal(variant).set(cfg);
     const u = new URL(cfg.siteUrl);
     const site = await this.graph.getSiteByPath(u.hostname, u.pathname.replace(/\/$/, ''));
     const drives = await this.graph.getDrives(site.id);
     // Match on display name OR the library's URL segment — display titles can collide (two
     // libraries titled "UatAFSAdjustments"), so the URL segment ("UatAFSAdjustments1") disambiguates.
-    const want = cfg.library.toLowerCase();
+    const want = normLibrary(cfg.library);
     const segOf = (url?: string) => (url || '').replace(/\/+$/, '').split('/').pop()?.toLowerCase() || '';
-    const exact = drives.find(d => d.name?.toLowerCase() === want || segOf(d.webUrl) === want);
+    const exact = drives.find(d => normLibrary(d.name) === want || normLibrary(segOf(d.webUrl)) === want);
     const drive = exact ?? drives[0];
     if (!drive) throw new Error(`Document library "${cfg.library}" not found on the SharePoint site.`);
     if (!exact) {
@@ -404,6 +423,14 @@ export class AfsSharePointService {
             siteUrl: p.afsAdjustmentsSharePointSiteUrl || d.siteUrl,
             library: p.afsAdjustmentsSharePointLibrary || d.library,
             linkColumn: (p.afsAdjustmentsSharePointLinkColumn || '').trim() || undefined,
+          };
+        }
+        if (variant === 'rfi') {
+          return {
+            enabled: p.afsRfiSharePointEnabled ?? d.enabled,
+            siteUrl: p.afsRfiSharePointSiteUrl || d.siteUrl,
+            library: p.afsRfiSharePointLibrary || d.library,
+            linkColumn: (p.afsRfiSharePointLinkColumn || '').trim() || undefined,
           };
         }
         return {
