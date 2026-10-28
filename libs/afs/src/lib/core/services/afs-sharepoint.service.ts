@@ -9,18 +9,19 @@ import { GraphService } from '@platinumv3/shared/graph';
  *
  *   Library columns written:  AFSID, description, Classification, Category, Tags
  *
- * Five independent libraries are supported, each with its own enable toggle:
+ * Six independent libraries are supported, each with its own enable toggle:
  *   • 'afs'          → general AFS documents (and working papers when 'workingPaper' is off) (default lib: UatAFS)
  *   • 'adjustments'  → adjustment supporting documents   (default lib: UatAFSAdjustments)
  *   • 'rfi'          → Working-Papers RFI attachments    (default lib: UatAFS WorkingPapers_RFI_Attachment)
  *   • 'workingPaper' → Working-Papers working papers     (default lib: UatAFS WorkingPapers-WorkingPaper)
  *   • 'finding'      → Working-Papers finding attachments (default lib: UatAFS WorkingPapers_FindingAttachment)
+ *   • 'scoaVersion'  → Working-Papers SCOA version documents (default lib: UatAFS WorkingPapers_ScoaVersion)
  *
  * Mirrors the Assets SharePointConfigService / Overtime OvertimeSharePointService.
  */
 const STORAGE_KEY = 'platinum_module_config';
 
-export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi' | 'workingPaper' | 'finding';
+export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi' | 'workingPaper' | 'finding' | 'scoaVersion';
 
 export interface AfsSharePointConfig {
   enabled: boolean;
@@ -55,6 +56,7 @@ const DEFAULT_CONFIGS: Record<AfsSpVariant, AfsSharePointConfig> = {
   rfi: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_RFI_Attachment' },
   workingPaper: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers-WorkingPaper' },
   finding: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_FindingAttachment' },
+  scoaVersion: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_ScoaVersion' },
 };
 
 interface AfsDocMeta {
@@ -70,14 +72,15 @@ const emptyFields = (): Record<string, string | null> =>
   ({ afsid: null, description: null, classification: null, category: null, tags: null, documenttype: null, accesslevel: null });
 
 // The entity-link column differs per library: AFS uses "AFSID", the Adjustments
-// library uses "ADJID", and the RFI / working-paper / finding libraries also use "AFSID" (holding
-// the RFI / working-paper / finding id). (description/Classification/Category/Tags are the same.)
+// library uses "ADJID", and the RFI / working-paper / finding / SCOA version libraries also use
+// "AFSID" (holding the linked entity id). (description/Classification/Category/Tags are the same.)
 const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   afs: { key: 'afsid', defaultName: 'AFSID' },
   adjustments: { key: 'adjid', defaultName: 'ADJID' },
   rfi: { key: 'afsid', defaultName: 'AFSID' },
   workingPaper: { key: 'afsid', defaultName: 'AFSID' },
   finding: { key: 'afsid', defaultName: 'AFSID' },
+  scoaVersion: { key: 'afsid', defaultName: 'AFSID' },
 };
 
 /** Normalise a library title / URL segment for matching: decode %20, lowercase, drop whitespace
@@ -102,10 +105,12 @@ export class AfsSharePointService {
   readonly workingPaperConfig = signal<AfsSharePointConfig>(this.read('workingPaper'));
   /** Working-Papers finding attachment library config. */
   readonly findingConfig = signal<AfsSharePointConfig>(this.read('finding'));
+  /** Working-Papers SCOA version library config. */
+  readonly scoaVersionConfig = signal<AfsSharePointConfig>(this.read('scoaVersion'));
 
-  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null };
+  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null };
   private fieldsByVariant: Record<AfsSpVariant, Record<string, string | null>> = {
-    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(),
+    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(),
   };
 
   refresh(): void {
@@ -114,8 +119,9 @@ export class AfsSharePointService {
     this.rfiConfig.set(this.read('rfi'));
     this.workingPaperConfig.set(this.read('workingPaper'));
     this.findingConfig.set(this.read('finding'));
-    this.driveIds = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null };
-    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields() };
+    this.scoaVersionConfig.set(this.read('scoaVersion'));
+    this.driveIds = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null };
+    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields() };
   }
 
   private configSignal(variant: AfsSpVariant) {
@@ -124,6 +130,7 @@ export class AfsSharePointService {
       case 'rfi': return this.rfiConfig;
       case 'workingPaper': return this.workingPaperConfig;
       case 'finding': return this.findingConfig;
+      case 'scoaVersion': return this.scoaVersionConfig;
       default: return this.config;
     }
   }
@@ -449,6 +456,14 @@ export class AfsSharePointService {
             siteUrl: p.afsRfiSharePointSiteUrl || d.siteUrl,
             library: p.afsRfiSharePointLibrary || d.library,
             linkColumn: (p.afsRfiSharePointLinkColumn || '').trim() || undefined,
+          };
+        }
+        if (variant === 'scoaVersion') {
+          return {
+            enabled: p.afsScoaSharePointEnabled ?? d.enabled,
+            siteUrl: p.afsScoaSharePointSiteUrl || d.siteUrl,
+            library: p.afsScoaSharePointLibrary || d.library,
+            linkColumn: (p.afsScoaSharePointLinkColumn || '').trim() || undefined,
           };
         }
         if (variant === 'finding') {

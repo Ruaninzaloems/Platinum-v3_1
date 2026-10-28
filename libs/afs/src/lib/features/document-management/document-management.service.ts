@@ -135,12 +135,13 @@ export class DocumentManagementService {
   }
 
   /** Adjustment documents go to the separate Adjustments library; RFI attachments, finding
-   *  attachments and working papers to their Working-Papers libraries (when those toggles are
-   *  on); everything else to the AFS library. */
+   *  attachments, SCOA version documents and working papers to their Working-Papers libraries
+   *  (when those toggles are on); everything else to the AFS library. */
   private variantForUpload(m: UploadMetadata): AfsSpVariant {
     if (m.adjustmentId) return 'adjustments';
     if (m.rfiId && this.afsSp.isEnabled('rfi')) return 'rfi';
     if (m.findingId && this.afsSp.isEnabled('finding')) return 'finding';
+    if (m.documentType === 'scoa_version' && this.afsSp.isEnabled('scoaVersion')) return 'scoaVersion';
     if (m.workingPaperId && this.afsSp.isEnabled('workingPaper')) return 'workingPaper';
     return 'afs';
   }
