@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, from } from 'rxjs';
+import { Observable, from, forkJoin, of, catchError, map } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { AfsSharePointService, SpAfsDoc, AfsSpVariant } from '../../core/services/afs-sharepoint.service';
 
@@ -135,13 +135,14 @@ export class DocumentManagementService {
   }
 
   /** Adjustment documents go to the separate Adjustments library; RFI attachments, finding
-   *  attachments, SCOA version documents and working papers to their Working-Papers libraries
+   *  attachments, SCOA version documents, AFS drafts and working papers to their Working-Papers libraries
    *  (when those toggles are on); everything else to the AFS library. */
   private variantForUpload(m: UploadMetadata): AfsSpVariant {
     if (m.adjustmentId) return 'adjustments';
     if (m.rfiId && this.afsSp.isEnabled('rfi')) return 'rfi';
     if (m.findingId && this.afsSp.isEnabled('finding')) return 'finding';
     if (m.documentType === 'scoa_version' && this.afsSp.isEnabled('scoaVersion')) return 'scoaVersion';
+    if (m.documentType === 'afs_draft' && this.afsSp.isEnabled('afsDraft')) return 'afsDraft';
     if (m.workingPaperId && this.afsSp.isEnabled('workingPaper')) return 'workingPaper';
     return 'afs';
   }
@@ -323,10 +324,18 @@ export class DocumentManagementService {
     // configured library (filtered by AFSID = contextId). Adjustments read from the
     // separate Adjustments library when that toggle is on.
     const variant = this.variantForContext(contextType);
-    if (this.useSharePoint(variant)) {
-      return from(this.afsSp.listAfsDocuments(contextId, variant).then(docs => docs.map(d => this.spToDms(d))));
+    const list$ = this.useSharePoint(variant)
+      ? from(this.afsSp.listAfsDocuments(contextId, variant).then(docs => docs.map(d => this.spToDms(d))))
+      : this.api.get<DmsDocument[]>(`/documents/by-context/${contextType}/${contextId}`);
+    // A compilation's AFS drafts live in the Working-Papers AFS draft library when its toggle is
+    // on; list them alongside the compilation's other documents.
+    if (contextType === 'compilation' && this.afsSp.isEnabled('afsDraft')) {
+      const drafts$ = from(this.afsSp.listAfsDocuments(contextId, 'afsDraft').then(docs => docs.map(d => this.spToDms(d))));
+      return forkJoin([list$.pipe(catchError(() => of([] as DmsDocument[]))), drafts$]).pipe(
+        map(([others, drafts]) => [...drafts, ...(others || [])]),
+      );
     }
-    return this.api.get<DmsDocument[]>(`/documents/by-context/${contextType}/${contextId}`);
+    return list$;
   }
 
   getSourceDocuments(documentNumber: string, finYear?: string): Observable<SourceDocumentChain> {
