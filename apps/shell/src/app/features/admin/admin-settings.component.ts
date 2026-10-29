@@ -724,7 +724,7 @@ const MODULES: ModuleDef[] = [
         <div class="config-card">
           <div class="sp-header">
             <mat-icon style="color:#0078d4">cloud</mat-icon>
-            <span>Finding Attachment SharePoint Configuration</span>
+            <span>Working Papers - Finding Attachment SharePoint Configuration</span>
           </div>
 
           <div class="sp-toggle-row">
@@ -795,7 +795,7 @@ const MODULES: ModuleDef[] = [
         <div class="config-card">
           <div class="sp-header">
             <mat-icon style="color:#0078d4">cloud</mat-icon>
-            <span>SCOA Version SharePoint Configuration</span>
+            <span>Working Papers - SCOA Version SharePoint Configuration</span>
           </div>
 
           <div class="sp-toggle-row">
@@ -866,7 +866,7 @@ const MODULES: ModuleDef[] = [
         <div class="config-card">
           <div class="sp-header">
             <mat-icon style="color:#0078d4">cloud</mat-icon>
-            <span>AFS Draft SharePoint Configuration</span>
+            <span>Working Papers - AFS Draft SharePoint Configuration</span>
           </div>
 
           <div class="sp-toggle-row">
