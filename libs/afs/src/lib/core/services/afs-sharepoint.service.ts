@@ -9,7 +9,7 @@ import { GraphService } from '@platinumv3/shared/graph';
  *
  *   Library columns written:  AFSID, description, Classification, Category, Tags
  *
- * Ten independent libraries are supported, each with its own enable toggle:
+ * Eleven independent libraries are supported, each with its own enable toggle:
  *   • 'afs'          → general AFS documents (and working papers when 'workingPaper' is off) (default lib: UatAFS)
  *   • 'adjustments'  → adjustment supporting documents   (default lib: UatAFSAdjustments)
  *   • 'rfi'          → Working-Papers RFI attachments    (default lib: UatAFS WorkingPapers_RFI_Attachment)
@@ -20,12 +20,13 @@ import { GraphService } from '@platinumv3/shared/graph';
  *   • 'afsFinal'     → Working-Papers final AFS documents  (default lib: UatAFS WorkingPapers_AfsFinal)
  *   • 'adjustmentSupport' → Working-Papers adjustment support (default lib: UatAFS WorkingPapers_AdjustmentSupport)
  *   • 'mappingSnapshot' → Working-Papers mapping snapshots (default lib: UatAFS WorkingPapers_MappingSnapshot)
+ *   • 'export'       → Working-Papers exports              (default lib: UatAFS WorkingPapers_Export)
  *
  * Mirrors the Assets SharePointConfigService / Overtime OvertimeSharePointService.
  */
 const STORAGE_KEY = 'platinum_module_config';
 
-export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi' | 'workingPaper' | 'finding' | 'scoaVersion' | 'afsDraft' | 'afsFinal' | 'adjustmentSupport' | 'mappingSnapshot';
+export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi' | 'workingPaper' | 'finding' | 'scoaVersion' | 'afsDraft' | 'afsFinal' | 'adjustmentSupport' | 'mappingSnapshot' | 'export';
 
 export interface AfsSharePointConfig {
   enabled: boolean;
@@ -65,6 +66,7 @@ const DEFAULT_CONFIGS: Record<AfsSpVariant, AfsSharePointConfig> = {
   afsFinal: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_AfsFinal' },
   adjustmentSupport: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_AdjustmentSupport' },
   mappingSnapshot: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_MappingSnapshot' },
+  export: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_Export' },
 };
 
 interface AfsDocMeta {
@@ -80,7 +82,7 @@ const emptyFields = (): Record<string, string | null> =>
   ({ afsid: null, description: null, classification: null, category: null, tags: null, documenttype: null, accesslevel: null });
 
 // The entity-link column differs per library: AFS uses "AFSID", the Adjustments
-// library uses "ADJID", and the RFI / working-paper / finding / SCOA version / AFS draft / AFS final / adjustment support / mapping snapshot libraries also use
+// library uses "ADJID", and the RFI / working-paper / finding / SCOA version / AFS draft / AFS final / adjustment support / mapping snapshot / export libraries also use
 // "AFSID" (holding the linked entity id). (description/Classification/Category/Tags are the same.)
 const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   afs: { key: 'afsid', defaultName: 'AFSID' },
@@ -93,6 +95,7 @@ const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   afsFinal: { key: 'afsid', defaultName: 'AFSID' },
   adjustmentSupport: { key: 'afsid', defaultName: 'AFSID' },
   mappingSnapshot: { key: 'afsid', defaultName: 'AFSID' },
+  export: { key: 'afsid', defaultName: 'AFSID' },
 };
 
 /** Normalise a library title / URL segment for matching: decode %20, lowercase, drop whitespace
@@ -127,10 +130,12 @@ export class AfsSharePointService {
   readonly adjustmentSupportConfig = signal<AfsSharePointConfig>(this.read('adjustmentSupport'));
   /** Working-Papers mapping snapshot library config. */
   readonly mappingSnapshotConfig = signal<AfsSharePointConfig>(this.read('mappingSnapshot'));
+  /** Working-Papers export library config. */
+  readonly exportConfig = signal<AfsSharePointConfig>(this.read('export'));
 
-  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null };
+  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null };
   private fieldsByVariant: Record<AfsSpVariant, Record<string, string | null>> = {
-    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(),
+    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(),
   };
 
   refresh(): void {
@@ -144,8 +149,9 @@ export class AfsSharePointService {
     this.afsFinalConfig.set(this.read('afsFinal'));
     this.adjustmentSupportConfig.set(this.read('adjustmentSupport'));
     this.mappingSnapshotConfig.set(this.read('mappingSnapshot'));
-    this.driveIds = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null };
-    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields() };
+    this.exportConfig.set(this.read('export'));
+    this.driveIds = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null };
+    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields() };
   }
 
   private configSignal(variant: AfsSpVariant) {
@@ -159,6 +165,7 @@ export class AfsSharePointService {
       case 'afsFinal': return this.afsFinalConfig;
       case 'adjustmentSupport': return this.adjustmentSupportConfig;
       case 'mappingSnapshot': return this.mappingSnapshotConfig;
+      case 'export': return this.exportConfig;
       default: return this.config;
     }
   }
@@ -484,6 +491,14 @@ export class AfsSharePointService {
             siteUrl: p.afsRfiSharePointSiteUrl || d.siteUrl,
             library: p.afsRfiSharePointLibrary || d.library,
             linkColumn: (p.afsRfiSharePointLinkColumn || '').trim() || undefined,
+          };
+        }
+        if (variant === 'export') {
+          return {
+            enabled: p.afsExportSharePointEnabled ?? d.enabled,
+            siteUrl: p.afsExportSharePointSiteUrl || d.siteUrl,
+            library: p.afsExportSharePointLibrary || d.library,
+            linkColumn: (p.afsExportSharePointLinkColumn || '').trim() || undefined,
           };
         }
         if (variant === 'mappingSnapshot') {

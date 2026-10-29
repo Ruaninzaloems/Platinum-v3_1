@@ -76,6 +76,11 @@ export interface ModuleApiConfig {
   afsMappingSharePointSiteUrl : string;
   afsMappingSharePointLibrary : string;
   afsMappingSharePointLinkColumn : string;
+  // AFS Working-Papers export SharePoint document storage (separate library)
+  afsExportSharePointEnabled : boolean;
+  afsExportSharePointSiteUrl : string;
+  afsExportSharePointLibrary : string;
+  afsExportSharePointLinkColumn : string;
   // AFS PostgreSQL database (maps to AZURE_POSTGRES_URL read by AFS-UI/api)
   afsDbHost     : string;
   afsDbPort     : string;
@@ -167,6 +172,11 @@ const DEFAULTS: ModuleApiConfig = {
   afsMappingSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsMappingSharePointLibrary : 'UatAFS WorkingPapers_MappingSnapshot',
   afsMappingSharePointLinkColumn : 'AFSID',
+  // AFS Working-Papers export documents → separate SharePoint library
+  afsExportSharePointEnabled : false,
+  afsExportSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  afsExportSharePointLibrary : 'UatAFS WorkingPapers_Export',
+  afsExportSharePointLinkColumn : 'AFSID',
   // AFS database — separate "AFS" PostgreSQL on Azure
   afsDbHost     : 'platinum-postgre-sql.postgres.database.azure.com',
   afsDbPort     : '5432',
@@ -1175,6 +1185,77 @@ const MODULES: ModuleDef[] = [
             </button>
           </div>
         </div>
+
+        <!-- Working-Papers export SharePoint library (separate from general AFS docs) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Working Papers - Export Support Configuration</span>
+          </div>
+
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.afsExportSharePointEnabled"
+                    (click)="cfg.afsExportSharePointEnabled = !cfg.afsExportSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.afsExportSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for exports</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, export documents are stored in the dedicated Working-Papers export SharePoint library (with metadata) instead of the general AFS library or local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.afsExportSharePointEnabled">
+              {{ cfg.afsExportSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <div class="field-grid" [class.sp-disabled]="!cfg.afsExportSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.afsExportSharePointSiteUrl"
+                     [disabled]="!cfg.afsExportSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.afsExportSharePointLibrary"
+                     [disabled]="!cfg.afsExportSharePointEnabled"
+                     placeholder="UatAFS WorkingPapers_Export"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatAFS WorkingPapers_Export</strong> (the library's title or the URL segment in its address)</div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.afsExportSharePointLinkColumn"
+                     [disabled]="!cfg.afsExportSharePointEnabled"
+                     placeholder="AFSID"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.afsExportSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — exports use the AFS SharePoint library above (when it is on) or the module's local file storage.
+              </div>
+            </div>
+          }
+
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.afsExportSharePointEnabled || !cfg.afsExportSharePointSiteUrl"
+                    (click)="testSharePointAfsExport()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
       }
 
       <!-- AFS Database config — AFS module only -->
@@ -1776,6 +1857,20 @@ export class AdminSettingsComponent implements OnInit {
       this.spTesting.set(false);
       if (ok) {
         this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsMappingSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointAfsExport() {
+    this.spTesting.set(true);
+    const url = this.cfg.afsExportSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsExportSharePointLibrary}`, 'OK', { duration: 4000 });
       } else {
         this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
       }
