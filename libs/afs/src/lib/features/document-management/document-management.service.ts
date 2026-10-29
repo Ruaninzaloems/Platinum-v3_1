@@ -135,7 +135,8 @@ export class DocumentManagementService {
   }
 
   /** Adjustment documents go to the separate Adjustments library; RFI attachments, finding
-   *  attachments, SCOA version documents, AFS drafts and working papers to their Working-Papers libraries
+   *  attachments, SCOA version documents, AFS drafts, final AFS documents and
+   *  working papers to their Working-Papers libraries
    *  (when those toggles are on); everything else to the AFS library. */
   private variantForUpload(m: UploadMetadata): AfsSpVariant {
     if (m.adjustmentId) return 'adjustments';
@@ -143,6 +144,7 @@ export class DocumentManagementService {
     if (m.findingId && this.afsSp.isEnabled('finding')) return 'finding';
     if (m.documentType === 'scoa_version' && this.afsSp.isEnabled('scoaVersion')) return 'scoaVersion';
     if (m.documentType === 'afs_draft' && this.afsSp.isEnabled('afsDraft')) return 'afsDraft';
+    if (m.documentType === 'afs_final' && this.afsSp.isEnabled('afsFinal')) return 'afsFinal';
     if (m.workingPaperId && this.afsSp.isEnabled('workingPaper')) return 'workingPaper';
     return 'afs';
   }
@@ -327,13 +329,18 @@ export class DocumentManagementService {
     const list$ = this.useSharePoint(variant)
       ? from(this.afsSp.listAfsDocuments(contextId, variant).then(docs => docs.map(d => this.spToDms(d))))
       : this.api.get<DmsDocument[]>(`/documents/by-context/${contextType}/${contextId}`);
-    // A compilation's AFS drafts live in the Working-Papers AFS draft library when its toggle is
-    // on; list them alongside the compilation's other documents.
-    if (contextType === 'compilation' && this.afsSp.isEnabled('afsDraft')) {
-      const drafts$ = from(this.afsSp.listAfsDocuments(contextId, 'afsDraft').then(docs => docs.map(d => this.spToDms(d))));
-      return forkJoin([list$.pipe(catchError(() => of([] as DmsDocument[]))), drafts$]).pipe(
-        map(([others, drafts]) => [...drafts, ...(others || [])]),
-      );
+    // A compilation's AFS drafts / final AFS documents live in their Working-Papers libraries when
+    // those toggles are on; list them alongside the compilation's other documents.
+    if (contextType === 'compilation') {
+      const extra = ([['afsDraft', 'afs_draft'], ['afsFinal', 'afs_final']] as [AfsSpVariant, string][])
+        .filter(([v]) => this.afsSp.isEnabled(v))
+        .map(([v, type]) => from(this.afsSp.listAfsDocuments(contextId, v)
+          .then(docs => docs.map(d => ({ ...this.spToDms(d), documentType: type }) as DmsDocument))));
+      if (extra.length) {
+        return forkJoin([...extra, list$.pipe(catchError(() => of([] as DmsDocument[])))]).pipe(
+          map(lists => lists.flatMap(l => l || [])),
+        );
+      }
     }
     return list$;
   }
