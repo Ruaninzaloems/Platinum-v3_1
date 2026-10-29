@@ -137,8 +137,8 @@ export class DocumentManagementService {
 
   /** Adjustment documents go to the Working-Papers adjustment support library when its toggle is
    *  on, otherwise the separate Adjustments library; RFI attachments, finding
-   *  attachments, SCOA version documents, AFS drafts, final AFS documents and
-   *  working papers to their Working-Papers libraries
+   *  attachments, SCOA version documents, mapping snapshots, AFS drafts, final AFS
+   *  documents and working papers to their Working-Papers libraries
    *  (when those toggles are on); everything else to the AFS library. */
   private variantForUpload(m: UploadMetadata): AfsSpVariant {
     if (m.adjustmentId) return this.afsSp.isEnabled('adjustmentSupport') ? 'adjustmentSupport' : 'adjustments';
@@ -148,6 +148,7 @@ export class DocumentManagementService {
     if (m.documentType === 'afs_draft' && this.afsSp.isEnabled('afsDraft')) return 'afsDraft';
     if (m.documentType === 'afs_final' && this.afsSp.isEnabled('afsFinal')) return 'afsFinal';
     if (m.documentType === 'adjustment_support' && this.afsSp.isEnabled('adjustmentSupport')) return 'adjustmentSupport';
+    if (m.documentType === 'mapping_snapshot' && this.afsSp.isEnabled('mappingSnapshot')) return 'mappingSnapshot';
     if (m.workingPaperId && this.afsSp.isEnabled('workingPaper')) return 'workingPaper';
     return 'afs';
   }
