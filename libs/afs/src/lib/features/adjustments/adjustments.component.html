@@ -270,7 +270,7 @@
                   <div style="font-size: 13px; font-weight: 500;">{{ doc.originalName || doc.fileName }}</div>
                   <div style="font-size: 11px; color: var(--platinum-text-muted);">{{ formatFileSize(doc.fileSize) }} · {{ doc.createdAt | date:'shortDate' }}</div>
                 </div>
-                <button mat-icon-button matTooltip="Download" (click)="downloadDoc(doc.id)">
+                <button mat-icon-button matTooltip="Download" (click)="downloadDoc(doc)">
                   <mat-icon>download</mat-icon>
                 </button>
               </div>

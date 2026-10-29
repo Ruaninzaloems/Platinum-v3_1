@@ -316,8 +316,12 @@ export class AdjustmentsComponent implements OnInit {
     });
   }
 
-  downloadDoc(docId: string) {
-    window.open(`/api/documents/${docId}/download`, '_blank');
+  downloadDoc(doc: DmsDocument) {
+    if ((doc as any).__spItem) {
+      this.dms.downloadSpDocument(doc).catch(() => alert(`Could not download ${doc.originalName || doc.fileName} from SharePoint.`));
+      return;
+    }
+    window.open(`/api/documents/${doc.id}/download`, '_blank');
   }
 
   formatFileSize(bytes: number): string {

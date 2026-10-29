@@ -9,7 +9,7 @@ import { GraphService } from '@platinumv3/shared/graph';
  *
  *   Library columns written:  AFSID, description, Classification, Category, Tags
  *
- * Eight independent libraries are supported, each with its own enable toggle:
+ * Nine independent libraries are supported, each with its own enable toggle:
  *   • 'afs'          → general AFS documents (and working papers when 'workingPaper' is off) (default lib: UatAFS)
  *   • 'adjustments'  → adjustment supporting documents   (default lib: UatAFSAdjustments)
  *   • 'rfi'          → Working-Papers RFI attachments    (default lib: UatAFS WorkingPapers_RFI_Attachment)
@@ -18,12 +18,13 @@ import { GraphService } from '@platinumv3/shared/graph';
  *   • 'scoaVersion'  → Working-Papers SCOA version documents (default lib: UatAFS WorkingPapers_ScoaVersion)
  *   • 'afsDraft'     → Working-Papers AFS drafts           (default lib: UatAFS WorkingPapers_AFS_Draft)
  *   • 'afsFinal'     → Working-Papers final AFS documents  (default lib: UatAFS WorkingPapers_AfsFinal)
+ *   • 'adjustmentSupport' → Working-Papers adjustment support (default lib: UatAFS WorkingPapers_AdjustmentSupport)
  *
  * Mirrors the Assets SharePointConfigService / Overtime OvertimeSharePointService.
  */
 const STORAGE_KEY = 'platinum_module_config';
 
-export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi' | 'workingPaper' | 'finding' | 'scoaVersion' | 'afsDraft' | 'afsFinal';
+export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi' | 'workingPaper' | 'finding' | 'scoaVersion' | 'afsDraft' | 'afsFinal' | 'adjustmentSupport';
 
 export interface AfsSharePointConfig {
   enabled: boolean;
@@ -61,6 +62,7 @@ const DEFAULT_CONFIGS: Record<AfsSpVariant, AfsSharePointConfig> = {
   scoaVersion: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_ScoaVersion' },
   afsDraft: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_AFS_Draft' },
   afsFinal: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_AfsFinal' },
+  adjustmentSupport: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_AdjustmentSupport' },
 };
 
 interface AfsDocMeta {
@@ -76,7 +78,7 @@ const emptyFields = (): Record<string, string | null> =>
   ({ afsid: null, description: null, classification: null, category: null, tags: null, documenttype: null, accesslevel: null });
 
 // The entity-link column differs per library: AFS uses "AFSID", the Adjustments
-// library uses "ADJID", and the RFI / working-paper / finding / SCOA version / AFS draft / AFS final libraries also use
+// library uses "ADJID", and the RFI / working-paper / finding / SCOA version / AFS draft / AFS final / adjustment support libraries also use
 // "AFSID" (holding the linked entity id). (description/Classification/Category/Tags are the same.)
 const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   afs: { key: 'afsid', defaultName: 'AFSID' },
@@ -87,6 +89,7 @@ const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   scoaVersion: { key: 'afsid', defaultName: 'AFSID' },
   afsDraft: { key: 'afsid', defaultName: 'AFSID' },
   afsFinal: { key: 'afsid', defaultName: 'AFSID' },
+  adjustmentSupport: { key: 'afsid', defaultName: 'AFSID' },
 };
 
 /** Normalise a library title / URL segment for matching: decode %20, lowercase, drop whitespace
@@ -117,10 +120,12 @@ export class AfsSharePointService {
   readonly afsDraftConfig = signal<AfsSharePointConfig>(this.read('afsDraft'));
   /** Working-Papers final AFS library config. */
   readonly afsFinalConfig = signal<AfsSharePointConfig>(this.read('afsFinal'));
+  /** Working-Papers adjustment support library config. */
+  readonly adjustmentSupportConfig = signal<AfsSharePointConfig>(this.read('adjustmentSupport'));
 
-  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null };
+  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null };
   private fieldsByVariant: Record<AfsSpVariant, Record<string, string | null>> = {
-    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(),
+    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(),
   };
 
   refresh(): void {
@@ -132,8 +137,9 @@ export class AfsSharePointService {
     this.scoaVersionConfig.set(this.read('scoaVersion'));
     this.afsDraftConfig.set(this.read('afsDraft'));
     this.afsFinalConfig.set(this.read('afsFinal'));
-    this.driveIds = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null };
-    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields() };
+    this.adjustmentSupportConfig.set(this.read('adjustmentSupport'));
+    this.driveIds = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null };
+    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields() };
   }
 
   private configSignal(variant: AfsSpVariant) {
@@ -145,6 +151,7 @@ export class AfsSharePointService {
       case 'scoaVersion': return this.scoaVersionConfig;
       case 'afsDraft': return this.afsDraftConfig;
       case 'afsFinal': return this.afsFinalConfig;
+      case 'adjustmentSupport': return this.adjustmentSupportConfig;
       default: return this.config;
     }
   }
@@ -470,6 +477,14 @@ export class AfsSharePointService {
             siteUrl: p.afsRfiSharePointSiteUrl || d.siteUrl,
             library: p.afsRfiSharePointLibrary || d.library,
             linkColumn: (p.afsRfiSharePointLinkColumn || '').trim() || undefined,
+          };
+        }
+        if (variant === 'adjustmentSupport') {
+          return {
+            enabled: p.afsAdjSupportSharePointEnabled ?? d.enabled,
+            siteUrl: p.afsAdjSupportSharePointSiteUrl || d.siteUrl,
+            library: p.afsAdjSupportSharePointLibrary || d.library,
+            linkColumn: (p.afsAdjSupportSharePointLinkColumn || '').trim() || undefined,
           };
         }
         if (variant === 'afsFinal') {

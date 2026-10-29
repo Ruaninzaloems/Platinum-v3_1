@@ -66,6 +66,11 @@ export interface ModuleApiConfig {
   afsFinalSharePointSiteUrl : string;
   afsFinalSharePointLibrary : string;
   afsFinalSharePointLinkColumn : string;
+  // AFS Working-Papers adjustment support SharePoint document storage (separate library)
+  afsAdjSupportSharePointEnabled : boolean;
+  afsAdjSupportSharePointSiteUrl : string;
+  afsAdjSupportSharePointLibrary : string;
+  afsAdjSupportSharePointLinkColumn : string;
   // AFS PostgreSQL database (maps to AZURE_POSTGRES_URL read by AFS-UI/api)
   afsDbHost     : string;
   afsDbPort     : string;
@@ -147,6 +152,11 @@ const DEFAULTS: ModuleApiConfig = {
   afsFinalSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsFinalSharePointLibrary : 'UatAFS WorkingPapers_AfsFinal',
   afsFinalSharePointLinkColumn : 'AFSID',
+  // AFS Working-Papers adjustment support documents → separate SharePoint library
+  afsAdjSupportSharePointEnabled : false,
+  afsAdjSupportSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  afsAdjSupportSharePointLibrary : 'UatAFS WorkingPapers_AdjustmentSupport',
+  afsAdjSupportSharePointLinkColumn : 'AFSID',
   // AFS database — separate "AFS" PostgreSQL on Azure
   afsDbHost     : 'platinum-postgre-sql.postgres.database.azure.com',
   afsDbPort     : '5432',
@@ -1013,6 +1023,77 @@ const MODULES: ModuleDef[] = [
             </button>
           </div>
         </div>
+
+        <!-- Working-Papers adjustment support SharePoint library (separate from general AFS docs) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Working Papers - AFS Adjustment Support Configuration</span>
+          </div>
+
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.afsAdjSupportSharePointEnabled"
+                    (click)="cfg.afsAdjSupportSharePointEnabled = !cfg.afsAdjSupportSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.afsAdjSupportSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for adjustment support documents</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, adjustment support documents are stored in the dedicated Working-Papers adjustment support SharePoint library (linked by adjustment, with metadata) instead of the Adjustment library above. Documents already in the Adjustment library still show on each adjustment.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.afsAdjSupportSharePointEnabled">
+              {{ cfg.afsAdjSupportSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <div class="field-grid" [class.sp-disabled]="!cfg.afsAdjSupportSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.afsAdjSupportSharePointSiteUrl"
+                     [disabled]="!cfg.afsAdjSupportSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.afsAdjSupportSharePointLibrary"
+                     [disabled]="!cfg.afsAdjSupportSharePointEnabled"
+                     placeholder="UatAFS WorkingPapers_AdjustmentSupport"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatAFS WorkingPapers_AdjustmentSupport</strong> (the library's title or the URL segment in its address)</div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.afsAdjSupportSharePointLinkColumn"
+                     [disabled]="!cfg.afsAdjSupportSharePointEnabled"
+                     placeholder="AFSID"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the adjustment reference (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.afsAdjSupportSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — adjustment support documents use the Adjustment SharePoint library above (when it is on) or the module's local file storage.
+              </div>
+            </div>
+          }
+
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.afsAdjSupportSharePointEnabled || !cfg.afsAdjSupportSharePointSiteUrl"
+                    (click)="testSharePointAfsAdjSupport()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
       }
 
       <!-- AFS Database config — AFS module only -->
@@ -1586,6 +1667,20 @@ export class AdminSettingsComponent implements OnInit {
       this.spTesting.set(false);
       if (ok) {
         this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsFinalSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointAfsAdjSupport() {
+    this.spTesting.set(true);
+    const url = this.cfg.afsAdjSupportSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsAdjSupportSharePointLibrary}`, 'OK', { duration: 4000 });
       } else {
         this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
       }

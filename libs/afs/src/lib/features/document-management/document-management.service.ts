@@ -131,20 +131,23 @@ export class DocumentManagementService {
     if (variant === 'rfi') return (m.rfiId || '') as string;
     if (variant === 'workingPaper') return (m.workingPaperId || '') as string;
     if (variant === 'finding') return (m.findingId || '') as string;
+    if (variant === 'adjustmentSupport') return (m.adjustmentId || '') as string;
     return (m.workingPaperId || m.compilationId || m.findingId || m.rfiId || m.adjustmentId || '') as string;
   }
 
-  /** Adjustment documents go to the separate Adjustments library; RFI attachments, finding
+  /** Adjustment documents go to the Working-Papers adjustment support library when its toggle is
+   *  on, otherwise the separate Adjustments library; RFI attachments, finding
    *  attachments, SCOA version documents, AFS drafts, final AFS documents and
    *  working papers to their Working-Papers libraries
    *  (when those toggles are on); everything else to the AFS library. */
   private variantForUpload(m: UploadMetadata): AfsSpVariant {
-    if (m.adjustmentId) return 'adjustments';
+    if (m.adjustmentId) return this.afsSp.isEnabled('adjustmentSupport') ? 'adjustmentSupport' : 'adjustments';
     if (m.rfiId && this.afsSp.isEnabled('rfi')) return 'rfi';
     if (m.findingId && this.afsSp.isEnabled('finding')) return 'finding';
     if (m.documentType === 'scoa_version' && this.afsSp.isEnabled('scoaVersion')) return 'scoaVersion';
     if (m.documentType === 'afs_draft' && this.afsSp.isEnabled('afsDraft')) return 'afsDraft';
     if (m.documentType === 'afs_final' && this.afsSp.isEnabled('afsFinal')) return 'afsFinal';
+    if (m.documentType === 'adjustment_support' && this.afsSp.isEnabled('adjustmentSupport')) return 'adjustmentSupport';
     if (m.workingPaperId && this.afsSp.isEnabled('workingPaper')) return 'workingPaper';
     return 'afs';
   }
@@ -268,11 +271,13 @@ export class DocumentManagementService {
     return from(this.afsSp.listAllAfsDocuments(variant).then(docs => docs.map(d => this.spToDms(d))));
   }
 
-  /** Copy a SharePoint document into the Adjustments library, linked to the adjustment (ADJID). */
+  /** Copy a SharePoint document into the adjustment's library (the Working-Papers adjustment
+   *  support library when its toggle is on, otherwise Adjustments), linked to the adjustment. */
   copySpToAdjustment(doc: DmsDocument, adjustmentId: string): Observable<DmsDocument> {
     const item = (doc as any).__spItem;
     const sourceVariant: AfsSpVariant = (doc as any).__spVariant || 'afs';
-    return from(this.afsSp.copyDocument(item, sourceVariant, 'adjustments', adjustmentId, {
+    const target: AfsSpVariant = this.afsSp.isEnabled('adjustmentSupport') ? 'adjustmentSupport' : 'adjustments';
+    return from(this.afsSp.copyDocument(item, sourceVariant, target, adjustmentId, {
       description: doc.description,
       classification: doc.classificationLabel,
       category: doc.category,
@@ -331,6 +336,14 @@ export class DocumentManagementService {
       : this.api.get<DmsDocument[]>(`/documents/by-context/${contextType}/${contextId}`);
     // A compilation's AFS drafts / final AFS documents live in their Working-Papers libraries when
     // those toggles are on; list them alongside the compilation's other documents.
+    // An adjustment's support documents go to the Working-Papers adjustment support library when
+    // its toggle is on; keep listing the ones already in the Adjustments library too.
+    if (contextType === 'adjustment' && this.afsSp.isEnabled('adjustmentSupport')) {
+      const support$ = from(this.afsSp.listAfsDocuments(contextId, 'adjustmentSupport').then(docs => docs.map(d => this.spToDms(d))));
+      return forkJoin([support$, list$.pipe(catchError(() => of([] as DmsDocument[])))]).pipe(
+        map(lists => lists.flatMap(l => l || [])),
+      );
+    }
     if (contextType === 'compilation') {
       const extra = ([['afsDraft', 'afs_draft'], ['afsFinal', 'afs_final']] as [AfsSpVariant, string][])
         .filter(([v]) => this.afsSp.isEnabled(v))
