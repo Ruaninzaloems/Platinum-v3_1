@@ -9,7 +9,7 @@ import { GraphService } from '@platinumv3/shared/graph';
  *
  *   Library columns written:  AFSID, description, Classification, Category, Tags
  *
- * Thirteen independent libraries are supported, each with its own enable toggle:
+ * Fourteen independent libraries are supported, each with its own enable toggle:
  *   • 'afs'          → general AFS documents (and working papers when 'workingPaper' is off) (default lib: UatAFS)
  *   • 'adjustments'  → adjustment supporting documents   (default lib: UatAFSAdjustments)
  *   • 'rfi'          → Working-Papers RFI attachments    (default lib: UatAFS WorkingPapers_RFI_Attachment)
@@ -23,12 +23,13 @@ import { GraphService } from '@platinumv3/shared/graph';
  *   • 'export'       → Working-Papers exports              (default lib: UatAFS WorkingPapers_Export)
  *   • 'template'     → Working-Papers templates            (default lib: UatAFS WorkingPapers_Template)
  *   • 'evidence'     → Working-Papers evidence             (default lib: UatAFS WorkingPapers_Evidence)
+ *   • 'administration' → AFS administration documents     (default lib: UatAFS Administration)
  *
  * Mirrors the Assets SharePointConfigService / Overtime OvertimeSharePointService.
  */
 const STORAGE_KEY = 'platinum_module_config';
 
-export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi' | 'workingPaper' | 'finding' | 'scoaVersion' | 'afsDraft' | 'afsFinal' | 'adjustmentSupport' | 'mappingSnapshot' | 'export' | 'template' | 'evidence';
+export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi' | 'workingPaper' | 'finding' | 'scoaVersion' | 'afsDraft' | 'afsFinal' | 'adjustmentSupport' | 'mappingSnapshot' | 'export' | 'template' | 'evidence' | 'administration';
 
 export interface AfsSharePointConfig {
   enabled: boolean;
@@ -71,6 +72,7 @@ const DEFAULT_CONFIGS: Record<AfsSpVariant, AfsSharePointConfig> = {
   export: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_Export' },
   template: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_Template' },
   evidence: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_Evidence' },
+  administration: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS Administration' },
 };
 
 interface AfsDocMeta {
@@ -86,7 +88,7 @@ const emptyFields = (): Record<string, string | null> =>
   ({ afsid: null, description: null, classification: null, category: null, tags: null, documenttype: null, accesslevel: null });
 
 // The entity-link column differs per library: AFS uses "AFSID", the Adjustments
-// library uses "ADJID", and the RFI / working-paper / finding / SCOA version / AFS draft / AFS final / adjustment support / mapping snapshot / export / template / evidence libraries also use
+// library uses "ADJID", and the RFI / working-paper / finding / SCOA version / AFS draft / AFS final / adjustment support / mapping snapshot / export / template / evidence / administration libraries also use
 // "AFSID" (holding the linked entity id). (description/Classification/Category/Tags are the same.)
 const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   afs: { key: 'afsid', defaultName: 'AFSID' },
@@ -102,6 +104,7 @@ const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   export: { key: 'afsid', defaultName: 'AFSID' },
   template: { key: 'afsid', defaultName: 'AFSID' },
   evidence: { key: 'afsid', defaultName: 'AFSID' },
+  administration: { key: 'afsid', defaultName: 'AFSID' },
 };
 
 /** Normalise a library title / URL segment for matching: decode %20, lowercase, drop whitespace
@@ -142,10 +145,12 @@ export class AfsSharePointService {
   readonly templateConfig = signal<AfsSharePointConfig>(this.read('template'));
   /** Working-Papers evidence library config. */
   readonly evidenceConfig = signal<AfsSharePointConfig>(this.read('evidence'));
+  /** AFS administration library config. */
+  readonly administrationConfig = signal<AfsSharePointConfig>(this.read('administration'));
 
-  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null };
+  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null };
   private fieldsByVariant: Record<AfsSpVariant, Record<string, string | null>> = {
-    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(),
+    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields(),
   };
 
   refresh(): void {
@@ -162,8 +167,9 @@ export class AfsSharePointService {
     this.exportConfig.set(this.read('export'));
     this.templateConfig.set(this.read('template'));
     this.evidenceConfig.set(this.read('evidence'));
-    this.driveIds = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null };
-    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields() };
+    this.administrationConfig.set(this.read('administration'));
+    this.driveIds = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null };
+    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields() };
   }
 
   private configSignal(variant: AfsSpVariant) {
@@ -180,6 +186,7 @@ export class AfsSharePointService {
       case 'export': return this.exportConfig;
       case 'template': return this.templateConfig;
       case 'evidence': return this.evidenceConfig;
+      case 'administration': return this.administrationConfig;
       default: return this.config;
     }
   }
@@ -505,6 +512,14 @@ export class AfsSharePointService {
             siteUrl: p.afsRfiSharePointSiteUrl || d.siteUrl,
             library: p.afsRfiSharePointLibrary || d.library,
             linkColumn: (p.afsRfiSharePointLinkColumn || '').trim() || undefined,
+          };
+        }
+        if (variant === 'administration') {
+          return {
+            enabled: p.afsAdminSharePointEnabled ?? d.enabled,
+            siteUrl: p.afsAdminSharePointSiteUrl || d.siteUrl,
+            library: p.afsAdminSharePointLibrary || d.library,
+            linkColumn: (p.afsAdminSharePointLinkColumn || '').trim() || undefined,
           };
         }
         if (variant === 'evidence') {
