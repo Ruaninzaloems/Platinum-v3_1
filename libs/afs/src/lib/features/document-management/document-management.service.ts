@@ -137,7 +137,7 @@ export class DocumentManagementService {
 
   /** Adjustment documents go to the Working-Papers adjustment support library when its toggle is
    *  on, otherwise the separate Adjustments library; RFI attachments, finding
-   *  attachments, SCOA version documents, mapping snapshots, exports, templates, AFS drafts, final AFS
+   *  attachments, SCOA version documents, mapping snapshots, exports, templates, evidence, AFS drafts, final AFS
    *  documents and working papers to their Working-Papers libraries
    *  (when those toggles are on); everything else to the AFS library. */
   private variantForUpload(m: UploadMetadata): AfsSpVariant {
@@ -151,6 +151,7 @@ export class DocumentManagementService {
     if (m.documentType === 'mapping_snapshot' && this.afsSp.isEnabled('mappingSnapshot')) return 'mappingSnapshot';
     if (m.documentType === 'export' && this.afsSp.isEnabled('export')) return 'export';
     if (m.documentType === 'template' && this.afsSp.isEnabled('template')) return 'template';
+    if (m.documentType === 'evidence' && this.afsSp.isEnabled('evidence')) return 'evidence';
     if (m.workingPaperId && this.afsSp.isEnabled('workingPaper')) return 'workingPaper';
     return 'afs';
   }
