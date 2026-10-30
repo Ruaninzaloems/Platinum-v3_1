@@ -1048,7 +1048,7 @@ const MODULES: ModuleDef[] = [
         <div class="config-card">
           <div class="sp-header">
             <mat-icon style="color:#0078d4">cloud</mat-icon>
-            <span>Working Papers - AFS Adjustment Support Configuration</span>
+            <span>Working Papers - AFS Adjustment Support SharePoint Configuration</span>
           </div>
 
           <div class="sp-toggle-row">
@@ -1119,7 +1119,7 @@ const MODULES: ModuleDef[] = [
         <div class="config-card">
           <div class="sp-header">
             <mat-icon style="color:#0078d4">cloud</mat-icon>
-            <span>Working Papers - Mapping Snapshot Support Configuration</span>
+            <span>Working Papers - Mapping Snapshot Support SharePoint Configuration</span>
           </div>
 
           <div class="sp-toggle-row">
