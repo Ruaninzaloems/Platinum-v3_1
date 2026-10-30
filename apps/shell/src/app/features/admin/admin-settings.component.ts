@@ -1271,7 +1271,7 @@ const MODULES: ModuleDef[] = [
         <div class="config-card">
           <div class="sp-header">
             <mat-icon style="color:#0078d4">cloud</mat-icon>
-            <span>Working Papers - Template Configuration</span>
+            <span>Working Papers - Template SharePoint Configuration</span>
           </div>
 
           <div class="sp-toggle-row">
