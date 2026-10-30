@@ -81,6 +81,11 @@ export interface ModuleApiConfig {
   afsExportSharePointSiteUrl : string;
   afsExportSharePointLibrary : string;
   afsExportSharePointLinkColumn : string;
+  // AFS Working-Papers template SharePoint document storage (separate library)
+  afsTemplateSharePointEnabled : boolean;
+  afsTemplateSharePointSiteUrl : string;
+  afsTemplateSharePointLibrary : string;
+  afsTemplateSharePointLinkColumn : string;
   // AFS PostgreSQL database (maps to AZURE_POSTGRES_URL read by AFS-UI/api)
   afsDbHost     : string;
   afsDbPort     : string;
@@ -177,6 +182,11 @@ const DEFAULTS: ModuleApiConfig = {
   afsExportSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsExportSharePointLibrary : 'UatAFS WorkingPapers_Export',
   afsExportSharePointLinkColumn : 'AFSID',
+  // AFS Working-Papers template documents → separate SharePoint library
+  afsTemplateSharePointEnabled : false,
+  afsTemplateSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  afsTemplateSharePointLibrary : 'UatAFS WorkingPapers_Template',
+  afsTemplateSharePointLinkColumn : 'AFSID',
   // AFS database — separate "AFS" PostgreSQL on Azure
   afsDbHost     : 'platinum-postgre-sql.postgres.database.azure.com',
   afsDbPort     : '5432',
@@ -1256,6 +1266,77 @@ const MODULES: ModuleDef[] = [
             </button>
           </div>
         </div>
+
+        <!-- Working-Papers template SharePoint library (separate from general AFS docs) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Working Papers - Template Configuration</span>
+          </div>
+
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.afsTemplateSharePointEnabled"
+                    (click)="cfg.afsTemplateSharePointEnabled = !cfg.afsTemplateSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.afsTemplateSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for templates</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, template documents are stored in the dedicated Working-Papers template SharePoint library (with metadata) instead of the general AFS library or local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.afsTemplateSharePointEnabled">
+              {{ cfg.afsTemplateSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <div class="field-grid" [class.sp-disabled]="!cfg.afsTemplateSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.afsTemplateSharePointSiteUrl"
+                     [disabled]="!cfg.afsTemplateSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.afsTemplateSharePointLibrary"
+                     [disabled]="!cfg.afsTemplateSharePointEnabled"
+                     placeholder="UatAFS WorkingPapers_Template"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatAFS WorkingPapers_Template</strong> (the library's title or the URL segment in its address)</div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.afsTemplateSharePointLinkColumn"
+                     [disabled]="!cfg.afsTemplateSharePointEnabled"
+                     placeholder="AFSID"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.afsTemplateSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — templates use the AFS SharePoint library above (when it is on) or the module's local file storage.
+              </div>
+            </div>
+          }
+
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.afsTemplateSharePointEnabled || !cfg.afsTemplateSharePointSiteUrl"
+                    (click)="testSharePointAfsTemplate()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
       }
 
       <!-- AFS Database config — AFS module only -->
@@ -1871,6 +1952,20 @@ export class AdminSettingsComponent implements OnInit {
       this.spTesting.set(false);
       if (ok) {
         this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsExportSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointAfsTemplate() {
+    this.spTesting.set(true);
+    const url = this.cfg.afsTemplateSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsTemplateSharePointLibrary}`, 'OK', { duration: 4000 });
       } else {
         this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
       }
