@@ -107,7 +107,7 @@ const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   mappingSnapshot: { key: 'afsid', defaultName: 'AFSID' },
   export: { key: 'afsid', defaultName: 'AFSID' },
   template: { key: 'afsid', defaultName: 'AFSID' },
-  evidence: { key: 'afsid', defaultName: 'AFSID' },
+  evidence: { key: 'evd_id', defaultName: 'Evd_ID' },
   administration: { key: 'afsid', defaultName: 'AFSID' },
   documentManagement: { key: 'afsid', defaultName: 'AFSID' },
   dataSourceTb: { key: 'afsid', defaultName: 'AFSID' },
@@ -405,8 +405,8 @@ export class AfsSharePointService {
     const target = LINK_FIELD[variant].key;            // 'adjid' | 'afsid'
     try {
       const cols = await this.graph.getDriveColumns(driveId);
-      add(cols.find(c => this.normName(c.name) === target || this.normName(c.displayName) === target)?.name);
-      add(cols.find(c => this.normName(c.name).includes(target) || this.normName(c.displayName).includes(target))?.name);
+      add(cols.find(c => this.normName(c.name) === this.normName(target) || this.normName(c.displayName) === this.normName(target))?.name);
+      add(cols.find(c => this.normName(c.name).includes(this.normName(target)) || this.normName(c.displayName).includes(this.normName(target)))?.name);
     } catch { /* schema not readable — fall through to configured/encoded candidates */ }
 
     const override = this.read(variant).linkColumn;

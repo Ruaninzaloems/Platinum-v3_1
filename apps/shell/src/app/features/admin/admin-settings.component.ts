@@ -211,7 +211,7 @@ const DEFAULTS: ModuleApiConfig = {
   afsEvidenceSharePointEnabled : false,
   afsEvidenceSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsEvidenceSharePointLibrary : 'UatAFS WorkingPapers_Evidence',
-  afsEvidenceSharePointLinkColumn : 'AFSID',
+  afsEvidenceSharePointLinkColumn : 'Evd_ID',
   // AFS administration documents → separate SharePoint library
   afsAdminSharePointEnabled : false,
   afsAdminSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
@@ -1422,9 +1422,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsEvidenceSharePointLinkColumn"
                      [disabled]="!cfg.afsEvidenceSharePointEnabled"
-                     placeholder="AFSID"
+                     placeholder="Evd_ID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the linked evidence id (default <strong>Evd_ID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
