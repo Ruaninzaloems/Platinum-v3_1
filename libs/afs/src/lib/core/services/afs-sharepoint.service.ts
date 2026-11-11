@@ -113,7 +113,7 @@ const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   administration: { key: 'adminid', defaultName: 'AdminID' },
   documentManagement: { key: 'docid', defaultName: 'DocID' },
   dataSourceTb: { key: 'datasource_id', defaultName: 'DataSource_ID' },
-  rolledUpGl: { key: 'afsid', defaultName: 'AFSID' },
+  rolledUpGl: { key: 'gl_id', defaultName: 'GL_ID' },
 };
 
 /** Normalise a library title / URL segment for matching: decode %20, lowercase, drop whitespace

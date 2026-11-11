@@ -236,7 +236,7 @@ const DEFAULTS: ModuleApiConfig = {
   afsRollupGlSharePointEnabled : false,
   afsRollupGlSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsRollupGlSharePointLibrary : 'UatAFS Dashboard Rolled_Up_GL',
-  afsRollupGlSharePointLinkColumn : 'AFSID',
+  afsRollupGlSharePointLinkColumn : 'GL_ID',
   // AFS database — separate "AFS" PostgreSQL on Azure
   afsDbHost     : 'platinum-postgre-sql.postgres.database.azure.com',
   afsDbPort     : '5432',
@@ -1716,9 +1716,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsRollupGlSharePointLinkColumn"
                      [disabled]="!cfg.afsRollupGlSharePointEnabled"
-                     placeholder="AFSID"
+                     placeholder="GL_ID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>GL_ID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
