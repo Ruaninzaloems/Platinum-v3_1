@@ -116,6 +116,11 @@ export interface ModuleApiConfig {
   afsMfmaSharePointSiteUrl : string;
   afsMfmaSharePointLibrary : string;
   afsMfmaSharePointLinkColumn : string;
+  // AFS dashboard overview SharePoint document storage (separate library)
+  afsOverviewSharePointEnabled : boolean;
+  afsOverviewSharePointSiteUrl : string;
+  afsOverviewSharePointLibrary : string;
+  afsOverviewSharePointLinkColumn : string;
   // AFS PostgreSQL database (maps to AZURE_POSTGRES_URL read by AFS-UI/api)
   afsDbHost     : string;
   afsDbPort     : string;
@@ -247,6 +252,11 @@ const DEFAULTS: ModuleApiConfig = {
   afsMfmaSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsMfmaSharePointLibrary : 'UatAFS MFMA Reporting Dashboard',
   afsMfmaSharePointLinkColumn : 'MFMA_ID',
+  // AFS dashboard overview documents → separate SharePoint library
+  afsOverviewSharePointEnabled : false,
+  afsOverviewSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  afsOverviewSharePointLibrary : 'UatAFS Dashboard Overview',
+  afsOverviewSharePointLinkColumn : 'Overview_ID',
   // AFS database — separate "AFS" PostgreSQL on Azure
   afsDbHost     : 'platinum-postgre-sql.postgres.database.azure.com',
   afsDbPort     : '5432',
@@ -1823,6 +1833,77 @@ const MODULES: ModuleDef[] = [
             </button>
           </div>
         </div>
+
+        <!-- AFS dashboard overview SharePoint library (separate from general AFS docs) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Dashboard Overview SharePoint Configuration</span>
+          </div>
+
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.afsOverviewSharePointEnabled"
+                    (click)="cfg.afsOverviewSharePointEnabled = !cfg.afsOverviewSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.afsOverviewSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for dashboard overview documents</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, dashboard overview documents are stored in the dedicated AFS dashboard overview SharePoint library (with metadata) instead of the general AFS library or local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.afsOverviewSharePointEnabled">
+              {{ cfg.afsOverviewSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <div class="field-grid" [class.sp-disabled]="!cfg.afsOverviewSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.afsOverviewSharePointSiteUrl"
+                     [disabled]="!cfg.afsOverviewSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.afsOverviewSharePointLibrary"
+                     [disabled]="!cfg.afsOverviewSharePointEnabled"
+                     placeholder="UatAFS Dashboard Overview"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatAFS Dashboard Overview</strong> (the library's title or the URL segment in its address)</div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.afsOverviewSharePointLinkColumn"
+                     [disabled]="!cfg.afsOverviewSharePointEnabled"
+                     placeholder="Overview_ID"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>Overview_ID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.afsOverviewSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — dashboard overview documents use the AFS SharePoint library above (when it is on) or the module's local file storage.
+              </div>
+            </div>
+          }
+
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.afsOverviewSharePointEnabled || !cfg.afsOverviewSharePointSiteUrl"
+                    (click)="testSharePointAfsOverview()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
       }
 
       <!-- AFS Database config — AFS module only -->
@@ -2536,6 +2617,20 @@ export class AdminSettingsComponent implements OnInit {
       this.spTesting.set(false);
       if (ok) {
         this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsMfmaSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointAfsOverview() {
+    this.spTesting.set(true);
+    const url = this.cfg.afsOverviewSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsOverviewSharePointLibrary}`, 'OK', { duration: 4000 });
       } else {
         this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
       }

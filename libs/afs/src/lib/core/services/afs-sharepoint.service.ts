@@ -9,7 +9,7 @@ import { GraphService } from '@platinumv3/shared/graph';
  *
  *   Library columns written:  AFSID, description, Classification, Category, Tags
  *
- * Eighteen independent libraries are supported, each with its own enable toggle:
+ * Nineteen independent libraries are supported, each with its own enable toggle:
  *   • 'afs'          → general AFS documents (and working papers when 'workingPaper' is off) (default lib: UatAFS)
  *   • 'adjustments'  → adjustment supporting documents   (default lib: UatAFSAdjustments)
  *   • 'rfi'          → Working-Papers RFI attachments    (default lib: UatAFS WorkingPapers_RFI_Attachment)
@@ -28,12 +28,13 @@ import { GraphService } from '@platinumv3/shared/graph';
  *   • 'dataSourceTb' → AFS data sources (TB)              (default lib: UatAFS Data_Source_TB)
  *   • 'rolledUpGl'   → AFS dashboard rolled-up GL          (default lib: UatAFS Dashboard Rolled_Up_GL)
  *   • 'mfmaReporting' → AFS MFMA reporting dashboard      (default lib: UatAFS MFMA Reporting Dashboard)
+ *   • 'dashboardOverview' → AFS dashboard overview      (default lib: UatAFS Dashboard Overview)
  *
  * Mirrors the Assets SharePointConfigService / Overtime OvertimeSharePointService.
  */
 const STORAGE_KEY = 'platinum_module_config';
 
-export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi' | 'workingPaper' | 'finding' | 'scoaVersion' | 'afsDraft' | 'afsFinal' | 'adjustmentSupport' | 'mappingSnapshot' | 'export' | 'template' | 'evidence' | 'administration' | 'documentManagement' | 'dataSourceTb' | 'rolledUpGl' | 'mfmaReporting';
+export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi' | 'workingPaper' | 'finding' | 'scoaVersion' | 'afsDraft' | 'afsFinal' | 'adjustmentSupport' | 'mappingSnapshot' | 'export' | 'template' | 'evidence' | 'administration' | 'documentManagement' | 'dataSourceTb' | 'rolledUpGl' | 'mfmaReporting' | 'dashboardOverview';
 
 export interface AfsSharePointConfig {
   enabled: boolean;
@@ -81,6 +82,7 @@ const DEFAULT_CONFIGS: Record<AfsSpVariant, AfsSharePointConfig> = {
   dataSourceTb: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS Data_Source_TB' },
   rolledUpGl: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS Dashboard Rolled_Up_GL' },
   mfmaReporting: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS MFMA Reporting Dashboard' },
+  dashboardOverview: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS Dashboard Overview' },
 };
 
 interface AfsDocMeta {
@@ -117,6 +119,7 @@ const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   dataSourceTb: { key: 'datasource_id', defaultName: 'DataSource_ID' },
   rolledUpGl: { key: 'gl_id', defaultName: 'GL_ID' },
   mfmaReporting: { key: 'mfma_id', defaultName: 'MFMA_ID' },
+  dashboardOverview: { key: 'overview_id', defaultName: 'Overview_ID' },
 };
 
 /** Normalise a library title / URL segment for matching: decode %20, lowercase, drop whitespace
@@ -167,10 +170,12 @@ export class AfsSharePointService {
   readonly rolledUpGlConfig = signal<AfsSharePointConfig>(this.read('rolledUpGl'));
   /** AFS MFMA reporting dashboard library config. */
   readonly mfmaReportingConfig = signal<AfsSharePointConfig>(this.read('mfmaReporting'));
+  /** AFS dashboard overview library config. */
+  readonly dashboardOverviewConfig = signal<AfsSharePointConfig>(this.read('dashboardOverview'));
 
-  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null, documentManagement: null, dataSourceTb: null, rolledUpGl: null, mfmaReporting: null };
+  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null, documentManagement: null, dataSourceTb: null, rolledUpGl: null, mfmaReporting: null, dashboardOverview: null };
   private fieldsByVariant: Record<AfsSpVariant, Record<string, string | null>> = {
-    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields(), documentManagement: emptyFields(), dataSourceTb: emptyFields(), rolledUpGl: emptyFields(), mfmaReporting: emptyFields(),
+    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields(), documentManagement: emptyFields(), dataSourceTb: emptyFields(), rolledUpGl: emptyFields(), mfmaReporting: emptyFields(), dashboardOverview: emptyFields(),
   };
 
   refresh(): void {
@@ -192,8 +197,9 @@ export class AfsSharePointService {
     this.dataSourceTbConfig.set(this.read('dataSourceTb'));
     this.rolledUpGlConfig.set(this.read('rolledUpGl'));
     this.mfmaReportingConfig.set(this.read('mfmaReporting'));
-    this.driveIds = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null, documentManagement: null, dataSourceTb: null, rolledUpGl: null, mfmaReporting: null };
-    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields(), documentManagement: emptyFields(), dataSourceTb: emptyFields(), rolledUpGl: emptyFields(), mfmaReporting: emptyFields() };
+    this.dashboardOverviewConfig.set(this.read('dashboardOverview'));
+    this.driveIds = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null, documentManagement: null, dataSourceTb: null, rolledUpGl: null, mfmaReporting: null, dashboardOverview: null };
+    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields(), documentManagement: emptyFields(), dataSourceTb: emptyFields(), rolledUpGl: emptyFields(), mfmaReporting: emptyFields(), dashboardOverview: emptyFields() };
   }
 
   private configSignal(variant: AfsSpVariant) {
@@ -215,6 +221,7 @@ export class AfsSharePointService {
       case 'dataSourceTb': return this.dataSourceTbConfig;
       case 'rolledUpGl': return this.rolledUpGlConfig;
       case 'mfmaReporting': return this.mfmaReportingConfig;
+      case 'dashboardOverview': return this.dashboardOverviewConfig;
       default: return this.config;
     }
   }
@@ -540,6 +547,14 @@ export class AfsSharePointService {
             siteUrl: p.afsRfiSharePointSiteUrl || d.siteUrl,
             library: p.afsRfiSharePointLibrary || d.library,
             linkColumn: (p.afsRfiSharePointLinkColumn || '').trim() || undefined,
+          };
+        }
+        if (variant === 'dashboardOverview') {
+          return {
+            enabled: p.afsOverviewSharePointEnabled ?? d.enabled,
+            siteUrl: p.afsOverviewSharePointSiteUrl || d.siteUrl,
+            library: p.afsOverviewSharePointLibrary || d.library,
+            linkColumn: (p.afsOverviewSharePointLinkColumn || '').trim() || undefined,
           };
         }
         if (variant === 'mfmaReporting') {
