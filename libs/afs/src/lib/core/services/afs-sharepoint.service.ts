@@ -9,7 +9,7 @@ import { GraphService } from '@platinumv3/shared/graph';
  *
  *   Library columns written:  AFSID, description, Classification, Category, Tags
  *
- * Sixteen independent libraries are supported, each with its own enable toggle:
+ * Seventeen independent libraries are supported, each with its own enable toggle:
  *   • 'afs'          → general AFS documents (and working papers when 'workingPaper' is off) (default lib: UatAFS)
  *   • 'adjustments'  → adjustment supporting documents   (default lib: UatAFSAdjustments)
  *   • 'rfi'          → Working-Papers RFI attachments    (default lib: UatAFS WorkingPapers_RFI_Attachment)
@@ -26,12 +26,13 @@ import { GraphService } from '@platinumv3/shared/graph';
  *   • 'administration' → AFS administration documents     (default lib: UatAFS Administration)
  *   • 'documentManagement' → AFS document management      (default lib: UatAFS Document_Management)
  *   • 'dataSourceTb' → AFS data sources (TB)              (default lib: UatAFS Data_Source_TB)
+ *   • 'rolledUpGl'   → AFS dashboard rolled-up GL          (default lib: UatAFS Dashboard Rolled_Up_GL)
  *
  * Mirrors the Assets SharePointConfigService / Overtime OvertimeSharePointService.
  */
 const STORAGE_KEY = 'platinum_module_config';
 
-export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi' | 'workingPaper' | 'finding' | 'scoaVersion' | 'afsDraft' | 'afsFinal' | 'adjustmentSupport' | 'mappingSnapshot' | 'export' | 'template' | 'evidence' | 'administration' | 'documentManagement' | 'dataSourceTb';
+export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi' | 'workingPaper' | 'finding' | 'scoaVersion' | 'afsDraft' | 'afsFinal' | 'adjustmentSupport' | 'mappingSnapshot' | 'export' | 'template' | 'evidence' | 'administration' | 'documentManagement' | 'dataSourceTb' | 'rolledUpGl';
 
 export interface AfsSharePointConfig {
   enabled: boolean;
@@ -77,6 +78,7 @@ const DEFAULT_CONFIGS: Record<AfsSpVariant, AfsSharePointConfig> = {
   administration: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS Administration' },
   documentManagement: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS Document_Management' },
   dataSourceTb: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS Data_Source_TB' },
+  rolledUpGl: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS Dashboard Rolled_Up_GL' },
 };
 
 interface AfsDocMeta {
@@ -111,6 +113,7 @@ const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   administration: { key: 'adminid', defaultName: 'AdminID' },
   documentManagement: { key: 'docid', defaultName: 'DocID' },
   dataSourceTb: { key: 'datasource_id', defaultName: 'DataSource_ID' },
+  rolledUpGl: { key: 'afsid', defaultName: 'AFSID' },
 };
 
 /** Normalise a library title / URL segment for matching: decode %20, lowercase, drop whitespace
@@ -157,10 +160,12 @@ export class AfsSharePointService {
   readonly documentManagementConfig = signal<AfsSharePointConfig>(this.read('documentManagement'));
   /** AFS data sources (TB) library config. */
   readonly dataSourceTbConfig = signal<AfsSharePointConfig>(this.read('dataSourceTb'));
+  /** AFS dashboard rolled-up general ledger library config. */
+  readonly rolledUpGlConfig = signal<AfsSharePointConfig>(this.read('rolledUpGl'));
 
-  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null, documentManagement: null, dataSourceTb: null };
+  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null, documentManagement: null, dataSourceTb: null, rolledUpGl: null };
   private fieldsByVariant: Record<AfsSpVariant, Record<string, string | null>> = {
-    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields(), documentManagement: emptyFields(), dataSourceTb: emptyFields(),
+    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields(), documentManagement: emptyFields(), dataSourceTb: emptyFields(), rolledUpGl: emptyFields(),
   };
 
   refresh(): void {
@@ -180,8 +185,9 @@ export class AfsSharePointService {
     this.administrationConfig.set(this.read('administration'));
     this.documentManagementConfig.set(this.read('documentManagement'));
     this.dataSourceTbConfig.set(this.read('dataSourceTb'));
-    this.driveIds = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null, documentManagement: null, dataSourceTb: null };
-    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields(), documentManagement: emptyFields(), dataSourceTb: emptyFields() };
+    this.rolledUpGlConfig.set(this.read('rolledUpGl'));
+    this.driveIds = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null, documentManagement: null, dataSourceTb: null, rolledUpGl: null };
+    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields(), documentManagement: emptyFields(), dataSourceTb: emptyFields(), rolledUpGl: emptyFields() };
   }
 
   private configSignal(variant: AfsSpVariant) {
@@ -201,6 +207,7 @@ export class AfsSharePointService {
       case 'administration': return this.administrationConfig;
       case 'documentManagement': return this.documentManagementConfig;
       case 'dataSourceTb': return this.dataSourceTbConfig;
+      case 'rolledUpGl': return this.rolledUpGlConfig;
       default: return this.config;
     }
   }
@@ -526,6 +533,14 @@ export class AfsSharePointService {
             siteUrl: p.afsRfiSharePointSiteUrl || d.siteUrl,
             library: p.afsRfiSharePointLibrary || d.library,
             linkColumn: (p.afsRfiSharePointLinkColumn || '').trim() || undefined,
+          };
+        }
+        if (variant === 'rolledUpGl') {
+          return {
+            enabled: p.afsRollupGlSharePointEnabled ?? d.enabled,
+            siteUrl: p.afsRollupGlSharePointSiteUrl || d.siteUrl,
+            library: p.afsRollupGlSharePointLibrary || d.library,
+            linkColumn: (p.afsRollupGlSharePointLinkColumn || '').trim() || undefined,
           };
         }
         if (variant === 'dataSourceTb') {
