@@ -31,6 +31,111 @@ export interface ModuleApiConfig {
   afsSharePointEnabled : boolean;
   afsSharePointSiteUrl : string;
   afsSharePointLibrary : string;
+  // IDP SharePoint document storage (milestone evidence)
+  idpSharePointEnabled : boolean;
+  idpSharePointSiteUrl : string;
+  idpSharePointLibrary : string;
+  // IDP Institutional Capacity Assessment SharePoint document storage (separate library)
+  idpInstitutionalSharePointEnabled : boolean;
+  idpInstitutionalSharePointSiteUrl : string;
+  idpInstitutionalSharePointLibrary : string;
+  idpInstitutionalSharePointLinkColumn : string;
+  // IDP Situational Analysis Report SharePoint document storage (separate library)
+  idpSituationalSharePointEnabled : boolean;
+  idpSituationalSharePointSiteUrl : string;
+  idpSituationalSharePointLibrary : string;
+  idpSituationalSharePointLinkColumn : string;
+  // IDP Spatial Analysis and Development SharePoint document storage (separate library)
+  idpSpatialSharePointEnabled : boolean;
+  idpSpatialSharePointSiteUrl : string;
+  idpSpatialSharePointLibrary : string;
+  idpSpatialSharePointLinkColumn : string;
+  // IDP SWOT Analysis SharePoint document storage (separate library)
+  idpSwotSharePointEnabled : boolean;
+  idpSwotSharePointSiteUrl : string;
+  idpSwotSharePointLibrary : string;
+  idpSwotSharePointLinkColumn : string;
+  // IDP Priority Issues SharePoint document storage (separate library)
+  idpPrioritySharePointEnabled : boolean;
+  idpPrioritySharePointSiteUrl : string;
+  idpPrioritySharePointLibrary : string;
+  idpPrioritySharePointLinkColumn : string;
+  idpStrategicSharePointEnabled : boolean;
+  idpStrategicSharePointSiteUrl : string;
+  idpStrategicSharePointLibrary : string;
+  idpStrategicSharePointLinkColumn : string;
+  idpVisionSharePointEnabled : boolean;
+  idpVisionSharePointSiteUrl : string;
+  idpVisionSharePointLibrary : string;
+  idpVisionSharePointLinkColumn : string;
+  idpKpiSharePointEnabled : boolean;
+  idpKpiSharePointSiteUrl : string;
+  idpKpiSharePointLibrary : string;
+  idpKpiSharePointLinkColumn : string;
+  idpDevelopmentSharePointEnabled : boolean;
+  idpDevelopmentSharePointSiteUrl : string;
+  idpDevelopmentSharePointLibrary : string;
+  idpDevelopmentSharePointLinkColumn : string;
+  idpSdfSharePointEnabled : boolean;
+  idpSdfSharePointSiteUrl : string;
+  idpSdfSharePointLibrary : string;
+  idpSdfSharePointLinkColumn : string;
+  idpCapitalSharePointEnabled : boolean;
+  idpCapitalSharePointSiteUrl : string;
+  idpCapitalSharePointLibrary : string;
+  idpCapitalSharePointLinkColumn : string;
+  idpOperationalSharePointEnabled : boolean;
+  idpOperationalSharePointSiteUrl : string;
+  idpOperationalSharePointLibrary : string;
+  idpOperationalSharePointLinkColumn : string;
+  idpMscoaSharePointEnabled : boolean;
+  idpMscoaSharePointSiteUrl : string;
+  idpMscoaSharePointLibrary : string;
+  idpMscoaSharePointLinkColumn : string;
+  idpProjectPrioritisationSharePointEnabled : boolean;
+  idpProjectPrioritisationSharePointSiteUrl : string;
+  idpProjectPrioritisationSharePointLibrary : string;
+  idpProjectPrioritisationSharePointLinkColumn : string;
+  idpFinancialSharePointEnabled : boolean;
+  idpFinancialSharePointSiteUrl : string;
+  idpFinancialSharePointLibrary : string;
+  idpFinancialSharePointLinkColumn : string;
+  idpDocumentSharePointEnabled : boolean;
+  idpDocumentSharePointSiteUrl : string;
+  idpDocumentSharePointLibrary : string;
+  idpDocumentSharePointLinkColumn : string;
+  idpSectorSharePointEnabled : boolean;
+  idpSectorSharePointSiteUrl : string;
+  idpSectorSharePointLibrary : string;
+  idpSectorSharePointLinkColumn : string;
+  idpBudgetAlignmentSharePointEnabled : boolean;
+  idpBudgetAlignmentSharePointSiteUrl : string;
+  idpBudgetAlignmentSharePointLibrary : string;
+  idpBudgetAlignmentSharePointLinkColumn : string;
+  idpPublicCommentSharePointEnabled : boolean;
+  idpPublicCommentSharePointSiteUrl : string;
+  idpPublicCommentSharePointLibrary : string;
+  idpPublicCommentSharePointLinkColumn : string;
+  idpMecSharePointEnabled : boolean;
+  idpMecSharePointSiteUrl : string;
+  idpMecSharePointLibrary : string;
+  idpMecSharePointLinkColumn : string;
+  idpFinalSubmissionSharePointEnabled : boolean;
+  idpFinalSubmissionSharePointSiteUrl : string;
+  idpFinalSubmissionSharePointLibrary : string;
+  idpFinalSubmissionSharePointLinkColumn : string;
+  idpPublicCommentPeriodSharePointEnabled : boolean;
+  idpPublicCommentPeriodSharePointSiteUrl : string;
+  idpPublicCommentPeriodSharePointLibrary : string;
+  idpPublicCommentPeriodSharePointLinkColumn : string;
+  idpCouncilAdoptionSharePointEnabled : boolean;
+  idpCouncilAdoptionSharePointSiteUrl : string;
+  idpCouncilAdoptionSharePointLibrary : string;
+  idpCouncilAdoptionSharePointLinkColumn : string;
+  idpCommunityNeedsSharePointEnabled : boolean;
+  idpCommunityNeedsSharePointSiteUrl : string;
+  idpCommunityNeedsSharePointLibrary : string;
+  idpCommunityNeedsSharePointLinkColumn : string;
   // AFS Adjustments SharePoint document storage (separate library)
   afsAdjustmentsSharePointEnabled : boolean;
   afsAdjustmentsSharePointSiteUrl : string;
@@ -87,6 +192,111 @@ const DEFAULTS: ModuleApiConfig = {
   afsSharePointEnabled : false,
   afsSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsSharePointLibrary : 'UatAFS',
+  // SharePoint OFF by default → IDP module uses its current (local) evidence file storage
+  idpSharePointEnabled : false,
+  idpSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpSharePointLibrary : 'UatIDP',
+  // IDP Institutional Capacity Assessment → separate SharePoint library
+  idpInstitutionalSharePointEnabled : false,
+  idpInstitutionalSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpInstitutionalSharePointLibrary : 'UatIDPInstitutional capacity assessment completed',
+  idpInstitutionalSharePointLinkColumn : 'institutionalid',
+  // IDP Situational Analysis Report → separate SharePoint library
+  idpSituationalSharePointEnabled : false,
+  idpSituationalSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpSituationalSharePointLibrary : 'UatIDPSituational analysis report finalised',
+  idpSituationalSharePointLinkColumn : 'Situationalid',
+  // IDP Spatial Analysis and Development → separate SharePoint library
+  idpSpatialSharePointEnabled : false,
+  idpSpatialSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpSpatialSharePointLibrary : 'UatIDPSpatial analysis and development profile finalised',
+  idpSpatialSharePointLinkColumn : 'spartialid',
+  // IDP SWOT Analysis → separate SharePoint library
+  idpSwotSharePointEnabled : false,
+  idpSwotSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpSwotSharePointLibrary : 'UatIDPSWOT analysis completed',
+  idpSwotSharePointLinkColumn : 'swotid',
+  // IDP Priority Issues → separate SharePoint library
+  idpPrioritySharePointEnabled : false,
+  idpPrioritySharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpPrioritySharePointLibrary : 'UatIDPPriority issues identified and documented',
+  idpPrioritySharePointLinkColumn : 'priorityid',
+  idpStrategicSharePointEnabled : false,
+  idpStrategicSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpStrategicSharePointLibrary : 'UatIDPStrategic objectives approved by Council',
+  idpStrategicSharePointLinkColumn : 'Strategicid',
+  idpVisionSharePointEnabled : false,
+  idpVisionSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpVisionSharePointLibrary : 'UatIDPVision and mission reviewed and confirmed',
+  idpVisionSharePointLinkColumn : 'visionid',
+  idpKpiSharePointEnabled : false,
+  idpKpiSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpKpiSharePointLibrary : 'UatIDPKPI framework aligned with PGDS targets',
+  idpKpiSharePointLinkColumn : 'kpiid',
+  idpDevelopmentSharePointEnabled : false,
+  idpDevelopmentSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpDevelopmentSharePointLibrary : 'UatIDPDevelopment strategies aligned with NDP/PGDS',
+  idpDevelopmentSharePointLinkColumn : 'developmentid',
+  idpSdfSharePointEnabled : false,
+  idpSdfSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpSdfSharePointLibrary : 'UatIDPSpatial Development Framework alignment verified',
+  idpSdfSharePointLinkColumn : 'spartialdevid',
+  idpCapitalSharePointEnabled : false,
+  idpCapitalSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpCapitalSharePointLibrary : 'UatIDPCapital projects identified and costed',
+  idpCapitalSharePointLinkColumn : 'capitalid',
+  idpOperationalSharePointEnabled : false,
+  idpOperationalSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpOperationalSharePointLibrary : 'UatIDPOperational plans drafted per department',
+  idpOperationalSharePointLinkColumn : 'operationalid',
+  idpMscoaSharePointEnabled : false,
+  idpMscoaSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpMscoaSharePointLibrary : 'UatIDPMSCOA alignment verification',
+  idpMscoaSharePointLinkColumn : 'mscoaid',
+  idpProjectPrioritisationSharePointEnabled : false,
+  idpProjectPrioritisationSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpProjectPrioritisationSharePointLibrary : 'UatIDPProject prioritisation scoring completed',
+  idpProjectPrioritisationSharePointLinkColumn : 'projectid',
+  idpFinancialSharePointEnabled : false,
+  idpFinancialSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpFinancialSharePointLibrary : 'UatIDPFinancial plan and MTREF aligned with IDP',
+  idpFinancialSharePointLinkColumn : 'financialid',
+  idpDocumentSharePointEnabled : false,
+  idpDocumentSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpDocumentSharePointLibrary : 'UatIDPIDP document compiled and reviewed internally',
+  idpDocumentSharePointLinkColumn : 'idpid',
+  idpSectorSharePointEnabled : false,
+  idpSectorSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpSectorSharePointLibrary : 'UatIDPSector plan integration review',
+  idpSectorSharePointLinkColumn : 'sectorid',
+  idpBudgetAlignmentSharePointEnabled : false,
+  idpBudgetAlignmentSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpBudgetAlignmentSharePointLibrary : 'UatIDPBudget-IDP alignment confirmed by CFO',
+  idpBudgetAlignmentSharePointLinkColumn : 'budgetid',
+  idpPublicCommentSharePointEnabled : false,
+  idpPublicCommentSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpPublicCommentSharePointLibrary : 'UatIDPIDP advertised for public comment (21 days)',
+  idpPublicCommentSharePointLinkColumn : 'idpadvid',
+  idpMecSharePointEnabled : false,
+  idpMecSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpMecSharePointLibrary : 'UatIDPMEC assessment response addressed',
+  idpMecSharePointLinkColumn : 'mecid',
+  idpFinalSubmissionSharePointEnabled : false,
+  idpFinalSubmissionSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpFinalSubmissionSharePointLibrary : 'UatIDPFinal IDP submitted to MEC',
+  idpFinalSubmissionSharePointLinkColumn : 'finalid',
+  idpPublicCommentPeriodSharePointEnabled : false,
+  idpPublicCommentPeriodSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpPublicCommentPeriodSharePointLibrary : 'UatIDPPublic comment period completed',
+  idpPublicCommentPeriodSharePointLinkColumn : 'publicid',
+  idpCouncilAdoptionSharePointEnabled : false,
+  idpCouncilAdoptionSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpCouncilAdoptionSharePointLibrary : 'UatIDPCouncil adoption resolution',
+  idpCouncilAdoptionSharePointLinkColumn : 'councilid',
+  idpCommunityNeedsSharePointEnabled : false,
+  idpCommunityNeedsSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  idpCommunityNeedsSharePointLibrary : 'UatIDPCommunity needs assessment completed',
+  idpCommunityNeedsSharePointLinkColumn : 'communityid',
   // AFS Adjustments → separate SharePoint library (URL segment "UatAFSAdjustments1")
   afsAdjustmentsSharePointEnabled : false,
   afsAdjustmentsSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
@@ -391,6 +601,1850 @@ const MODULES: ModuleDef[] = [
           <div class="actions" style="margin-top:0">
             <button class="btn-secondary" [disabled]="spTesting() || !cfg.overtimeSharePointEnabled || !cfg.overtimeSharePointSiteUrl"
                     (click)="testSharePointOvertime()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- SharePoint config — IDP module only -->
+      @if (activeKey() === 'idp') {
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpSharePointEnabled"
+                    (click)="cfg.idpSharePointEnabled = !cfg.idpSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for new uploads</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, new IDP evidence uploads are stored in SharePoint instead of the IDP module's local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpSharePointEnabled">
+              {{ cfg.idpSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpSharePointSiteUrl"
+                     [disabled]="!cfg.idpSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpSharePointLibrary"
+                     [disabled]="!cfg.idpSharePointEnabled"
+                     placeholder="UatIDP"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDP</strong></div>
+            </div>
+          </div>
+
+          @if (!cfg.idpSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — IDP evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpSharePointEnabled || !cfg.idpSharePointSiteUrl"
+                    (click)="testSharePointIdp()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Institutional Capacity Assessment SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Institutional Capacity Assessment SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpInstitutionalSharePointEnabled"
+                    (click)="cfg.idpInstitutionalSharePointEnabled = !cfg.idpInstitutionalSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpInstitutionalSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Institutional capacity assessment evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "Institutional capacity assessment completed" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpInstitutionalSharePointEnabled">
+              {{ cfg.idpInstitutionalSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpInstitutionalSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpInstitutionalSharePointSiteUrl"
+                     [disabled]="!cfg.idpInstitutionalSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpInstitutionalSharePointLibrary"
+                     [disabled]="!cfg.idpInstitutionalSharePointEnabled"
+                     placeholder="UatIDPInstitutional capacity assessment completed"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPInstitutional capacity assessment completed</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpInstitutionalSharePointLinkColumn"
+                     [disabled]="!cfg.idpInstitutionalSharePointEnabled"
+                     placeholder="institutionalid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Institutional capacity assessment id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpInstitutionalSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Institutional capacity assessment evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpInstitutionalSharePointEnabled || !cfg.idpInstitutionalSharePointSiteUrl"
+                    (click)="testSharePointIdpInstitutional()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Situational Analysis Report SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Situational Analysis Report SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpSituationalSharePointEnabled"
+                    (click)="cfg.idpSituationalSharePointEnabled = !cfg.idpSituationalSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpSituationalSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Situational analysis report evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the Situational analysis report is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpSituationalSharePointEnabled">
+              {{ cfg.idpSituationalSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpSituationalSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpSituationalSharePointSiteUrl"
+                     [disabled]="!cfg.idpSituationalSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpSituationalSharePointLibrary"
+                     [disabled]="!cfg.idpSituationalSharePointEnabled"
+                     placeholder="UatIDPSituational analysis report finalised"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPSituational analysis report finalised</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpSituationalSharePointLinkColumn"
+                     [disabled]="!cfg.idpSituationalSharePointEnabled"
+                     placeholder="Situationalid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Situational analysis report id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpSituationalSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Situational analysis report evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpSituationalSharePointEnabled || !cfg.idpSituationalSharePointSiteUrl"
+                    (click)="testSharePointIdpSituational()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Spatial Analysis and Development SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Spatial Analysis and Development SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpSpatialSharePointEnabled"
+                    (click)="cfg.idpSpatialSharePointEnabled = !cfg.idpSpatialSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpSpatialSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Spatial analysis and development evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for Spatial analysis and development is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpSpatialSharePointEnabled">
+              {{ cfg.idpSpatialSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpSpatialSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpSpatialSharePointSiteUrl"
+                     [disabled]="!cfg.idpSpatialSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpSpatialSharePointLibrary"
+                     [disabled]="!cfg.idpSpatialSharePointEnabled"
+                     placeholder="UatIDPSpatial analysis and development profile finalised"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPSpatial analysis and development profile finalised</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpSpatialSharePointLinkColumn"
+                     [disabled]="!cfg.idpSpatialSharePointEnabled"
+                     placeholder="spartialid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Spatial analysis and development id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpSpatialSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Spatial analysis and development evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpSpatialSharePointEnabled || !cfg.idpSpatialSharePointSiteUrl"
+                    (click)="testSharePointIdpSpatial()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- SWOT Analysis SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>SWOT Analysis SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpSwotSharePointEnabled"
+                    (click)="cfg.idpSwotSharePointEnabled = !cfg.idpSwotSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpSwotSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for SWOT analysis evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "SWOT analysis completed" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpSwotSharePointEnabled">
+              {{ cfg.idpSwotSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpSwotSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpSwotSharePointSiteUrl"
+                     [disabled]="!cfg.idpSwotSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpSwotSharePointLibrary"
+                     [disabled]="!cfg.idpSwotSharePointEnabled"
+                     placeholder="UatIDPSWOT analysis completed"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPSWOT analysis completed</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpSwotSharePointLinkColumn"
+                     [disabled]="!cfg.idpSwotSharePointEnabled"
+                     placeholder="swotid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the SWOT analysis id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpSwotSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — SWOT analysis evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpSwotSharePointEnabled || !cfg.idpSwotSharePointSiteUrl"
+                    (click)="testSharePointIdpSwot()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Priority Issues SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Priority Issues SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpPrioritySharePointEnabled"
+                    (click)="cfg.idpPrioritySharePointEnabled = !cfg.idpPrioritySharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpPrioritySharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Priority issues evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "Priority issues identified and documented" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpPrioritySharePointEnabled">
+              {{ cfg.idpPrioritySharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpPrioritySharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpPrioritySharePointSiteUrl"
+                     [disabled]="!cfg.idpPrioritySharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpPrioritySharePointLibrary"
+                     [disabled]="!cfg.idpPrioritySharePointEnabled"
+                     placeholder="UatIDPPriority issues identified and documented"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPPriority issues identified and documented</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpPrioritySharePointLinkColumn"
+                     [disabled]="!cfg.idpPrioritySharePointEnabled"
+                     placeholder="priorityid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Priority issues id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpPrioritySharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Priority issues evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpPrioritySharePointEnabled || !cfg.idpPrioritySharePointSiteUrl"
+                    (click)="testSharePointIdpPriority()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Strategic Objectives SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Strategic Objectives SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpStrategicSharePointEnabled"
+                    (click)="cfg.idpStrategicSharePointEnabled = !cfg.idpStrategicSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpStrategicSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Strategic objectives evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "Strategic objectives approved by Council" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpStrategicSharePointEnabled">
+              {{ cfg.idpStrategicSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpStrategicSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpStrategicSharePointSiteUrl"
+                     [disabled]="!cfg.idpStrategicSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpStrategicSharePointLibrary"
+                     [disabled]="!cfg.idpStrategicSharePointEnabled"
+                     placeholder="UatIDPStrategic objectives approved by Council"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPStrategic objectives approved by Council</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpStrategicSharePointLinkColumn"
+                     [disabled]="!cfg.idpStrategicSharePointEnabled"
+                     placeholder="Strategicid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Strategic objectives id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpStrategicSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Strategic objectives evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpStrategicSharePointEnabled || !cfg.idpStrategicSharePointSiteUrl"
+                    (click)="testSharePointIdpStrategic()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Vision and Mission SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Vision and Mission SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpVisionSharePointEnabled"
+                    (click)="cfg.idpVisionSharePointEnabled = !cfg.idpVisionSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpVisionSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Vision and mission evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "Vision and mission reviewed and confirmed" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpVisionSharePointEnabled">
+              {{ cfg.idpVisionSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpVisionSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpVisionSharePointSiteUrl"
+                     [disabled]="!cfg.idpVisionSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpVisionSharePointLibrary"
+                     [disabled]="!cfg.idpVisionSharePointEnabled"
+                     placeholder="UatIDPVision and mission reviewed and confirmed"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPVision and mission reviewed and confirmed</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpVisionSharePointLinkColumn"
+                     [disabled]="!cfg.idpVisionSharePointEnabled"
+                     placeholder="visionid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Vision and mission id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpVisionSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Vision and mission evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpVisionSharePointEnabled || !cfg.idpVisionSharePointSiteUrl"
+                    (click)="testSharePointIdpVision()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Framework SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>KPI Framework SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpKpiSharePointEnabled"
+                    (click)="cfg.idpKpiSharePointEnabled = !cfg.idpKpiSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpKpiSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for KPI framework evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "KPI framework aligned with PGDS targets" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpKpiSharePointEnabled">
+              {{ cfg.idpKpiSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpKpiSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpKpiSharePointSiteUrl"
+                     [disabled]="!cfg.idpKpiSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpKpiSharePointLibrary"
+                     [disabled]="!cfg.idpKpiSharePointEnabled"
+                     placeholder="UatIDPKPI framework aligned with PGDS targets"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPKPI framework aligned with PGDS targets</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpKpiSharePointLinkColumn"
+                     [disabled]="!cfg.idpKpiSharePointEnabled"
+                     placeholder="kpiid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the KPI framework id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpKpiSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — KPI framework evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpKpiSharePointEnabled || !cfg.idpKpiSharePointSiteUrl"
+                    (click)="testSharePointIdpKpi()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Development Strategies SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Development Strategies SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpDevelopmentSharePointEnabled"
+                    (click)="cfg.idpDevelopmentSharePointEnabled = !cfg.idpDevelopmentSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpDevelopmentSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Development strategies evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "Development strategies aligned with NDP/PGDS" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpDevelopmentSharePointEnabled">
+              {{ cfg.idpDevelopmentSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpDevelopmentSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpDevelopmentSharePointSiteUrl"
+                     [disabled]="!cfg.idpDevelopmentSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpDevelopmentSharePointLibrary"
+                     [disabled]="!cfg.idpDevelopmentSharePointEnabled"
+                     placeholder="UatIDPDevelopment strategies aligned with NDP/PGDS"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPDevelopment strategies aligned with NDP/PGDS</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpDevelopmentSharePointLinkColumn"
+                     [disabled]="!cfg.idpDevelopmentSharePointEnabled"
+                     placeholder="developmentid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Development strategies id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpDevelopmentSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Development strategies evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpDevelopmentSharePointEnabled || !cfg.idpDevelopmentSharePointSiteUrl"
+                    (click)="testSharePointIdpDevelopment()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Spatial Development Framework SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Spatial Development Framework SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpSdfSharePointEnabled"
+                    (click)="cfg.idpSdfSharePointEnabled = !cfg.idpSdfSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpSdfSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Spatial Development Framework evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "Spatial Development Framework alignment verified" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpSdfSharePointEnabled">
+              {{ cfg.idpSdfSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpSdfSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpSdfSharePointSiteUrl"
+                     [disabled]="!cfg.idpSdfSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpSdfSharePointLibrary"
+                     [disabled]="!cfg.idpSdfSharePointEnabled"
+                     placeholder="UatIDPSpatial Development Framework alignment verified"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPSpatial Development Framework alignment verified</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpSdfSharePointLinkColumn"
+                     [disabled]="!cfg.idpSdfSharePointEnabled"
+                     placeholder="spartialdevid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Spatial Development Framework id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpSdfSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Spatial Development Framework evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpSdfSharePointEnabled || !cfg.idpSdfSharePointSiteUrl"
+                    (click)="testSharePointIdpSdf()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Capital Projects SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Capital Projects SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpCapitalSharePointEnabled"
+                    (click)="cfg.idpCapitalSharePointEnabled = !cfg.idpCapitalSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpCapitalSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Capital Projects evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "Capital projects identified and costed" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpCapitalSharePointEnabled">
+              {{ cfg.idpCapitalSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpCapitalSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpCapitalSharePointSiteUrl"
+                     [disabled]="!cfg.idpCapitalSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpCapitalSharePointLibrary"
+                     [disabled]="!cfg.idpCapitalSharePointEnabled"
+                     placeholder="UatIDPCapital projects identified and costed"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPCapital projects identified and costed</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpCapitalSharePointLinkColumn"
+                     [disabled]="!cfg.idpCapitalSharePointEnabled"
+                     placeholder="capitalid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Capital Projects id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpCapitalSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Capital Projects evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpCapitalSharePointEnabled || !cfg.idpCapitalSharePointSiteUrl"
+                    (click)="testSharePointIdpCapital()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Operational Plans SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Operational Plans SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpOperationalSharePointEnabled"
+                    (click)="cfg.idpOperationalSharePointEnabled = !cfg.idpOperationalSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpOperationalSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Operational Plans evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "Operational plans drafted per department" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpOperationalSharePointEnabled">
+              {{ cfg.idpOperationalSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpOperationalSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpOperationalSharePointSiteUrl"
+                     [disabled]="!cfg.idpOperationalSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpOperationalSharePointLibrary"
+                     [disabled]="!cfg.idpOperationalSharePointEnabled"
+                     placeholder="UatIDPOperational plans drafted per department"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPOperational plans drafted per department</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpOperationalSharePointLinkColumn"
+                     [disabled]="!cfg.idpOperationalSharePointEnabled"
+                     placeholder="operationalid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Operational Plans id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpOperationalSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Operational Plans evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpOperationalSharePointEnabled || !cfg.idpOperationalSharePointSiteUrl"
+                    (click)="testSharePointIdpOperational()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- MSCOA Alignment SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>MSCOA Alignment SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpMscoaSharePointEnabled"
+                    (click)="cfg.idpMscoaSharePointEnabled = !cfg.idpMscoaSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpMscoaSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for MSCOA Alignment evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "MSCOA alignment verification" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpMscoaSharePointEnabled">
+              {{ cfg.idpMscoaSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpMscoaSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpMscoaSharePointSiteUrl"
+                     [disabled]="!cfg.idpMscoaSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpMscoaSharePointLibrary"
+                     [disabled]="!cfg.idpMscoaSharePointEnabled"
+                     placeholder="UatIDPMSCOA alignment verification"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPMSCOA alignment verification</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpMscoaSharePointLinkColumn"
+                     [disabled]="!cfg.idpMscoaSharePointEnabled"
+                     placeholder="mscoaid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the MSCOA Alignment id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpMscoaSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — MSCOA Alignment evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpMscoaSharePointEnabled || !cfg.idpMscoaSharePointSiteUrl"
+                    (click)="testSharePointIdpMscoa()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Project Prioritisation SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Project Prioritisation SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpProjectPrioritisationSharePointEnabled"
+                    (click)="cfg.idpProjectPrioritisationSharePointEnabled = !cfg.idpProjectPrioritisationSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpProjectPrioritisationSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Project Prioritisation evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "Project prioritisation scoring completed" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpProjectPrioritisationSharePointEnabled">
+              {{ cfg.idpProjectPrioritisationSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpProjectPrioritisationSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpProjectPrioritisationSharePointSiteUrl"
+                     [disabled]="!cfg.idpProjectPrioritisationSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpProjectPrioritisationSharePointLibrary"
+                     [disabled]="!cfg.idpProjectPrioritisationSharePointEnabled"
+                     placeholder="UatIDPProject prioritisation scoring completed"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPProject prioritisation scoring completed</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpProjectPrioritisationSharePointLinkColumn"
+                     [disabled]="!cfg.idpProjectPrioritisationSharePointEnabled"
+                     placeholder="projectid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Project Prioritisation id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpProjectPrioritisationSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Project Prioritisation evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpProjectPrioritisationSharePointEnabled || !cfg.idpProjectPrioritisationSharePointSiteUrl"
+                    (click)="testSharePointIdpProjectPrioritisation()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Financial Plan and MTREF SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Financial Plan and MTREF SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpFinancialSharePointEnabled"
+                    (click)="cfg.idpFinancialSharePointEnabled = !cfg.idpFinancialSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpFinancialSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Financial Plan and MTREF evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "Financial plan and MTREF aligned with IDP" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpFinancialSharePointEnabled">
+              {{ cfg.idpFinancialSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpFinancialSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpFinancialSharePointSiteUrl"
+                     [disabled]="!cfg.idpFinancialSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpFinancialSharePointLibrary"
+                     [disabled]="!cfg.idpFinancialSharePointEnabled"
+                     placeholder="UatIDPFinancial plan and MTREF aligned with IDP"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPFinancial plan and MTREF aligned with IDP</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpFinancialSharePointLinkColumn"
+                     [disabled]="!cfg.idpFinancialSharePointEnabled"
+                     placeholder="financialid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Financial Plan and MTREF id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpFinancialSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Financial Plan and MTREF evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpFinancialSharePointEnabled || !cfg.idpFinancialSharePointSiteUrl"
+                    (click)="testSharePointIdpFinancial()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- IDP Document SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>IDP Document SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpDocumentSharePointEnabled"
+                    (click)="cfg.idpDocumentSharePointEnabled = !cfg.idpDocumentSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpDocumentSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for IDP Document evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "IDP document compiled and reviewed internally" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpDocumentSharePointEnabled">
+              {{ cfg.idpDocumentSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpDocumentSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpDocumentSharePointSiteUrl"
+                     [disabled]="!cfg.idpDocumentSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpDocumentSharePointLibrary"
+                     [disabled]="!cfg.idpDocumentSharePointEnabled"
+                     placeholder="UatIDPIDP document compiled and reviewed internally"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPIDP document compiled and reviewed internally</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpDocumentSharePointLinkColumn"
+                     [disabled]="!cfg.idpDocumentSharePointEnabled"
+                     placeholder="idpid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the IDP Document id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpDocumentSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — IDP Document evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpDocumentSharePointEnabled || !cfg.idpDocumentSharePointSiteUrl"
+                    (click)="testSharePointIdpDocument()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Sector Plan Integration SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Sector Plan Integration SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpSectorSharePointEnabled"
+                    (click)="cfg.idpSectorSharePointEnabled = !cfg.idpSectorSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpSectorSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Sector Plan Integration evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "Sector plan integration review" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpSectorSharePointEnabled">
+              {{ cfg.idpSectorSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpSectorSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpSectorSharePointSiteUrl"
+                     [disabled]="!cfg.idpSectorSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpSectorSharePointLibrary"
+                     [disabled]="!cfg.idpSectorSharePointEnabled"
+                     placeholder="UatIDPSector plan integration review"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPSector plan integration review</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpSectorSharePointLinkColumn"
+                     [disabled]="!cfg.idpSectorSharePointEnabled"
+                     placeholder="sectorid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Sector Plan Integration id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpSectorSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Sector Plan Integration evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpSectorSharePointEnabled || !cfg.idpSectorSharePointSiteUrl"
+                    (click)="testSharePointIdpSector()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Budget-IDP Alignment SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Budget-IDP Alignment SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpBudgetAlignmentSharePointEnabled"
+                    (click)="cfg.idpBudgetAlignmentSharePointEnabled = !cfg.idpBudgetAlignmentSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpBudgetAlignmentSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Budget-IDP Alignment evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "Budget-IDP alignment confirmed by CFO" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpBudgetAlignmentSharePointEnabled">
+              {{ cfg.idpBudgetAlignmentSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpBudgetAlignmentSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpBudgetAlignmentSharePointSiteUrl"
+                     [disabled]="!cfg.idpBudgetAlignmentSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpBudgetAlignmentSharePointLibrary"
+                     [disabled]="!cfg.idpBudgetAlignmentSharePointEnabled"
+                     placeholder="UatIDPBudget-IDP alignment confirmed by CFO"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPBudget-IDP alignment confirmed by CFO</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpBudgetAlignmentSharePointLinkColumn"
+                     [disabled]="!cfg.idpBudgetAlignmentSharePointEnabled"
+                     placeholder="budgetid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Budget-IDP Alignment id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpBudgetAlignmentSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Budget-IDP Alignment evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpBudgetAlignmentSharePointEnabled || !cfg.idpBudgetAlignmentSharePointSiteUrl"
+                    (click)="testSharePointIdpBudgetAlignment()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- IDP Public Comment SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>IDP Public Comment SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpPublicCommentSharePointEnabled"
+                    (click)="cfg.idpPublicCommentSharePointEnabled = !cfg.idpPublicCommentSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpPublicCommentSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for IDP Public Comment evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "IDP advertised for public comment (21 days)" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpPublicCommentSharePointEnabled">
+              {{ cfg.idpPublicCommentSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpPublicCommentSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpPublicCommentSharePointSiteUrl"
+                     [disabled]="!cfg.idpPublicCommentSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpPublicCommentSharePointLibrary"
+                     [disabled]="!cfg.idpPublicCommentSharePointEnabled"
+                     placeholder="UatIDPIDP advertised for public comment (21 days)"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPIDP advertised for public comment (21 days)</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpPublicCommentSharePointLinkColumn"
+                     [disabled]="!cfg.idpPublicCommentSharePointEnabled"
+                     placeholder="idpadvid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the IDP Public Comment id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpPublicCommentSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — IDP Public Comment evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpPublicCommentSharePointEnabled || !cfg.idpPublicCommentSharePointSiteUrl"
+                    (click)="testSharePointIdpPublicComment()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- MEC Assessment SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>MEC Assessment SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpMecSharePointEnabled"
+                    (click)="cfg.idpMecSharePointEnabled = !cfg.idpMecSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpMecSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for MEC Assessment evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "MEC assessment response addressed" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpMecSharePointEnabled">
+              {{ cfg.idpMecSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpMecSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpMecSharePointSiteUrl"
+                     [disabled]="!cfg.idpMecSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpMecSharePointLibrary"
+                     [disabled]="!cfg.idpMecSharePointEnabled"
+                     placeholder="UatIDPMEC assessment response addressed"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPMEC assessment response addressed</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpMecSharePointLinkColumn"
+                     [disabled]="!cfg.idpMecSharePointEnabled"
+                     placeholder="mecid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the MEC Assessment id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpMecSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — MEC Assessment evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpMecSharePointEnabled || !cfg.idpMecSharePointSiteUrl"
+                    (click)="testSharePointIdpMec()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Final IDP Submission SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Final IDP Submission SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpFinalSubmissionSharePointEnabled"
+                    (click)="cfg.idpFinalSubmissionSharePointEnabled = !cfg.idpFinalSubmissionSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpFinalSubmissionSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Final IDP Submission evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "Final IDP submitted to MEC" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpFinalSubmissionSharePointEnabled">
+              {{ cfg.idpFinalSubmissionSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpFinalSubmissionSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpFinalSubmissionSharePointSiteUrl"
+                     [disabled]="!cfg.idpFinalSubmissionSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpFinalSubmissionSharePointLibrary"
+                     [disabled]="!cfg.idpFinalSubmissionSharePointEnabled"
+                     placeholder="UatIDPFinal IDP submitted to MEC"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPFinal IDP submitted to MEC</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpFinalSubmissionSharePointLinkColumn"
+                     [disabled]="!cfg.idpFinalSubmissionSharePointEnabled"
+                     placeholder="finalid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Final IDP Submission id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpFinalSubmissionSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Final IDP Submission evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpFinalSubmissionSharePointEnabled || !cfg.idpFinalSubmissionSharePointSiteUrl"
+                    (click)="testSharePointIdpFinalSubmission()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Public Comment Period SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Public Comment Period SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpPublicCommentPeriodSharePointEnabled"
+                    (click)="cfg.idpPublicCommentPeriodSharePointEnabled = !cfg.idpPublicCommentPeriodSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpPublicCommentPeriodSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Public Comment Period evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "Public comment period completed" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpPublicCommentPeriodSharePointEnabled">
+              {{ cfg.idpPublicCommentPeriodSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpPublicCommentPeriodSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpPublicCommentPeriodSharePointSiteUrl"
+                     [disabled]="!cfg.idpPublicCommentPeriodSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpPublicCommentPeriodSharePointLibrary"
+                     [disabled]="!cfg.idpPublicCommentPeriodSharePointEnabled"
+                     placeholder="UatIDPPublic comment period completed"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPPublic comment period completed</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpPublicCommentPeriodSharePointLinkColumn"
+                     [disabled]="!cfg.idpPublicCommentPeriodSharePointEnabled"
+                     placeholder="publicid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Public Comment Period id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpPublicCommentPeriodSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Public Comment Period evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpPublicCommentPeriodSharePointEnabled || !cfg.idpPublicCommentPeriodSharePointSiteUrl"
+                    (click)="testSharePointIdpPublicCommentPeriod()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Council Adoption SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Council Adoption SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpCouncilAdoptionSharePointEnabled"
+                    (click)="cfg.idpCouncilAdoptionSharePointEnabled = !cfg.idpCouncilAdoptionSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpCouncilAdoptionSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Council Adoption evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "Council adoption resolution" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpCouncilAdoptionSharePointEnabled">
+              {{ cfg.idpCouncilAdoptionSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpCouncilAdoptionSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpCouncilAdoptionSharePointSiteUrl"
+                     [disabled]="!cfg.idpCouncilAdoptionSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpCouncilAdoptionSharePointLibrary"
+                     [disabled]="!cfg.idpCouncilAdoptionSharePointEnabled"
+                     placeholder="UatIDPCouncil adoption resolution"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPCouncil adoption resolution</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpCouncilAdoptionSharePointLinkColumn"
+                     [disabled]="!cfg.idpCouncilAdoptionSharePointEnabled"
+                     placeholder="councilid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Council Adoption id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpCouncilAdoptionSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Council Adoption evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpCouncilAdoptionSharePointEnabled || !cfg.idpCouncilAdoptionSharePointSiteUrl"
+                    (click)="testSharePointIdpCouncilAdoption()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Community Needs Assessment SharePoint library (separate from general IDP evidence) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Community Needs Assessment SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.idpCommunityNeedsSharePointEnabled"
+                    (click)="cfg.idpCommunityNeedsSharePointEnabled = !cfg.idpCommunityNeedsSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.idpCommunityNeedsSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for Community Needs Assessment evidence</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, evidence for the "Community needs assessment completed" milestone is stored in this dedicated SharePoint library instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.idpCommunityNeedsSharePointEnabled">
+              {{ cfg.idpCommunityNeedsSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.idpCommunityNeedsSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.idpCommunityNeedsSharePointSiteUrl"
+                     [disabled]="!cfg.idpCommunityNeedsSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.idpCommunityNeedsSharePointLibrary"
+                     [disabled]="!cfg.idpCommunityNeedsSharePointEnabled"
+                     placeholder="UatIDPCommunity needs assessment completed"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatIDPCommunity needs assessment completed</strong></div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.idpCommunityNeedsSharePointLinkColumn"
+                     [disabled]="!cfg.idpCommunityNeedsSharePointEnabled"
+                     placeholder="communityid"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the Community Needs Assessment id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.idpCommunityNeedsSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — Community Needs Assessment evidence uses the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.idpCommunityNeedsSharePointEnabled || !cfg.idpCommunityNeedsSharePointSiteUrl"
+                    (click)="testSharePointIdpCommunityNeeds()">
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
@@ -968,6 +3022,108 @@ export class AdminSettingsComponent implements OnInit {
       this.cfg.afsSharePointSiteUrl = DEFAULTS.afsSharePointSiteUrl;
       this.cfg.afsSharePointLibrary = DEFAULTS.afsSharePointLibrary;
     }
+    // IDP page owns the SharePoint config — reset it too
+    if (this.activeKey() === 'idp') {
+      this.cfg.idpSharePointEnabled = DEFAULTS.idpSharePointEnabled;
+      this.cfg.idpSharePointSiteUrl = DEFAULTS.idpSharePointSiteUrl;
+      this.cfg.idpSharePointLibrary = DEFAULTS.idpSharePointLibrary;
+      this.cfg.idpInstitutionalSharePointEnabled = DEFAULTS.idpInstitutionalSharePointEnabled;
+      this.cfg.idpInstitutionalSharePointSiteUrl = DEFAULTS.idpInstitutionalSharePointSiteUrl;
+      this.cfg.idpInstitutionalSharePointLibrary = DEFAULTS.idpInstitutionalSharePointLibrary;
+      this.cfg.idpInstitutionalSharePointLinkColumn = DEFAULTS.idpInstitutionalSharePointLinkColumn;
+      this.cfg.idpSituationalSharePointEnabled = DEFAULTS.idpSituationalSharePointEnabled;
+      this.cfg.idpSituationalSharePointSiteUrl = DEFAULTS.idpSituationalSharePointSiteUrl;
+      this.cfg.idpSituationalSharePointLibrary = DEFAULTS.idpSituationalSharePointLibrary;
+      this.cfg.idpSituationalSharePointLinkColumn = DEFAULTS.idpSituationalSharePointLinkColumn;
+      this.cfg.idpSpatialSharePointEnabled = DEFAULTS.idpSpatialSharePointEnabled;
+      this.cfg.idpSpatialSharePointSiteUrl = DEFAULTS.idpSpatialSharePointSiteUrl;
+      this.cfg.idpSpatialSharePointLibrary = DEFAULTS.idpSpatialSharePointLibrary;
+      this.cfg.idpSpatialSharePointLinkColumn = DEFAULTS.idpSpatialSharePointLinkColumn;
+      this.cfg.idpSwotSharePointEnabled = DEFAULTS.idpSwotSharePointEnabled;
+      this.cfg.idpSwotSharePointSiteUrl = DEFAULTS.idpSwotSharePointSiteUrl;
+      this.cfg.idpSwotSharePointLibrary = DEFAULTS.idpSwotSharePointLibrary;
+      this.cfg.idpSwotSharePointLinkColumn = DEFAULTS.idpSwotSharePointLinkColumn;
+      this.cfg.idpPrioritySharePointEnabled = DEFAULTS.idpPrioritySharePointEnabled;
+      this.cfg.idpPrioritySharePointSiteUrl = DEFAULTS.idpPrioritySharePointSiteUrl;
+      this.cfg.idpPrioritySharePointLibrary = DEFAULTS.idpPrioritySharePointLibrary;
+      this.cfg.idpPrioritySharePointLinkColumn = DEFAULTS.idpPrioritySharePointLinkColumn;
+      this.cfg.idpStrategicSharePointEnabled = DEFAULTS.idpStrategicSharePointEnabled;
+      this.cfg.idpStrategicSharePointSiteUrl = DEFAULTS.idpStrategicSharePointSiteUrl;
+      this.cfg.idpStrategicSharePointLibrary = DEFAULTS.idpStrategicSharePointLibrary;
+      this.cfg.idpStrategicSharePointLinkColumn = DEFAULTS.idpStrategicSharePointLinkColumn;
+      this.cfg.idpVisionSharePointEnabled = DEFAULTS.idpVisionSharePointEnabled;
+      this.cfg.idpVisionSharePointSiteUrl = DEFAULTS.idpVisionSharePointSiteUrl;
+      this.cfg.idpVisionSharePointLibrary = DEFAULTS.idpVisionSharePointLibrary;
+      this.cfg.idpVisionSharePointLinkColumn = DEFAULTS.idpVisionSharePointLinkColumn;
+      this.cfg.idpKpiSharePointEnabled = DEFAULTS.idpKpiSharePointEnabled;
+      this.cfg.idpKpiSharePointSiteUrl = DEFAULTS.idpKpiSharePointSiteUrl;
+      this.cfg.idpKpiSharePointLibrary = DEFAULTS.idpKpiSharePointLibrary;
+      this.cfg.idpKpiSharePointLinkColumn = DEFAULTS.idpKpiSharePointLinkColumn;
+      this.cfg.idpDevelopmentSharePointEnabled = DEFAULTS.idpDevelopmentSharePointEnabled;
+      this.cfg.idpDevelopmentSharePointSiteUrl = DEFAULTS.idpDevelopmentSharePointSiteUrl;
+      this.cfg.idpDevelopmentSharePointLibrary = DEFAULTS.idpDevelopmentSharePointLibrary;
+      this.cfg.idpDevelopmentSharePointLinkColumn = DEFAULTS.idpDevelopmentSharePointLinkColumn;
+      this.cfg.idpSdfSharePointEnabled = DEFAULTS.idpSdfSharePointEnabled;
+      this.cfg.idpSdfSharePointSiteUrl = DEFAULTS.idpSdfSharePointSiteUrl;
+      this.cfg.idpSdfSharePointLibrary = DEFAULTS.idpSdfSharePointLibrary;
+      this.cfg.idpSdfSharePointLinkColumn = DEFAULTS.idpSdfSharePointLinkColumn;
+      this.cfg.idpCapitalSharePointEnabled = DEFAULTS.idpCapitalSharePointEnabled;
+      this.cfg.idpCapitalSharePointSiteUrl = DEFAULTS.idpCapitalSharePointSiteUrl;
+      this.cfg.idpCapitalSharePointLibrary = DEFAULTS.idpCapitalSharePointLibrary;
+      this.cfg.idpCapitalSharePointLinkColumn = DEFAULTS.idpCapitalSharePointLinkColumn;
+      this.cfg.idpOperationalSharePointEnabled = DEFAULTS.idpOperationalSharePointEnabled;
+      this.cfg.idpOperationalSharePointSiteUrl = DEFAULTS.idpOperationalSharePointSiteUrl;
+      this.cfg.idpOperationalSharePointLibrary = DEFAULTS.idpOperationalSharePointLibrary;
+      this.cfg.idpOperationalSharePointLinkColumn = DEFAULTS.idpOperationalSharePointLinkColumn;
+      this.cfg.idpMscoaSharePointEnabled = DEFAULTS.idpMscoaSharePointEnabled;
+      this.cfg.idpMscoaSharePointSiteUrl = DEFAULTS.idpMscoaSharePointSiteUrl;
+      this.cfg.idpMscoaSharePointLibrary = DEFAULTS.idpMscoaSharePointLibrary;
+      this.cfg.idpMscoaSharePointLinkColumn = DEFAULTS.idpMscoaSharePointLinkColumn;
+      this.cfg.idpProjectPrioritisationSharePointEnabled = DEFAULTS.idpProjectPrioritisationSharePointEnabled;
+      this.cfg.idpProjectPrioritisationSharePointSiteUrl = DEFAULTS.idpProjectPrioritisationSharePointSiteUrl;
+      this.cfg.idpProjectPrioritisationSharePointLibrary = DEFAULTS.idpProjectPrioritisationSharePointLibrary;
+      this.cfg.idpProjectPrioritisationSharePointLinkColumn = DEFAULTS.idpProjectPrioritisationSharePointLinkColumn;
+      this.cfg.idpFinancialSharePointEnabled = DEFAULTS.idpFinancialSharePointEnabled;
+      this.cfg.idpFinancialSharePointSiteUrl = DEFAULTS.idpFinancialSharePointSiteUrl;
+      this.cfg.idpFinancialSharePointLibrary = DEFAULTS.idpFinancialSharePointLibrary;
+      this.cfg.idpFinancialSharePointLinkColumn = DEFAULTS.idpFinancialSharePointLinkColumn;
+      this.cfg.idpDocumentSharePointEnabled = DEFAULTS.idpDocumentSharePointEnabled;
+      this.cfg.idpDocumentSharePointSiteUrl = DEFAULTS.idpDocumentSharePointSiteUrl;
+      this.cfg.idpDocumentSharePointLibrary = DEFAULTS.idpDocumentSharePointLibrary;
+      this.cfg.idpDocumentSharePointLinkColumn = DEFAULTS.idpDocumentSharePointLinkColumn;
+      this.cfg.idpSectorSharePointEnabled = DEFAULTS.idpSectorSharePointEnabled;
+      this.cfg.idpSectorSharePointSiteUrl = DEFAULTS.idpSectorSharePointSiteUrl;
+      this.cfg.idpSectorSharePointLibrary = DEFAULTS.idpSectorSharePointLibrary;
+      this.cfg.idpSectorSharePointLinkColumn = DEFAULTS.idpSectorSharePointLinkColumn;
+      this.cfg.idpBudgetAlignmentSharePointEnabled = DEFAULTS.idpBudgetAlignmentSharePointEnabled;
+      this.cfg.idpBudgetAlignmentSharePointSiteUrl = DEFAULTS.idpBudgetAlignmentSharePointSiteUrl;
+      this.cfg.idpBudgetAlignmentSharePointLibrary = DEFAULTS.idpBudgetAlignmentSharePointLibrary;
+      this.cfg.idpBudgetAlignmentSharePointLinkColumn = DEFAULTS.idpBudgetAlignmentSharePointLinkColumn;
+      this.cfg.idpPublicCommentSharePointEnabled = DEFAULTS.idpPublicCommentSharePointEnabled;
+      this.cfg.idpPublicCommentSharePointSiteUrl = DEFAULTS.idpPublicCommentSharePointSiteUrl;
+      this.cfg.idpPublicCommentSharePointLibrary = DEFAULTS.idpPublicCommentSharePointLibrary;
+      this.cfg.idpPublicCommentSharePointLinkColumn = DEFAULTS.idpPublicCommentSharePointLinkColumn;
+      this.cfg.idpMecSharePointEnabled = DEFAULTS.idpMecSharePointEnabled;
+      this.cfg.idpMecSharePointSiteUrl = DEFAULTS.idpMecSharePointSiteUrl;
+      this.cfg.idpMecSharePointLibrary = DEFAULTS.idpMecSharePointLibrary;
+      this.cfg.idpMecSharePointLinkColumn = DEFAULTS.idpMecSharePointLinkColumn;
+      this.cfg.idpFinalSubmissionSharePointEnabled = DEFAULTS.idpFinalSubmissionSharePointEnabled;
+      this.cfg.idpFinalSubmissionSharePointSiteUrl = DEFAULTS.idpFinalSubmissionSharePointSiteUrl;
+      this.cfg.idpFinalSubmissionSharePointLibrary = DEFAULTS.idpFinalSubmissionSharePointLibrary;
+      this.cfg.idpFinalSubmissionSharePointLinkColumn = DEFAULTS.idpFinalSubmissionSharePointLinkColumn;
+      this.cfg.idpPublicCommentPeriodSharePointEnabled = DEFAULTS.idpPublicCommentPeriodSharePointEnabled;
+      this.cfg.idpPublicCommentPeriodSharePointSiteUrl = DEFAULTS.idpPublicCommentPeriodSharePointSiteUrl;
+      this.cfg.idpPublicCommentPeriodSharePointLibrary = DEFAULTS.idpPublicCommentPeriodSharePointLibrary;
+      this.cfg.idpPublicCommentPeriodSharePointLinkColumn = DEFAULTS.idpPublicCommentPeriodSharePointLinkColumn;
+      this.cfg.idpCouncilAdoptionSharePointEnabled = DEFAULTS.idpCouncilAdoptionSharePointEnabled;
+      this.cfg.idpCouncilAdoptionSharePointSiteUrl = DEFAULTS.idpCouncilAdoptionSharePointSiteUrl;
+      this.cfg.idpCouncilAdoptionSharePointLibrary = DEFAULTS.idpCouncilAdoptionSharePointLibrary;
+      this.cfg.idpCouncilAdoptionSharePointLinkColumn = DEFAULTS.idpCouncilAdoptionSharePointLinkColumn;
+      this.cfg.idpCommunityNeedsSharePointEnabled = DEFAULTS.idpCommunityNeedsSharePointEnabled;
+      this.cfg.idpCommunityNeedsSharePointSiteUrl = DEFAULTS.idpCommunityNeedsSharePointSiteUrl;
+      this.cfg.idpCommunityNeedsSharePointLibrary = DEFAULTS.idpCommunityNeedsSharePointLibrary;
+      this.cfg.idpCommunityNeedsSharePointLinkColumn = DEFAULTS.idpCommunityNeedsSharePointLinkColumn;
+    }
     // Overtime page owns the DB config + SharePoint config — reset them too
     if (this.activeKey() === 'overtime') {
       this.cfg.overtimeDbHost     = DEFAULTS.overtimeDbHost;
@@ -1084,6 +3240,357 @@ export class AdminSettingsComponent implements OnInit {
       this.spTesting.set(false);
       if (ok) {
         this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdp() {
+    this.spTesting.set(true);
+    // Basic site-URL well-formedness check (mirrors the assets module's check).
+    const url = this.cfg.idpSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpInstitutional() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpInstitutionalSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpInstitutionalSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpSituational() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpSituationalSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpSituationalSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpSpatial() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpSpatialSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpSpatialSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpSwot() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpSwotSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpSwotSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpPriority() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpPrioritySharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpPrioritySharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpStrategic() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpStrategicSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpStrategicSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpVision() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpVisionSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpVisionSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpKpi() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpKpiSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpKpiSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpDevelopment() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpDevelopmentSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpDevelopmentSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpSdf() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpSdfSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpSdfSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpCapital() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpCapitalSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpCapitalSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpOperational() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpOperationalSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpOperationalSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpMscoa() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpMscoaSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpMscoaSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpProjectPrioritisation() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpProjectPrioritisationSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpProjectPrioritisationSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpFinancial() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpFinancialSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpFinancialSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpDocument() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpDocumentSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpDocumentSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpSector() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpSectorSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpSectorSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpBudgetAlignment() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpBudgetAlignmentSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpBudgetAlignmentSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpPublicComment() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpPublicCommentSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpPublicCommentSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpMec() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpMecSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpMecSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpFinalSubmission() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpFinalSubmissionSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpFinalSubmissionSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpPublicCommentPeriod() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpPublicCommentPeriodSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpPublicCommentPeriodSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpCouncilAdoption() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpCouncilAdoptionSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpCouncilAdoptionSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointIdpCommunityNeeds() {
+    this.spTesting.set(true);
+    const url = this.cfg.idpCommunityNeedsSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.idpCommunityNeedsSharePointLibrary}`, 'OK', { duration: 4000 });
       } else {
         this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
       }
