@@ -176,72 +176,72 @@ const DEFAULTS: ModuleApiConfig = {
   afsAdjustmentsSharePointEnabled : false,
   afsAdjustmentsSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsAdjustmentsSharePointLibrary : 'UatAFSAdjustments1',
-  afsAdjustmentsSharePointLinkColumn : 'ADJID',
+  afsAdjustmentsSharePointLinkColumn : 'AFSID',
   // AFS Working-Papers RFI attachments → separate SharePoint library
   afsRfiSharePointEnabled : false,
   afsRfiSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsRfiSharePointLibrary : 'UatAFS WorkingPapers_RFI_Attachment',
-  afsRfiSharePointLinkColumn : 'RFI_A_ID',
+  afsRfiSharePointLinkColumn : 'AFSID',
   // AFS Working-Papers working papers → separate SharePoint library
   afsWpSharePointEnabled : false,
   afsWpSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsWpSharePointLibrary : 'UatAFS WorkingPapers-WorkingPaper',
-  afsWpSharePointLinkColumn : 'WPID',
+  afsWpSharePointLinkColumn : 'AFSID',
   // AFS Working-Papers finding attachments → separate SharePoint library
   afsFindingSharePointEnabled : false,
   afsFindingSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsFindingSharePointLibrary : 'UatAFS WorkingPapers_FindingAttachment',
-  afsFindingSharePointLinkColumn : 'FA_ID',
+  afsFindingSharePointLinkColumn : 'AFSID',
   // AFS Working-Papers SCOA version documents → separate SharePoint library
   afsScoaSharePointEnabled : false,
   afsScoaSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsScoaSharePointLibrary : 'UatAFS WorkingPapers_ScoaVersion',
-  afsScoaSharePointLinkColumn : 'SCOAID',
+  afsScoaSharePointLinkColumn : 'AFSID',
   // AFS Working-Papers AFS draft documents → separate SharePoint library
   afsDraftSharePointEnabled : false,
   afsDraftSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsDraftSharePointLibrary : 'UatAFS WorkingPapers_AFS_Draft',
-  afsDraftSharePointLinkColumn : 'AFS_Draft_ID',
+  afsDraftSharePointLinkColumn : 'AFSID',
   // AFS Working-Papers AFS final documents → separate SharePoint library
   afsFinalSharePointEnabled : false,
   afsFinalSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsFinalSharePointLibrary : 'UatAFS WorkingPapers_AfsFinal',
-  afsFinalSharePointLinkColumn : 'AFSFinal_ID',
+  afsFinalSharePointLinkColumn : 'AFSID',
   // AFS Working-Papers adjustment support documents → separate SharePoint library
   afsAdjSupportSharePointEnabled : false,
   afsAdjSupportSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsAdjSupportSharePointLibrary : 'UatAFS WorkingPapers_AdjustmentSupport',
-  afsAdjSupportSharePointLinkColumn : 'ADJSupportID',
+  afsAdjSupportSharePointLinkColumn : 'AFSID',
   // AFS Working-Papers mapping snapshot documents → separate SharePoint library
   afsMappingSharePointEnabled : false,
   afsMappingSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsMappingSharePointLibrary : 'UatAFS WorkingPapers_MappingSnapshot',
-  afsMappingSharePointLinkColumn : 'MappingID',
+  afsMappingSharePointLinkColumn : 'AFSID',
   // AFS Working-Papers export documents → separate SharePoint library
   afsExportSharePointEnabled : false,
   afsExportSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsExportSharePointLibrary : 'UatAFS WorkingPapers_Export',
-  afsExportSharePointLinkColumn : 'ExportID',
+  afsExportSharePointLinkColumn : 'AFSID',
   // AFS Working-Papers template documents → separate SharePoint library
   afsTemplateSharePointEnabled : false,
   afsTemplateSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsTemplateSharePointLibrary : 'UatAFS WorkingPapers_Template',
-  afsTemplateSharePointLinkColumn : 'TemplateID',
+  afsTemplateSharePointLinkColumn : 'AFSID',
   // AFS Working-Papers evidence documents → separate SharePoint library
   afsEvidenceSharePointEnabled : false,
   afsEvidenceSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsEvidenceSharePointLibrary : 'UatAFS WorkingPapers_Evidence',
-  afsEvidenceSharePointLinkColumn : 'Evd_ID',
+  afsEvidenceSharePointLinkColumn : 'AFSID',
   // AFS administration documents → separate SharePoint library
   afsAdminSharePointEnabled : false,
   afsAdminSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsAdminSharePointLibrary : 'UatAFS Administration',
-  afsAdminSharePointLinkColumn : 'AdminID',
+  afsAdminSharePointLinkColumn : 'AFSID',
   // AFS document management documents → separate SharePoint library
   afsDocMgmtSharePointEnabled : false,
   afsDocMgmtSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsDocMgmtSharePointLibrary : 'UatAFS Document_Management',
-  afsDocMgmtSharePointLinkColumn : 'DocID',
+  afsDocMgmtSharePointLinkColumn : 'AFSID',
   // AFS data sources (TB) documents → separate SharePoint library
   afsTbSharePointEnabled : false,
   afsTbSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
@@ -251,22 +251,22 @@ const DEFAULTS: ModuleApiConfig = {
   afsRollupGlSharePointEnabled : false,
   afsRollupGlSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsRollupGlSharePointLibrary : 'UatAFS Dashboard Rolled_Up_GL',
-  afsRollupGlSharePointLinkColumn : 'GL_ID',
+  afsRollupGlSharePointLinkColumn : 'AFSID',
   // AFS MFMA reporting dashboard documents → separate SharePoint library
   afsMfmaSharePointEnabled : false,
   afsMfmaSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsMfmaSharePointLibrary : 'UatAFS MFMA Reporting Dashboard',
-  afsMfmaSharePointLinkColumn : 'MFMA_ID',
+  afsMfmaSharePointLinkColumn : 'AFSID',
   // AFS dashboard overview documents → separate SharePoint library
   afsOverviewSharePointEnabled : false,
   afsOverviewSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsOverviewSharePointLibrary : 'UatAFS Dashboard Overview',
-  afsOverviewSharePointLinkColumn : 'Overview_ID',
+  afsOverviewSharePointLinkColumn : 'AFSID',
   // AFS exports center documents → separate SharePoint library
   afsExportsCenterSharePointEnabled : false,
   afsExportsCenterSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsExportsCenterSharePointLibrary : 'UatAFS Exports Center Overview',
-  afsExportsCenterSharePointLinkColumn : 'Exports_ID',
+  afsExportsCenterSharePointLinkColumn : 'AFSID',
   // AFS database — separate "AFS" PostgreSQL on Azure
   afsDbHost     : 'platinum-postgre-sql.postgres.database.azure.com',
   afsDbPort     : '5432',
@@ -681,7 +681,7 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsAdjustmentsSharePointLinkColumn"
                      [disabled]="!cfg.afsAdjustmentsSharePointEnabled"
-                     placeholder="ADJID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
               <div class="field-hint">The column that stores the adjustment id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value, e.g. <strong>ADJID0</strong> if it was recreated).</div>
             </div>
@@ -752,9 +752,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsRfiSharePointLinkColumn"
                      [disabled]="!cfg.afsRfiSharePointEnabled"
-                     placeholder="RFI_A_ID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the RFI id (default <strong>RFI_A_ID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the RFI id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
@@ -823,9 +823,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsWpSharePointLinkColumn"
                      [disabled]="!cfg.afsWpSharePointEnabled"
-                     placeholder="WPID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the working-paper id (default <strong>WPID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the working-paper id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
@@ -894,9 +894,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsFindingSharePointLinkColumn"
                      [disabled]="!cfg.afsFindingSharePointEnabled"
-                     placeholder="FA_ID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the finding id (default <strong>FA_ID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the finding id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
@@ -965,9 +965,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsScoaSharePointLinkColumn"
                      [disabled]="!cfg.afsScoaSharePointEnabled"
-                     placeholder="SCOAID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>SCOAID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
@@ -1036,9 +1036,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsDraftSharePointLinkColumn"
                      [disabled]="!cfg.afsDraftSharePointEnabled"
-                     placeholder="AFS_Draft_ID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the compilation id (default <strong>AFS_Draft_ID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the compilation id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
@@ -1107,9 +1107,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsFinalSharePointLinkColumn"
                      [disabled]="!cfg.afsFinalSharePointEnabled"
-                     placeholder="AFSFinal_ID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the compilation id (default <strong>AFSFinal_ID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the compilation id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
@@ -1178,9 +1178,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsAdjSupportSharePointLinkColumn"
                      [disabled]="!cfg.afsAdjSupportSharePointEnabled"
-                     placeholder="ADJSupportID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the adjustment reference (default <strong>ADJSupportID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the adjustment reference (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
@@ -1249,9 +1249,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsMappingSharePointLinkColumn"
                      [disabled]="!cfg.afsMappingSharePointEnabled"
-                     placeholder="MappingID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>MappingID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
@@ -1320,9 +1320,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsExportSharePointLinkColumn"
                      [disabled]="!cfg.afsExportSharePointEnabled"
-                     placeholder="ExportID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>ExportID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
@@ -1391,9 +1391,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsTemplateSharePointLinkColumn"
                      [disabled]="!cfg.afsTemplateSharePointEnabled"
-                     placeholder="TemplateID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>TemplateID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
@@ -1462,9 +1462,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsEvidenceSharePointLinkColumn"
                      [disabled]="!cfg.afsEvidenceSharePointEnabled"
-                     placeholder="Evd_ID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the linked evidence id (default <strong>Evd_ID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the linked evidence id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
@@ -1533,9 +1533,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsAdminSharePointLinkColumn"
                      [disabled]="!cfg.afsAdminSharePointEnabled"
-                     placeholder="AdminID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>AdminID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
@@ -1604,9 +1604,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsDocMgmtSharePointLinkColumn"
                      [disabled]="!cfg.afsDocMgmtSharePointEnabled"
-                     placeholder="DocID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>DocID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
@@ -1746,9 +1746,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsRollupGlSharePointLinkColumn"
                      [disabled]="!cfg.afsRollupGlSharePointEnabled"
-                     placeholder="GL_ID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>GL_ID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
@@ -1817,9 +1817,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsMfmaSharePointLinkColumn"
                      [disabled]="!cfg.afsMfmaSharePointEnabled"
-                     placeholder="MFMA_ID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>MFMA_ID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
@@ -1888,9 +1888,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsOverviewSharePointLinkColumn"
                      [disabled]="!cfg.afsOverviewSharePointEnabled"
-                     placeholder="Overview_ID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>Overview_ID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
@@ -1959,9 +1959,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsExportsCenterSharePointLinkColumn"
                      [disabled]="!cfg.afsExportsCenterSharePointEnabled"
-                     placeholder="Exports_ID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>Exports_ID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 

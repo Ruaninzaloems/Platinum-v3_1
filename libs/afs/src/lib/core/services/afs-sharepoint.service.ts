@@ -99,30 +99,29 @@ interface AfsDocMeta {
 const emptyFields = (): Record<string, string | null> =>
   ({ afsid: null, description: null, classification: null, category: null, tags: null, documenttype: null, accesslevel: null });
 
-// The entity-link column differs per library: AFS uses "AFSID", the Adjustments
-// library uses "ADJID", and each Working-Papers / administration / document management / data
-// sources (TB) library has its own (RFI_A_ID, WPID, FA_ID …). (description/Classification/Category/Tags are the same.)
+// The entity-link column defaults to "AFSID" in every library; each library can override it
+// via its Admin → AFS "Link Column" setting. (description/Classification/Category/Tags are the same.)
 const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   afs: { key: 'afsid', defaultName: 'AFSID' },
-  adjustments: { key: 'adjid', defaultName: 'ADJID' },
-  rfi: { key: 'rfi_a_id', defaultName: 'RFI_A_ID' },
-  workingPaper: { key: 'wpid', defaultName: 'WPID' },
-  finding: { key: 'fa_id', defaultName: 'FA_ID' },
-  scoaVersion: { key: 'scoaid', defaultName: 'SCOAID' },
-  afsDraft: { key: 'afs_draft_id', defaultName: 'AFS_Draft_ID' },
-  afsFinal: { key: 'afsfinal_id', defaultName: 'AFSFinal_ID' },
-  adjustmentSupport: { key: 'adjsupportid', defaultName: 'ADJSupportID' },
-  mappingSnapshot: { key: 'mappingid', defaultName: 'MappingID' },
-  export: { key: 'exportid', defaultName: 'ExportID' },
-  template: { key: 'templateid', defaultName: 'TemplateID' },
-  evidence: { key: 'evd_id', defaultName: 'Evd_ID' },
-  administration: { key: 'adminid', defaultName: 'AdminID' },
-  documentManagement: { key: 'docid', defaultName: 'DocID' },
+  adjustments: { key: 'afsid', defaultName: 'AFSID' },
+  rfi: { key: 'afsid', defaultName: 'AFSID' },
+  workingPaper: { key: 'afsid', defaultName: 'AFSID' },
+  finding: { key: 'afsid', defaultName: 'AFSID' },
+  scoaVersion: { key: 'afsid', defaultName: 'AFSID' },
+  afsDraft: { key: 'afsid', defaultName: 'AFSID' },
+  afsFinal: { key: 'afsid', defaultName: 'AFSID' },
+  adjustmentSupport: { key: 'afsid', defaultName: 'AFSID' },
+  mappingSnapshot: { key: 'afsid', defaultName: 'AFSID' },
+  export: { key: 'afsid', defaultName: 'AFSID' },
+  template: { key: 'afsid', defaultName: 'AFSID' },
+  evidence: { key: 'afsid', defaultName: 'AFSID' },
+  administration: { key: 'afsid', defaultName: 'AFSID' },
+  documentManagement: { key: 'afsid', defaultName: 'AFSID' },
   dataSourceTb: { key: 'afsid', defaultName: 'AFSID' },
-  rolledUpGl: { key: 'gl_id', defaultName: 'GL_ID' },
-  mfmaReporting: { key: 'mfma_id', defaultName: 'MFMA_ID' },
-  dashboardOverview: { key: 'overview_id', defaultName: 'Overview_ID' },
-  exportsCenter: { key: 'exports_id', defaultName: 'Exports_ID' },
+  rolledUpGl: { key: 'afsid', defaultName: 'AFSID' },
+  mfmaReporting: { key: 'afsid', defaultName: 'AFSID' },
+  dashboardOverview: { key: 'afsid', defaultName: 'AFSID' },
+  exportsCenter: { key: 'afsid', defaultName: 'AFSID' },
 };
 
 /** Normalise a library title / URL segment for matching: decode %20, lowercase, drop whitespace
