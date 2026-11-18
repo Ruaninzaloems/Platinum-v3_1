@@ -118,7 +118,7 @@ const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   evidence: { key: 'evd_id', defaultName: 'Evd_ID' },
   administration: { key: 'adminid', defaultName: 'AdminID' },
   documentManagement: { key: 'docid', defaultName: 'DocID' },
-  dataSourceTb: { key: 'datasource_id', defaultName: 'DataSource_ID' },
+  dataSourceTb: { key: 'afsid', defaultName: 'AFSID' },
   rolledUpGl: { key: 'gl_id', defaultName: 'GL_ID' },
   mfmaReporting: { key: 'mfma_id', defaultName: 'MFMA_ID' },
   dashboardOverview: { key: 'overview_id', defaultName: 'Overview_ID' },

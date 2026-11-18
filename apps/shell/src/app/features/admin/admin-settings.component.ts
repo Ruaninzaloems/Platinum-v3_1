@@ -246,7 +246,7 @@ const DEFAULTS: ModuleApiConfig = {
   afsTbSharePointEnabled : false,
   afsTbSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsTbSharePointLibrary : 'UatAFS Data_Source_TB',
-  afsTbSharePointLinkColumn : 'DataSource_ID',
+  afsTbSharePointLinkColumn : 'AFSID',
   // AFS dashboard rolled-up general ledger documents → separate SharePoint library
   afsRollupGlSharePointEnabled : false,
   afsRollupGlSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
@@ -1675,9 +1675,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
               <input class="field-input" [(ngModel)]="cfg.afsTbSharePointLinkColumn"
                      [disabled]="!cfg.afsTbSharePointEnabled"
-                     placeholder="DataSource_ID"
+                     placeholder="AFSID"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>DataSource_ID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
             </div>
           </div>
 
