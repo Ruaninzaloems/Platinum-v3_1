@@ -58,6 +58,29 @@ public class AssigneeResolverService : IAssigneeResolverService
         var byPosId = configs.ToDictionary(c => c.PositionId, StringComparer.OrdinalIgnoreCase);
         var now = asOf ?? DateTime.UtcNow;
 
+        // Payroll_Position.EmployeeID is the authoritative current incumbent.
+        // Payroll_Employee.PositionID can remain pointed at a former position
+        // after an employee leaves, so resolving a primary assignee from the
+        // user directory alone can resurrect a stale employee into a vacant seat.
+        var configuredPositionIds = configs
+            .Select(c => int.TryParse(c.PositionId, out var id) ? (int?)id : null)
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToList();
+        var currentEmployeeByPositionId = new Dictionary<int, int?>();
+        if (configuredPositionIds.Count > 0)
+        {
+            var positionRows = await _db.PayrollPositions
+                .AsNoTracking()
+                .Where(p => configuredPositionIds.Contains(p.PositionId))
+                .Select(p => new { p.PositionId, p.EmployeeId })
+                .ToListAsync(ct);
+
+            foreach (var row in positionRows)
+                currentEmployeeByPositionId[row.PositionId] = row.EmployeeId;
+        }
+
         // Returns the parent position ID of the given child position by REVERSE
         // lookup: scan all configs and find the one that lists childPositionId in
         // its active ReportingRelationships. Because the data model stores
@@ -88,8 +111,21 @@ public class AssigneeResolverService : IAssigneeResolverService
                     string.Equals(u.EmployeeId, acting.ActingEmployeeId, StringComparison.OrdinalIgnoreCase));
                 if (actingUser != null) return (actingUser, true);
             }
-            return (_users.All.FirstOrDefault(u =>
-                string.Equals(u.PositionId, posId, StringComparison.OrdinalIgnoreCase)), false);
+
+            // The employee directory contains historical position references.
+            // Only the employee currently attached to Payroll_Position may fill
+            // the primary seat; a null or missing position row is vacant.
+            if (!int.TryParse(posId, out var numericPositionId)
+                || !currentEmployeeByPositionId.TryGetValue(numericPositionId, out var incumbentEmployeeId)
+                || !incumbentEmployeeId.HasValue)
+                return (null, false);
+
+            var incumbentUser = _users.All.FirstOrDefault(u =>
+                string.Equals(
+                    u.EmployeeId,
+                    incumbentEmployeeId.Value.ToString(),
+                    StringComparison.OrdinalIgnoreCase));
+            return (incumbentUser, false);
         }
 
         // Walk upward starting AT startPositionId (inclusive) until a position
@@ -107,7 +143,9 @@ public class AssigneeResolverService : IAssigneeResolverService
                 if (match(cfg))
                 {
                     var (user, isActing) = ResolveUser(cfg);
-                    return (user, cfg.PositionId, isActing);
+                    if (user != null)
+                        return (user, cfg.PositionId, isActing);
+                    // Position has the right role flag but is vacant — skip and keep walking.
                 }
 
                 // Move upward via reverse lookup (find which config lists 'current'

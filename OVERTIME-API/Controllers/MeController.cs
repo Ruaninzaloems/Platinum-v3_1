@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PlatinumOvertime_API.Data;
 using PlatinumOvertime_API.DTOs.Responses;
 using PlatinumOvertime_API.Models.Common;
+using PlatinumOvertime_API.Services.Implementations;
 using PlatinumOvertime_API.Services.Interfaces;
 
 namespace PlatinumOvertime_API.Controllers;
@@ -47,15 +48,8 @@ public class MeController : ControllerBase
                 .AsNoTracking()
                 .ToListAsync(ct);
 
-            dto.ActingForUserIds = actingConfigs
-                .Select(cfg => _user.AllUsers
-                    .FirstOrDefault(u2 => string.Equals(
-                        u2.PositionId, cfg.PositionId,
-                        StringComparison.OrdinalIgnoreCase))?.UserId)
-                .Where(uid => !string.IsNullOrWhiteSpace(uid))
-                .Select(uid => uid!)
-                .Distinct()
-                .ToList();
+            dto.ActingForUserIds = WorkflowAssigneeIdentity.ActingIdentityValues(
+                _user.AllUsers, actingConfigs);
         }
 
         return Ok(ApiResponse<MeDto>.Success(dto));

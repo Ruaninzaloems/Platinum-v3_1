@@ -141,6 +141,26 @@ public class AuthController : ControllerBase
             && !string.IsNullOrWhiteSpace(devUser.PositionId)
             && string.Equals(devUser.PositionId, loginCfg.OverridePositionId, StringComparison.OrdinalIgnoreCase);
 
+        // Keep the login response equivalent to the subsequent /auth/me
+        // response. The capture list uses these values to grant action
+        // controls for transactions assigned to a deputy's primary holder,
+        // including legacy rows that stored the holder's EmployeeId.
+        if (!string.IsNullOrWhiteSpace(devUser.EmployeeId))
+        {
+            var nowUtc = DateTime.UtcNow;
+            var actingConfigs = await _db.PositionApprovalConfigs
+                .Include(c => c.ActingAppointments)
+                .Where(c => c.ActingAppointments.Any(a =>
+                    a.ActingEmployeeId == devUser.EmployeeId
+                    && a.StartDate <= nowUtc
+                    && a.EndDate >= nowUtc))
+                .AsNoTracking()
+                .ToListAsync(ct);
+
+            loginDto.ActingForUserIds = WorkflowAssigneeIdentity.ActingIdentityValues(
+                _directory.All, actingConfigs);
+        }
+
         return Ok(ApiResponse<MeDto>.Success(loginDto));
     }
 
@@ -315,15 +335,8 @@ public class AuthController : ControllerBase
                 .AsNoTracking()
                 .ToListAsync(ct);
 
-            dto.ActingForUserIds = actingConfigs
-                .Select(cfg => _currentUser.AllUsers
-                    .FirstOrDefault(u2 => string.Equals(
-                        u2.PositionId, cfg.PositionId,
-                        StringComparison.OrdinalIgnoreCase))?.UserId)
-                .Where(uid => !string.IsNullOrWhiteSpace(uid))
-                .Select(uid => uid!)
-                .Distinct()
-                .ToList();
+            dto.ActingForUserIds = WorkflowAssigneeIdentity.ActingIdentityValues(
+                _currentUser.AllUsers, actingConfigs);
         }
 
         return Ok(ApiResponse<MeDto>.Success(dto));

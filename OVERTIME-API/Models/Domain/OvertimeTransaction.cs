@@ -111,9 +111,12 @@ public class OvertimeTransaction
     public string? PayrollApproverEmployeeId { get; set; }
     public string? PayrollApproverEmployeeName { get; set; }
 
-    /// <summary>The current outstanding assignee (UserId of the dev directory
-    /// in dev; an Employee_ID in prod). Null when the transaction has reached
-    /// a terminal state (Processed / Rejected).</summary>
+    /// <summary>
+    /// The current outstanding assignee. New rows store the canonical
+    /// User_UserDetail.User_id; legacy rows may contain the linked payroll
+    /// Employee_ID and are matched by the workflow identity compatibility rule.
+    /// Null when the transaction has reached a terminal state.
+    /// </summary>
     public string? CurrentAssigneeUserId { get; set; }
 
     public string? CapturedBy { get; set; }

@@ -26,13 +26,28 @@ public class OvertimeTransactionsController : ControllerBase
 
     [HttpGet("current")]
     public async Task<ActionResult<ApiResponse<PaginatedResponse<OvertimeTransactionDto>>>> ListCurrent(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 25, CancellationToken ct = default)
-        => Ok(await _service.ListCurrentForUserAsync(page, pageSize, ct));
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        [FromQuery] string? employeeSearch = null,
+        [FromQuery] int? status = null,
+        [FromQuery] string? salaryHeadName = null,
+        [FromQuery] string? departmentId = null,
+        [FromQuery] string? divisionName = null,
+        CancellationToken ct = default)
+        => Ok(await _service.ListCurrentForUserAsync(page, pageSize, employeeSearch, status, salaryHeadName, departmentId, divisionName, ct));
 
     [HttpGet("processed")]
     public async Task<ActionResult<ApiResponse<PaginatedResponse<OvertimeTransactionDto>>>> ListProcessed(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 25, CancellationToken ct = default)
-        => Ok(await _service.ListProcessedAsync(page, pageSize, ct));
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        [FromQuery] string? capturedById = null,
+        [FromQuery] string? employeeSearch = null,
+        [FromQuery] int? status = null,
+        [FromQuery] string? salaryHeadName = null,
+        [FromQuery] string? departmentId = null,
+        [FromQuery] string? divisionName = null,
+        CancellationToken ct = default)
+        => Ok(await _service.ListProcessedAsync(page, pageSize, capturedById, employeeSearch, status, salaryHeadName, departmentId, divisionName, ct));
 
     [HttpGet("enquiry")]
     public async Task<ActionResult<ApiResponse<PaginatedResponse<OvertimeTransactionDto>>>> ListEnquiry(
@@ -44,13 +59,38 @@ public class OvertimeTransactionsController : ControllerBase
         [FromQuery] DateTime? toDate = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
+        [FromQuery] string? divisionName = null,
+        [FromQuery] bool excludeTerminal = false,
         CancellationToken ct = default)
     {
         if (!_currentUser.Current.CanAccessCapture)
             return StatusCode(403, ApiResponse<PaginatedResponse<OvertimeTransactionDto>>.Failure(
                 "You do not have permission to access Overtime Enquiry (permission 3201 required)."));
-        return Ok(await _service.ListEnquiryAsync(status, departmentId, employeeSearch, salaryHeadName, fromDate, toDate, page, pageSize, ct));
+        return Ok(await _service.ListEnquiryAsync(status, departmentId, employeeSearch, salaryHeadName, fromDate, toDate, page, pageSize, divisionName, excludeTerminal, ct));
     }
+
+    // ── Export (returns all matching rows without pagination) ──
+
+    [HttpGet("current/export")]
+    public async Task<ActionResult<ApiResponse<List<OvertimeTransactionDto>>>> ExportCurrent(
+        [FromQuery] string? employeeSearch = null,
+        [FromQuery] int? status = null,
+        [FromQuery] string? salaryHeadName = null,
+        [FromQuery] string? departmentId = null,
+        [FromQuery] string? divisionName = null,
+        CancellationToken ct = default)
+        => Ok(await _service.ExportCurrentAsync(employeeSearch, status, salaryHeadName, departmentId, divisionName, ct));
+
+    [HttpGet("processed/export")]
+    public async Task<ActionResult<ApiResponse<List<OvertimeTransactionDto>>>> ExportProcessed(
+        [FromQuery] string? capturedById = null,
+        [FromQuery] string? employeeSearch = null,
+        [FromQuery] int? status = null,
+        [FromQuery] string? salaryHeadName = null,
+        [FromQuery] string? departmentId = null,
+        [FromQuery] string? divisionName = null,
+        CancellationToken ct = default)
+        => Ok(await _service.ExportProcessedAsync(capturedById, employeeSearch, status, salaryHeadName, departmentId, divisionName, ct));
 
     [HttpGet("by-employee/{employeeId}")]
     public async Task<ActionResult<ApiResponse<List<OvertimeTransactionDto>>>> ListForEmployee(

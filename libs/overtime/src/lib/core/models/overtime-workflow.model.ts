@@ -44,6 +44,10 @@ export interface PayrollProcessingRowDto {
   legacyDepartmentName?: string | null;
   legacyDivisionId?: number | null;
   legacyDivisionName?: string | null;
+  departmentId?: number | null;
+  departmentName?: string | null;
+  divisionId?: number | null;
+  divisionName?: string | null;
   positionId?: string | null;
   positionDescription?: string | null;
   overtimeDate: string;

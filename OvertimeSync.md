@@ -22,7 +22,7 @@ forward, per that commit's own todo.
 | API base config | `src/environments/environment.ts` → plain `apiBaseUrl` | `libs/overtime/src/lib/environment.ts` → `apiPrefix: '/overtime-app'` (services prepend it manually, standard monorepo convention) |
 | Auth stack | **Has its own** — `core/services/auth.service.ts`, `core/interceptors/auth.interceptor.ts`, `core/guards/{auth,role}.guard.ts`, `features/login`, `features/reset-password`, session-cookie backend (`SessionCurrentUserService`, `SessionAuthFilter`, ASP.NET session/DataProtection) | **None of the above.** Rides on the shell's shared `@platinumv3/shared/auth`. Backend identity comes from `DevCurrentUserService` bridged to the shell's real POS user via an `X-Username` header — see `MASTER.md` §13.4 "Overtime identity bridge". `SessionCurrentUserService` is kept only as a second `ICurrentUserService` implementation so the project compiles; it is never registered/used. |
 | Permission source | Standalone: its own `role.guard.ts` reading standalone `/auth/me` flags | Monorepo: `permission.guard.ts`'s `canAccess{Config,Capture,Payroll,Enquiry}Guard` functions, reading the same `MeDto` flags via the identity-bridged `GET /overtime-app/api/auth/me` |
-| DB startup behavior | `Database.Migrate()` + dev-only seeders, no try/catch (crashes on any failure, gated `IsDevelopment()`) | `Database.Migrate()` unprotected (still crashes — see `MASTER.md` §4.2, deliberate), but all seeders/backfills run unconditionally wrapped in a non-fatal `RunSeeder` helper, gated by `Seeding:SkipOnStartup` config instead of environment |
+| DB startup behavior | `Database.Migrate()` + dev-only seeders, no try/catch (crashes on any failure, gated `IsDevelopment()`) | **(superseded 2026-09-03 — see `prompts/overtime.md`)** `Database.Migrate()` is now wrapped in try/catch that logs a warning (local dev only; `EMS_GeorgeUAT`'s `__EFMigrationsHistory` doesn't match this project's migrations 1:1). Seeders/backfills run in a non-fatal `RunSeeder` helper gated by `Seeding:SkipOnStartup` (now `true`). Dev DB is the real shared `EMS_GeorgeUAT` SQL Server, `OvertimePermissions:FailOpen=false`. The SqlServer `AddDbContext` also carries the `PendingModelChangesWarning` suppression. |
 | SQL Server support | Plain hardcoded SSL mode in connection-string builder | Adds `sslmode` query-param parsing (disable/require/prefer/verify-full/verify-ca → Npgsql SSL Mode) — a monorepo-only Azure-firewall-driven improvement, not present in standalone |
 | Diagnostics | None | `GET /api/health/db` — added directly in monorepo to debug the Azure Postgres firewall-IP issue (`MASTER.md` §4.2) |
 
@@ -110,6 +110,125 @@ directory shallower) or the identity-bridge/permission-guard adaptation already 
 **Needs a human decision:** none. This was a near-no-op sync; nothing here changes runtime
 behavior for end users.
 
+> ⚠️ **Correction (2026-11-25): the "near-no-op" conclusion above was wrong.** That run compared the
+> two trees and judged every differing file to be monorepo adaptation. The third sync (below)
+> found the monorepo was in fact *missing* real upstream work from before this date — the
+> server-side filtering/pagination/export in `OvertimeTransactionsService`, the `EmployeeId`
+> assignee fallback in `WorkflowService`, the vacancy guard in `AssigneeResolverService`.
+> **Comparing trees cannot distinguish "monorepo adaptation" from "monorepo is behind"** — both
+> look like a difference. Use the 3-way method in the next section instead.
+
+---
+
+## 2026-11-25 — third sync: a real one (17 files merged, 5 added), and a method change
+
+### Method: 3-way merge from the last-synced standalone commit — do not diff trees
+
+For each file the standalone changed since the last sync, merge it into the monorepo copy with
+`git merge-file` (base = standalone at the last-synced commit, ours = monorepo file, theirs =
+standalone HEAD). Files the standalone didn't change are never touched, so every monorepo-only
+adaptation (`Program.cs`, `appsettings*`, `JwtCurrentUserService`, the `FindByUserName` bridge
+member, `environment.ts`, `permission.guard.ts`, …) is preserved by construction, and no
+judgment call per file is needed. Normalise CRLF to LF for the merge and restore each file's
+original line endings afterwards (the monorepo copies are CRLF).
+
+```
+cd C:\Repos\Platinum-Overtime
+git diff --name-status --no-renames <LAST_SYNCED> HEAD -- PlatinumOvertime/PlatinumOvertime-UI/src/app PlatinumOvertime/PlatinumOvertime-API
+# per file:  git show <LAST_SYNCED>:<p> > base ; monorepo file > ours ; git show HEAD:<p> > theirs
+#            git merge-file -p ours base theirs
+```
+
+Then audit: after the merge, every touched file must be **byte-identical to standalone HEAD
+(ignoring CR)** except the known import-path adaptation (`'../../../environments/environment'` →
+`'../../environment'`, 2 files this time). Anything else remaining is either a real adaptation to
+document or a regression to fix.
+
+**Last-synced standalone commit after this run: `c35ec39` (2026-10-15).** Use it as `<LAST_SYNCED>`
+next time. Files that differ from upstream but were *not* touched this run (the adaptation set):
+`Program.cs`, `PlatinumOvertime-API.csproj` (JwtBearer package ref), `appsettings*.json`,
+`DevCurrentUserService.cs`, `SessionCurrentUserService.cs` + `ICurrentUserService.cs` (the
+`FindByUserName` / `UserName` bridge members), `Properties/launchSettings.json` (port), the
+`Data/SeedData`/`SeedData` JSON files.
+
+### 🛑 Pitfall hit this run: picking the wrong base silently *reverts* work
+
+The first attempt used `374c485` (standalone, 2026-08-05, "the last commit before the 08-06
+sync") as the base. That commit **added** the vacancy guard to `AssigneeResolverService`
+("position has the right role flag but is vacant — skip and keep walking"), but the monorepo's
+08-06 sync (14:57 +0200) had missed it. With that base, "base has it, monorepo lacks it, upstream
+has it" resolves as *"monorepo deliberately removed it"* — so the merge reported **clean** while
+keeping the regression. It was caught only because upstream's own test
+`ResolveAsync_VacantPosition_DoesNotUseStaleEmployee_AndContinuesUpward` failed. A clean merge
+proves nothing about base choice. Two safeguards, use both:
+1. Run the byte-identical-to-upstream audit above — it catches this class of error immediately.
+2. Run upstream's unit tests (next section).
+
+The true base for that run was `8759464` (parent of `374c485`). The 08-06 sync's snapshot
+predated the two 08-05 commits at ~11:40–11:58 UTC (the guard, and `da42f3c` "Seed payroll
+employee data").
+
+### What came in (upstream changes since the last real sync, 2026-08-05 → 2026-10-15)
+
+**Backend (`OVERTIME-API`)**
+- **Workflow identity compatibility** — new `WorkflowAssigneeIdentity` helper: assignee/capturer
+  matching now accepts either the canonical `User_id` **or** the linked payroll `EmployeeId`
+  (legacy rows stored the latter). Used by `WorkflowService`, `OvertimeTransactionsService`,
+  `DashboardController`, `MeController`, `AuthController` (login response now also carries
+  `ActingForUserIds`, matching `/auth/me`).
+- **`AssigneeResolverService`** — primary seat is filled only by the employee currently on
+  `Payroll_Position.EmployeeID` (stale `Payroll_Employee.PositionID` no longer resurrects a former
+  employee into a vacant seat), plus the vacancy guard above.
+- **`OvertimeTransactionsService`** — server-side filters (employee search, status, salary head,
+  department, division), page/pageSize clamping, `current/export` + `processed/export`
+  (no-pagination) endpoints, and edits preserve historical classification labels unless explicitly
+  changed (`ResolveClassificationUpdateAsync`).
+- **Payroll processing** — new `PayrollOrganisationResolver`; rows now carry
+  `DepartmentId/Name` + `DivisionId/Name` resolved from captured labels first, then master data;
+  the department/division filter runs *after* resolution (previously filtered in SQL on legacy IDs
+  that ordinary captures never set, silently dropping valid rows).
+- `Scripts/PlatinumOvertime_SqlServer_FullSchema.sql` (new, reference DDL — not executed by the app).
+
+**Frontend (`libs/overtime`)** — capture/enquiry components + `overtime-transactions.service.ts`
+(server-side filtering/export wiring), payroll-processing component (CSV logic extracted to new
+`payroll-csv.ts`), `overtime-workflow.model.ts` (new DTO fields).
+
+### Verification performed (and what was not)
+
+- `tsc --noEmit -p apps/shell/tsconfig.app.json` — clean.
+- `dotnet build -c Release OVERTIME-API` (to a scratch `-o` dir) — **0 errors**.
+- **Upstream's own unit tests run against the merged code: 82/82 pass.** The monorepo carries no
+  test project, so this is done in a scratch copy: copy `OVERTIME-API` (minus `bin`/`obj`) and
+  `PlatinumOvertime-API.Tests` into a scratch dir and run `dotnet test` there (never reference the
+  monorepo project directly — that rewrites its **tracked** `bin/obj` files). Two scratch-only
+  changes were needed: give `ICurrentUserService.FindByUserName` a default body (`=> null`) so the
+  upstream test stubs compile (the monorepo's identity-bridge member isn't in their interface).
+  **Do this every sync** — it is the only check that caught the wrong-base regression.
+- Live API (built output run on a spare port, `ASPNETCORE_ENVIRONMENT=Development`, **from the
+  build directory** — `dotnet x.dll` takes its content root from the cwd, so launching it from
+  elsewhere fails with "Database connection string is not configured"): `/api/health/db` → 200
+  connected; `/api/dashboard/summary`, `/api/overtime-transactions/current?…&employeeSearch=…`
+  (returned real rows), `/processed`, `/current/export`, `/api/payroll-processing/search` all 200;
+  `/enquiry` and payroll search correctly 403 for a user lacking permissions 3201/3202.
+- Nav: unchanged upstream (no layout/routes file in the delta); 5 items match the standalone 1:1.
+- Grep: no bare `'/api'`, no leftover conflict markers, no secrets in the new SQL script.
+- **Not verified:** (a) the shell-proxy/browser leg — no shell dev server was started, so the
+  changed capture/enquiry/payroll pages were type-checked but never rendered; (b) the new
+  payroll-division resolver on real rows — the UAT DB had **zero** "Approved for Payment"
+  transactions, so `payroll-processing/search` returned empty; that logic is covered only by
+  upstream's unit tests (`PayrollProcessingDivisionTests`, which pass).
+
+### Left alone — needs a human decision
+
+- `Data/SeedData/payroll_employees.json` is stale vs upstream (upstream `da42f3c`, 2026-08-05;
+  ~694 KB vs ~459 KB here). Not synced: the monorepo runs with `Seeding:SkipOnStartup=true`
+  against the real `EMS_GeorgeUAT` data, so the seed is inert, and it is a large file of employee
+  records. Sync it only if someone actually needs seeding.
+- The 23 "files changed, not committed" the Platinum-v3-sync dashboard showed before this run
+  were all **tracked `OVERTIME-API/bin/**` and `obj/**` build output**, not source. They keep
+  showing as dirty on every build. Untracking them (`git rm -r --cached` + `.gitignore`) would make
+  the dashboard's per-module change count meaningful — a separate cleanup, not done here.
+
 ---
 
 ## General principles (apply to every module, every sync — see also `BudgetSync.md`)
@@ -121,9 +240,17 @@ behavior for end users.
   `DevCurrentUserService.FindByUserName` → `Sys_RolePermission`/`User_UserRoles` lookup is what
   makes nav/permission checks reflect the real signed-in user instead of an arbitrary default.
   Never let a sync revert `ICurrentUserService` registration back to `SessionCurrentUserService`.
-- **`Database.Migrate()` is deliberately NOT wrapped non-fatally** (unlike Budget/AFS) — see
-  `MASTER.md` §4.2. Don't "fix" this as an incidental side effect of a sync; it's a known,
-  accepted asymmetry, not a bug.
+- **`Database.Migrate()` IS now wrapped non-fatally for local dev (since 2026-09-03)** — this
+  reverses the older "deliberately not wrapped" rule that used to be here; see the DB-startup row
+  above and `prompts/overtime.md`. Don't revert it, and don't remove the SqlServer
+  `ConfigureWarnings(...PendingModelChangesWarning)` call, unless the underlying migration-history
+  mismatch has actually been root-caused first.
+- **Identity is JWT-first now (since 2026-09-09):** `ICurrentUserService` is `JwtCurrentUserService`
+  (verifies POS-API's global JWT), falling back to the old unsigned `X-User-Id`/`X-Username`
+  headers; `DevCurrentUserService` + `Auth:UseLegacyHeaderBridge` remain as an instant rollback.
+  The "identity bridge" bullet above describes the fallback path — don't delete any of these.
+- **Sync by 3-way merge from the last-synced commit, never by comparing trees** (see the
+  2026-11-25 section), and **run upstream's unit tests** against the result.
 - **Always verify before declaring done.** Frontend: `tsc --project apps/shell/tsconfig.app.json
   --noEmit`. Backend: `dotnet build -c Release` (build to `-o <scratch>` if the normal output is
   locked by a running instance rather than killing someone else's process). Also grep for bare

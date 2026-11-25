@@ -13,6 +13,15 @@ public class PayrollProcessingRowDto
     public string? LegacyDepartmentName { get; set; }
     public int? LegacyDivisionId { get; set; }
     public string? LegacyDivisionName { get; set; }
+    public int? DepartmentId { get; set; }
+    public string? DepartmentName { get; set; }
+    public int? DivisionId { get; set; }
+    /// <summary>
+    /// Division label shown in payroll processing. Uses the captured payroll
+    /// classification first, then the position division snapshot/current master
+    /// data for transactions where the optional classification was not selected.
+    /// </summary>
+    public string? DivisionName { get; set; }
     public string? PositionId { get; set; }
     public string? PositionDescription { get; set; }
     public DateTime OvertimeDate { get; set; }

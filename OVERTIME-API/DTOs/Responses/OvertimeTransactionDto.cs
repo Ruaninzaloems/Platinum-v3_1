@@ -149,9 +149,10 @@ public class MeDto
     public bool IsOverrideUser { get; set; }
     public List<MeDto> AvailableUsers { get; set; } = new();
     /// <summary>
-    /// UserIds of primary position holders that the current user is actively
-    /// deputising for via a TemporaryActingAppointment today.
-    /// The UI uses this to show action buttons on transactions assigned to those users.
+    /// Identity values of primary position holders that the current user is
+    /// actively deputising for via a TemporaryActingAppointment today. Each
+    /// holder contributes both their application UserId and payroll EmployeeId
+    /// so legacy assignee rows remain actionable in the UI.
     /// </summary>
     public List<string> ActingForUserIds { get; set; } = new();
 }

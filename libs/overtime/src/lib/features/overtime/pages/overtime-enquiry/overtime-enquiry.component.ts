@@ -217,6 +217,14 @@ function buildChainSteps(r: OvertimeTransactionDto): ChainStep[] {
                (input)="setFilterSearch($event)" />
       </div>
 
+      <!-- Over-cap warning: shown when the server has more rows than ENQUIRY_CAP -->
+      @if (serverOverCap()) {
+        <div class="overcap-banner">
+          <mat-icon>warning</mat-icon>
+          Showing the first 500 results. Use the filters above (date range, employee, department) to narrow the results and see the full set.
+        </div>
+      }
+
       <!-- Summary bar -->
       @if (!loading() && txCount()) {
         <div class="summary-bar">
@@ -445,6 +453,20 @@ function buildChainSteps(r: OvertimeTransactionDto): ChainStep[] {
     .date-toggle button { width: 30px !important; height: 30px !important; padding: 0 !important; }
 
     /* ── Summary bar ── */
+    .overcap-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 20px 8px;
+      padding: 10px 14px;
+      background: #fff8e1;
+      border: 1px solid #ffe082;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #7b5e00;
+    }
+    .overcap-banner mat-icon { font-size: 18px; height: 18px; width: 18px; }
+
     .summary-bar {
       display: flex;
       align-items: center;
@@ -641,8 +663,17 @@ export class OvertimeEnquiryComponent {
 
   activeTab = signal<'current' | 'processed'>('current');
 
-  allRows    = signal<OvertimeTransactionDto[]>([]);
-  loading    = signal(false);
+  /**
+   * Maximum transactions to load in a single request. When the server total
+   * exceeds this, a warning is shown and the user should refine their filters.
+   * The client groups and paginates within these rows.
+   */
+  private readonly ENQUIRY_CAP = 500;
+
+  allRows      = signal<OvertimeTransactionDto[]>([]);
+  /** Set to true when the server has more rows than ENQUIRY_CAP. */
+  serverOverCap = signal(false);
+  loading      = signal(false);
   pageIndex  = signal(0);
   pageSize   = signal(10);
 
@@ -666,15 +697,9 @@ export class OvertimeEnquiryComponent {
     })) as AugmentedRow[]
   );
 
-  private filteredRows = computed(() => {
-    let rows = this.augmentedRows();
-    if (this.activeTab() === 'current')
-      rows = rows.filter(r => r.status !== WorkflowStatus.Processed);
-    const division = this.filterDivision();
-    if (division)
-      rows = rows.filter(r => (r.legacyDivisionName ?? '') === division);
-    return rows;
-  });
+  // Division and terminal-status exclusion are now server-side predicates applied
+  // before the ENQUIRY_CAP; no client-side filtering needed for those dimensions.
+  private filteredRows = computed(() => this.augmentedRows());
 
   groupedRows = computed((): EmployeeMonthGroup[] => {
     const rows = this.filteredRows();
@@ -775,7 +800,10 @@ export class OvertimeEnquiryComponent {
   }
 
   private loadOptions(): void {
-    this.txService.listEnquiry({ page: 1, pageSize: 500 }).subscribe({
+    // Fetch a small unfiltered sample to populate the status and salary-head
+    // dropdowns. This replaces the previous full-dataset fetch (fetchAll({}))
+    // that loaded every transaction regardless of count.
+    this.txService.listEnquiry({ page: 1, pageSize: 200 }).subscribe({
       next: result => this.optionRows.set(result?.items ?? []),
     });
     this.lookupService.payrollDivisions().subscribe({
@@ -795,6 +823,7 @@ export class OvertimeEnquiryComponent {
     this.loading.set(true);
     this.pageIndex.set(0);
     this.expandedGroups.set(new Set());
+    this.serverOverCap.set(false);
 
     const tab        = this.activeTab();
     const dept       = this.filterDepartment();
@@ -808,23 +837,30 @@ export class OvertimeEnquiryComponent {
         ? WorkflowStatus.Processed
         : (this.filterStatus() !== '' ? (this.filterStatus() as number) : undefined);
 
+    // For the 'current' tab with no specific status selected, exclude terminal
+    // statuses at the server level so the cap applies to qualifying rows only.
+    const excludeTerminal = tab === 'current' && this.filterStatus() === '';
+
     this.txService.listEnquiry({
-      page:           1,
-      pageSize:       500,
-      status:         effectiveStatus,
-      departmentId:   dept       || undefined,
-      employeeSearch: search     || undefined,
-      salaryHeadName: salaryHead || undefined,
-      fromDate:       from       || undefined,
-      toDate:         to         || undefined,
+      status:          effectiveStatus,
+      departmentId:    dept       || undefined,
+      employeeSearch:  search     || undefined,
+      salaryHeadName:  salaryHead || undefined,
+      fromDate:        from       || undefined,
+      toDate:          to         || undefined,
+      divisionName:    this.filterDivision() || undefined,
+      excludeTerminal: excludeTerminal || undefined,
+      page:     1,
+      pageSize: this.ENQUIRY_CAP,
     }).subscribe({
       next: result => {
-        this.allRows.set(result?.items ?? []);
+        const items = result?.items ?? [];
+        const total = result?.total ?? items.length;
+        this.allRows.set(items);
+        this.serverOverCap.set(total > this.ENQUIRY_CAP);
         this.loading.set(false);
       },
-      error: () => {
-        this.loading.set(false);
-      }
+      error: () => this.loading.set(false),
     });
   }
 
@@ -847,8 +883,7 @@ export class OvertimeEnquiryComponent {
   }
   setFilterDivision(e: Event): void {
     this.filterDivision.set((e.target as HTMLSelectElement).value);
-    this.pageIndex.set(0);
-    this.expandedGroups.set(new Set());
+    this.resetAndLoad();
   }
   setFilterSearch(e: Event): void {
     this.filterSearch.set((e.target as HTMLInputElement).value);

@@ -6,9 +6,13 @@ namespace PlatinumOvertime_API.Services.Interfaces;
 
 public interface IOvertimeTransactionsService
 {
-    Task<ApiResponse<PaginatedResponse<OvertimeTransactionDto>>> ListCurrentForUserAsync(int page, int pageSize, CancellationToken ct = default);
-    Task<ApiResponse<PaginatedResponse<OvertimeTransactionDto>>> ListProcessedAsync(int page, int pageSize, CancellationToken ct = default);
-    Task<ApiResponse<PaginatedResponse<OvertimeTransactionDto>>> ListEnquiryAsync(int? status, string? departmentId, string? employeeSearch, string? salaryHeadName, DateTime? fromDate, DateTime? toDate, int page, int pageSize, CancellationToken ct = default);
+    Task<ApiResponse<PaginatedResponse<OvertimeTransactionDto>>> ListCurrentForUserAsync(int page, int pageSize, string? employeeSearch = null, int? status = null, string? salaryHeadName = null, string? departmentId = null, string? divisionName = null, CancellationToken ct = default);
+    Task<ApiResponse<PaginatedResponse<OvertimeTransactionDto>>> ListProcessedAsync(int page, int pageSize, string? capturedById = null, string? employeeSearch = null, int? status = null, string? salaryHeadName = null, string? departmentId = null, string? divisionName = null, CancellationToken ct = default);
+    /// <summary>Returns ALL matching rows for the current user's in-flight queue without pagination, for export.</summary>
+    Task<ApiResponse<List<OvertimeTransactionDto>>> ExportCurrentAsync(string? employeeSearch = null, int? status = null, string? salaryHeadName = null, string? departmentId = null, string? divisionName = null, CancellationToken ct = default);
+    /// <summary>Returns ALL matching processed rows without pagination, for export.</summary>
+    Task<ApiResponse<List<OvertimeTransactionDto>>> ExportProcessedAsync(string? capturedById = null, string? employeeSearch = null, int? status = null, string? salaryHeadName = null, string? departmentId = null, string? divisionName = null, CancellationToken ct = default);
+    Task<ApiResponse<PaginatedResponse<OvertimeTransactionDto>>> ListEnquiryAsync(int? status, string? departmentId, string? employeeSearch, string? salaryHeadName, DateTime? fromDate, DateTime? toDate, int page, int pageSize, string? divisionName = null, bool excludeTerminal = false, CancellationToken ct = default);
     Task<ApiResponse<List<OvertimeTransactionDto>>> ListForEmployeeAsync(string employeeId, CancellationToken ct = default);
     Task<ApiResponse<OvertimeTransactionDto>> GetAsync(Guid id, CancellationToken ct = default);
     Task<ApiResponse<OvertimeTransactionDto>> CreateAsync(CreateOvertimeTransactionRequest request, CancellationToken ct = default);

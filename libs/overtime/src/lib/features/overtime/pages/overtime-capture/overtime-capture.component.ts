@@ -12,7 +12,7 @@ import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angu
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { forkJoin, filter, map, distinctUntilChanged, of, catchError } from 'rxjs';
+import { forkJoin, filter, map, distinctUntilChanged, of, catchError, Subscription } from 'rxjs';
 import { toObservable, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { OvertimeTransactionsService } from '../../../../core/services/overtime-transactions.service';
@@ -84,6 +84,14 @@ function captureLevelLabel(status: WorkflowStatus): string {
   }
 }
 
+function identitySet(...identities: Array<string | null | undefined>): Set<string> {
+  return new Set(
+    identities
+      .filter((id): id is string => !!id)
+      .map(id => id.toLowerCase())
+  );
+}
+
 @Component({
   selector: 'app-overtime-capture',
   standalone: true,
@@ -103,7 +111,7 @@ function captureLevelLabel(status: WorkflowStatus): string {
         </div>
         <div class="page-header-actions">
           <button class="btn" type="button" (click)="exportToExcel()"
-                  [matTooltip]="'Export ' + filteredRows().length + ' row(s) to Excel'">
+                  [matTooltip]="exportLoading() ? 'Preparing export…' : ('Export all ' + serverTotal() + ' filtered row(s) to Excel')">
             <mat-icon>download</mat-icon>
             <span>Export</span>
           </button>
@@ -113,6 +121,14 @@ function captureLevelLabel(status: WorkflowStatus): string {
           </a>
         </div>
       </header>
+
+      <!-- View tabs -->
+      <div class="view-tabs">
+        <button class="view-tab" [class.active]="activeTab() === 'current'" type="button"
+                (click)="switchTab('current')">My Queue</button>
+        <button class="view-tab" [class.active]="activeTab() === 'processed'" type="button"
+                (click)="switchTab('processed')">My History</button>
+      </div>
 
       <!-- Filter bar -->
       <div class="filter-bar">
@@ -165,7 +181,7 @@ function captureLevelLabel(status: WorkflowStatus): string {
             <mat-icon>inbox</mat-icon>
             <span class="empty-title">No transactions found.</span>
             <span class="empty-desc">
-              @if (allRows().length) {
+              @if (serverTotal()) {
                 Try adjusting the filters above.
               } @else {
                 When overtime is captured it will appear here.
@@ -322,7 +338,7 @@ function captureLevelLabel(status: WorkflowStatus): string {
           </div>
 
           <mat-paginator
-            [length]="filteredRows().length"
+            [length]="serverTotal()"
             [pageIndex]="pageIndex()"
             [pageSize]="pageSize()"
             [pageSizeOptions]="[10, 25, 50]"
@@ -334,6 +350,28 @@ function captureLevelLabel(status: WorkflowStatus): string {
 
   `,
   styles: [`
+    /* ── View tabs ── */
+    .view-tabs {
+      display: flex;
+      gap: 4px;
+      padding: 0 20px 0;
+      border-bottom: 1px solid #e0e0e0;
+      margin-bottom: 0;
+    }
+    .view-tab {
+      padding: 8px 20px;
+      border: none;
+      border-bottom: 3px solid transparent;
+      background: transparent;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: #666;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .view-tab:hover  { color: #1976d2; }
+    .view-tab.active { color: #1976d2; border-bottom-color: #1976d2; }
+
     /* ── Filter bar ── */
     .filter-bar {
       display: flex;
@@ -501,13 +539,30 @@ export class OvertimeCaptureComponent {
     return !!(me?.isApprover || me?.isExcessApprover);
   });
 
-  // ── Raw data ──
-  allRows  = signal<OvertimeTransactionDto[]>([]);
+  // ── View tab: 'current' shows in-flight queue, 'processed' shows own history ──
+  activeTab = signal<'current' | 'processed'>('current');
+
+  // ── Raw data — holds only the rows for the current server page ──
+  allRows      = signal<OvertimeTransactionDto[]>([]);
+  /** Total matching rows on the server (drives the paginator). */
+  serverTotal  = signal(0);
 
   // ── Pre-compute per-row values once on data load, not on every CD tick ──
   private augmentedRows = computed(() => {
-    const me             = this.user.me()?.userId ?? '';
-    const actingForUsers = this.user.me()?.actingForUserIds ?? [];
+    const me         = this.user.me();
+    const assigneeIds = identitySet(
+      me?.userId,
+      me?.employeeId,
+      ...(me?.actingForUserIds ?? [])
+    );
+    const captureIds = identitySet(
+      me?.userId,
+      me?.employeeId
+    );
+    const isCapturedByMe = (capturedBy?: string | null) =>
+      !!capturedBy && captureIds.has(capturedBy.toLowerCase());
+    const isAssignedToMe = (assignee?: string | null) =>
+      !!assignee && assigneeIds.has(assignee.toLowerCase());
     const isOverrideUser = this.user.me()?.isOverrideUser ?? false;
     return this.allRows().map(r => ({
       ...r,
@@ -515,22 +570,20 @@ export class OvertimeCaptureComponent {
       _ll: captureLevelLabel(r.status),
       _canEdit: r.status === WorkflowStatus.Requested
              || r.status === WorkflowStatus.Returned
-             || (r.status === WorkflowStatus.Recommended && r.capturedBy === me),
+             || (r.status === WorkflowStatus.Recommended && isCapturedByMe(r.capturedBy)),
       // isOverrideUser: master-approver can act on any non-terminal, non-submit row
-      _canAct:  ((r.currentAssigneeUserId === me
-             || (!!r.currentAssigneeUserId && actingForUsers.includes(r.currentAssigneeUserId)))
+      _canAct:  (isAssignedToMe(r.currentAssigneeUserId)
              || isOverrideUser)
              && r.status !== WorkflowStatus.Processed
              && r.status !== WorkflowStatus.Rejected
              && r.status !== WorkflowStatus.Returned,
       // True when override is the SOLE reason canAct is true (not the normal assignee)
       _isOverride: isOverrideUser
-             && r.currentAssigneeUserId !== me
-             && !(!!r.currentAssigneeUserId && actingForUsers.includes(r.currentAssigneeUserId))
+             && !isAssignedToMe(r.currentAssigneeUserId)
              && r.status !== WorkflowStatus.Processed
              && r.status !== WorkflowStatus.Rejected
              && r.status !== WorkflowStatus.Returned,
-      _canCapturerReject: r.capturedBy === me
+      _canCapturerReject: isCapturedByMe(r.capturedBy)
              && (r.status === WorkflowStatus.Requested
               || r.status === WorkflowStatus.Recommended
               || r.status === WorkflowStatus.Returned),
@@ -550,36 +603,22 @@ export class OvertimeCaptureComponent {
   // ── Selection ──
   selectedIds = signal<Set<string>>(new Set());
 
-  // ── Derived: filtered rows ──
-  filteredRows = computed(() => {
-    let rows = this.augmentedRows();
-    const status     = this.filterStatus();
-    const salaryHead = this.filterSalaryHead();
-    const dept       = this.filterDepartment();
-    const division   = this.filterDivision();
-    const search     = this.filterSearch().toLowerCase().trim();
+  // ── Derived: filtered rows — all filters are server-side; no client-side filter needed ──
+  filteredRows = computed(() => this.augmentedRows());
 
-    if (status !== '') rows = rows.filter(r => r.status === +status);
-    if (salaryHead)    rows = rows.filter(r => r.salaryHeadName === salaryHead);
-    if (dept)          rows = rows.filter(r => r.departmentId === dept);
-    if (division)      rows = rows.filter(r => (r.divisionName || r.legacyDivisionName) === division);
-    if (search)        rows = rows.filter(r =>
-      r.employeeName.toLowerCase().includes(search) ||
-      r.employeeId.includes(search));
+  // ── Derived: paginated page — server already paged ──
+  pagedRows = computed(() => this.filteredRows());
 
-    return rows;
-  });
+  /**
+   * Stable options snapshot: loaded once from a small unfiltered sample so the
+   * filter dropdowns show all available values independent of the current page.
+   */
+  optionRows = signal<OvertimeTransactionDto[]>([]);
 
-  // ── Derived: paginated page ──
-  pagedRows = computed(() => {
-    const start = this.pageIndex() * this.pageSize();
-    return this.filteredRows().slice(start, start + this.pageSize());
-  });
-
-  // ── Derived: filter dropdown options ──
+  // ── Derived: filter dropdown options (from stable optionRows, not current page) ──
   statusOptions = computed(() => {
     const seen = new Map<number, string>();
-    for (const r of this.allRows()) seen.set(r.status, r.statusLabel);
+    for (const r of this.optionRows()) seen.set(r.status, r.statusLabel);
     return [...seen.entries()]
       .map(([value, label]) => ({ value, label }))
       .sort((a, b) => a.value - b.value);
@@ -587,13 +626,13 @@ export class OvertimeCaptureComponent {
 
   salaryHeadOptions = computed(() => {
     const seen = new Set<string>();
-    for (const r of this.allRows()) if (r.salaryHeadName) seen.add(r.salaryHeadName);
+    for (const r of this.optionRows()) if (r.salaryHeadName) seen.add(r.salaryHeadName);
     return [...seen].sort();
   });
 
   departmentOptions = computed(() => {
     const seen = new Map<string, string>();
-    for (const r of this.allRows()) if (r.departmentId) seen.set(r.departmentId, r.departmentName);
+    for (const r of this.optionRows()) if (r.departmentId) seen.set(r.departmentId, r.departmentName);
     return [...seen.entries()]
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -601,7 +640,7 @@ export class OvertimeCaptureComponent {
 
   divisionOptions = computed(() => {
     const seen = new Set<string>();
-    for (const r of this.allRows()) {
+    for (const r of this.optionRows()) {
       const d = r.divisionName || r.legacyDivisionName;
       if (d) seen.add(d);
     }
@@ -635,30 +674,69 @@ export class OvertimeCaptureComponent {
         distinctUntilChanged(),
         takeUntilDestroyed()
       )
-      .subscribe(() => this.load());
+      .subscribe(() => {
+        this.loadOptions();
+        this.load();
+      });
   }
+
+  /**
+   * Loads a small unfiltered sample to populate dropdown option lists so they
+   * show all available values independent of the current filtered page.
+   */
+  private loadOptions(): void {
+    const me   = this.user.me();
+    const myId = me?.userId ?? '';
+    // Fetch both queues to capture all distinct status, salary-head, dept, and
+    // division values a capturer might encounter in their data.
+    this.txService.listCurrent({ page: 1, pageSize: 200 }).subscribe({
+      next: result => {
+        const current = result?.items ?? [];
+        this.txService.listProcessed({ page: 1, pageSize: 200, capturedById: myId }).subscribe({
+          next: r2 => {
+            const processed = r2?.items ?? [];
+            const seen = new Map<string, OvertimeTransactionDto>();
+            for (const r of [...current, ...processed]) seen.set(r.id.toString(), r);
+            this.optionRows.set([...seen.values()]);
+          }
+        });
+      }
+    });
+  }
+
+  /** Track the in-flight load subscription so rapid filter changes cancel the previous request. */
+  private loadSub?: Subscription;
 
   // ── Load ──
   load(): void {
+    this.loadSub?.unsubscribe();
     this.loading.set(true);
-    forkJoin({
-      current:   this.txService.listCurrent(1, 9999),
-      processed: this.txService.listProcessed(1, 9999)
-    }).subscribe({
-      next: ({ current, processed }) => {
-        const myId = this.user.me()?.userId ?? '';
-        const currentItems   = current?.items ?? [];
-        const processedItems = (processed?.items ?? []).filter(r => r.capturedBy === myId);
+    this.selectedIds.set(new Set());
 
-        const seen = new Set<string>();
-        const merged: OvertimeTransactionDto[] = [];
-        for (const r of [...currentItems, ...processedItems]) {
-          const key = r.id.toString();
-          if (!seen.has(key)) { seen.add(key); merged.push(r); }
-        }
-        merged.sort((a, b) =>
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-        this.allRows.set(merged);
+    const me     = this.user.me();
+    const myId   = me?.userId ?? '';
+    const tab    = this.activeTab();
+    const page   = this.pageIndex() + 1;   // Material paginator is 0-based; API is 1-based
+    const size   = this.pageSize();
+    const status = this.filterStatus() !== '' ? (this.filterStatus() as number) : undefined;
+    const filters = {
+      page,
+      pageSize:       size,
+      employeeSearch: this.filterSearch().trim() || undefined,
+      status,
+      salaryHeadName: this.filterSalaryHead() || undefined,
+      departmentId:   this.filterDepartment() || undefined,
+      divisionName:   this.filterDivision()   || undefined,
+    };
+
+    const obs$ = tab === 'current'
+      ? this.txService.listCurrent(filters)
+      : this.txService.listProcessed({ ...filters, capturedById: myId });
+
+    this.loadSub = obs$.subscribe({
+      next: result => {
+        this.allRows.set(result?.items ?? []);
+        this.serverTotal.set(result?.total ?? 0);
         this.loading.set(false);
       },
       error: e => {
@@ -668,37 +746,55 @@ export class OvertimeCaptureComponent {
     });
   }
 
+  /** Switch between the in-flight queue and the capturer's own history tab. */
+  switchTab(tab: 'current' | 'processed'): void {
+    this.activeTab.set(tab);
+    this.filterStatus.set('');
+    this.filterSalaryHead.set('');
+    this.filterDepartment.set('');
+    this.filterDivision.set('');
+    this.filterSearch.set('');
+    this.pageIndex.set(0);
+    this.load();
+  }
+
   // ── Filter setters ──
   setFilterStatus(e: Event): void {
     const v = (e.target as HTMLSelectElement).value;
     this.filterStatus.set(v === '' ? '' : +v as WorkflowStatus);
     this.pageIndex.set(0);
+    this.load();
   }
 
   setFilterSalaryHead(e: Event): void {
     this.filterSalaryHead.set((e.target as HTMLSelectElement).value);
     this.pageIndex.set(0);
+    this.load();
   }
 
   setFilterDepartment(e: Event): void {
     this.filterDepartment.set((e.target as HTMLSelectElement).value);
     this.pageIndex.set(0);
+    this.load();
   }
 
   setFilterDivision(e: Event): void {
     this.filterDivision.set((e.target as HTMLSelectElement).value);
     this.pageIndex.set(0);
+    this.load();
   }
 
   setFilterSearch(e: Event): void {
     this.filterSearch.set((e.target as HTMLInputElement).value);
     this.pageIndex.set(0);
+    this.load();
   }
 
   // ── Pagination ──
   onPage(e: PageEvent): void {
     this.pageIndex.set(e.pageIndex);
     this.pageSize.set(e.pageSize);
+    this.load();
   }
 
   // ── Selection ──
@@ -732,8 +828,14 @@ export class OvertimeCaptureComponent {
    *  and the transaction is not in a terminal or returned state.
    *  Controls Approve / Return buttons (assignee-only actions). */
   canAct(r: OvertimeTransactionDto): boolean {
-    const me = this.user.me()?.userId ?? '';
-    return r.currentAssigneeUserId === me
+    const me = this.user.me();
+    const assigneeIds = identitySet(
+      me?.userId,
+      me?.employeeId,
+      ...(me?.actingForUserIds ?? [])
+    );
+    return !!r.currentAssigneeUserId
+        && assigneeIds.has(r.currentAssigneeUserId.toLowerCase())
         && r.status !== WorkflowStatus.Processed
         && r.status !== WorkflowStatus.Rejected
         && r.status !== WorkflowStatus.Returned;
@@ -743,8 +845,10 @@ export class OvertimeCaptureComponent {
    *  has not yet been acted on by anyone above them (Requested, Recommended,
    *  or Returned). */
   canCapturerReject(r: OvertimeTransactionDto): boolean {
-    const me = this.user.me()?.userId ?? '';
-    return r.capturedBy === me
+    const me = this.user.me();
+    const captureIds = identitySet(me?.userId, me?.employeeId);
+    return !!r.capturedBy
+        && captureIds.has(r.capturedBy.toLowerCase())
         && (r.status === WorkflowStatus.Requested
             || r.status === WorkflowStatus.Recommended
             || r.status === WorkflowStatus.Returned);
@@ -754,10 +858,13 @@ export class OvertimeCaptureComponent {
    *  Includes Recommended so the capturer can recall and correct a
    *  submitted-but-not-yet-actioned transaction. */
   canEdit(r: OvertimeTransactionDto): boolean {
-    const me = this.user.me()?.userId ?? '';
+    const me = this.user.me();
+    const captureIds = identitySet(me?.userId, me?.employeeId);
     return r.status === WorkflowStatus.Requested
         || r.status === WorkflowStatus.Returned
-        || (r.status === WorkflowStatus.Recommended && r.capturedBy === me);
+        || (r.status === WorkflowStatus.Recommended
+            && !!r.capturedBy
+            && captureIds.has(r.capturedBy.toLowerCase()));
   }
 
 
@@ -833,45 +940,63 @@ export class OvertimeCaptureComponent {
   }
 
   // ── Export ──
+  exportLoading = signal(false);
+
+  /**
+   * Exports all rows matching the current filters using a dedicated server-side
+   * export endpoint that returns every matching row in a single response —
+   * no client-side pagination, no concurrency storms, no offset cap.
+   */
   exportToExcel(): void {
-    const rows = this.filteredRows();
+    if (this.exportLoading()) return;
+    this.exportLoading.set(true);
 
-    const data = rows.map(r => ({
-      'Employee':      r.employeeName,
-      'Employee ID':   r.employeeId,
-      'Department':    r.departmentName,
-      'Division':      r.divisionName || r.legacyDivisionName || '',
-      'Salary Head':   r.salaryHeadName,
-      'Hours':         r.hours,
-      'Date':          r.overtimeDate ? r.overtimeDate.slice(0, 10) : '',
-      'Status':        r.statusLabel,
-      'Recommender':   r.recommenderEmployeeName || '',
-      'Approver':      r.approverEmployeeName || '',
-      'Captured By':   r.capturedByEmployeeName || r.capturedByName || '',
-    }));
+    const me     = this.user.me();
+    const myId   = me?.userId ?? '';
+    const tab    = this.activeTab();
+    const status = this.filterStatus() !== '' ? (this.filterStatus() as number) : undefined;
+    const filters = {
+      employeeSearch: this.filterSearch().trim() || undefined,
+      status,
+      salaryHeadName: this.filterSalaryHead() || undefined,
+      departmentId:   this.filterDepartment() || undefined,
+      divisionName:   this.filterDivision()   || undefined,
+    };
 
-    const ws = XLSX.utils.json_to_sheet(data);
+    const obs$ = tab === 'current'
+      ? this.txService.exportCurrent(filters)
+      : this.txService.exportProcessed({ ...filters, capturedById: myId });
 
-    // Set sensible column widths
-    ws['!cols'] = [
-      { wch: 28 }, // Employee
-      { wch: 12 }, // Employee ID
-      { wch: 22 }, // Department
-      { wch: 22 }, // Division
-      { wch: 18 }, // Salary Head
-      { wch: 8  }, // Hours
-      { wch: 12 }, // Date
-      { wch: 28 }, // Status
-      { wch: 28 }, // Recommender
-      { wch: 28 }, // Approver
-      { wch: 28 }, // Captured By
-    ];
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Overtime');
-
-    const today = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(wb, `Overtime_${today}.xlsx`);
+    obs$.subscribe({
+      next: rows => {
+        this.exportLoading.set(false);
+        const data = (rows ?? []).map(r => ({
+          'Employee':      r.employeeName,
+          'Employee ID':   r.employeeId,
+          'Department':    r.departmentName,
+          'Division':      r.divisionName || r.legacyDivisionName || '',
+          'Salary Head':   r.salaryHeadName,
+          'Hours':         r.hours,
+          'Date':          r.overtimeDate ? r.overtimeDate.slice(0, 10) : '',
+          'Status':        r.statusLabel,
+          'Recommender':   r.recommenderEmployeeName || '',
+          'Approver':      r.approverEmployeeName || '',
+          'Captured By':   r.capturedByEmployeeName || r.capturedByName || '',
+        }));
+        const ws = XLSX.utils.json_to_sheet(data);
+        ws['!cols'] = [
+          { wch: 28 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 18 },
+          { wch: 8  }, { wch: 12 }, { wch: 28 }, { wch: 28 }, { wch: 28 }, { wch: 28 },
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Overtime');
+        XLSX.writeFile(wb, `Overtime_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      },
+      error: e => {
+        this.exportLoading.set(false);
+        this.snack.open(`Export failed: ${e?.error?.message ?? e?.message}`, 'OK', { duration: 4000 });
+      }
+    });
   }
 
   // ── Workflow actions ──

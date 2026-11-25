@@ -4,6 +4,7 @@ using PlatinumOvertime_API.Data;
 using PlatinumOvertime_API.DTOs.Responses;
 using PlatinumOvertime_API.Models.Common;
 using PlatinumOvertime_API.Models.Domain;
+using PlatinumOvertime_API.Services.Implementations;
 using PlatinumOvertime_API.Services.Interfaces;
 
 namespace PlatinumOvertime_API.Controllers;
@@ -44,34 +45,31 @@ public class DashboardController : ControllerBase
 
         // Resolve all userIds the current user is actively acting for, so that
         // transactions assigned to those users also appear in this user's queue.
-        var actingForUserIds = new List<string>();
+        var actingConfigs = new List<PositionApprovalConfig>();
         if (!string.IsNullOrWhiteSpace(me.EmployeeId))
         {
             var nowUtc = DateTime.UtcNow;
-            var actingConfigs = await _db.PositionApprovalConfigs
+            actingConfigs = await _db.PositionApprovalConfigs
                 .Include(c => c.ActingAppointments)
                 .Where(c => c.ActingAppointments.Any(a =>
                     a.ActingEmployeeId == me.EmployeeId
                     && a.StartDate <= nowUtc && a.EndDate >= nowUtc))
                 .AsNoTracking()
                 .ToListAsync(ct);
-
-            actingForUserIds = actingConfigs
-                .Select(cfg => _user.AllUsers.FirstOrDefault(u =>
-                    string.Equals(u.PositionId, cfg.PositionId, StringComparison.OrdinalIgnoreCase))?.UserId)
-                .Where(uid => !string.IsNullOrWhiteSpace(uid))
-                .Select(uid => uid!)
-                .ToList();
         }
 
-        // All userIds whose queue items the current user should see
-        // (their own + any positions they are actively deputising for).
-        var myUserIds = new[] { me.UserId }.Concat(actingForUserIds).ToList();
+        // Match both the canonical application UserId and the payroll
+        // EmployeeId used by legacy rows. Acting primary holders contribute
+        // both forms too, so acting appointments behave identically.
+        var myAssigneeIds = WorkflowAssigneeIdentity.ForUserAndActing(
+            me, _user.AllUsers, actingConfigs);
+        var myCaptureIds = WorkflowAssigneeIdentity.ForUser(me);
 
         // ── Recommendation queue ─────────────────────────────────────────────
         // Capturer submitted → Status=Recommended, assigned to Recommender.
         var awaitingMyRecommendation = await _db.OvertimeTransactions.CountAsync(
-            t => myUserIds.Contains(t.CurrentAssigneeUserId)
+            t => t.CurrentAssigneeUserId != null
+                 && myAssigneeIds.Contains(t.CurrentAssigneeUserId)
                  && t.Status == WorkflowStatus.Recommended, ct);
 
         // ── Overtime approval queue ──────────────────────────────────────────
@@ -79,30 +77,31 @@ public class DashboardController : ControllerBase
         // (Excess approver sub-hop also sits at this status but the workflow
         //  correctly re-assigns CurrentAssigneeUserId, so no extra filter needed.)
         var awaitingMyApproval = await _db.OvertimeTransactions.CountAsync(
-            t => myUserIds.Contains(t.CurrentAssigneeUserId)
+            t => t.CurrentAssigneeUserId != null
+                 && myAssigneeIds.Contains(t.CurrentAssigneeUserId)
                  && t.Status == WorkflowStatus.ApprovedForPayment, ct);
 
-        // ── Payroll capture queue ────────────────────────────────────────────
-        // Open queue — any user with CanAccessPayroll sees all transactions
-        // at AwaitingPayrollApproval that haven't been payroll-captured yet.
-        var awaitingPayrollCapture = me.CanAccessPayroll
-            ? await _db.OvertimeTransactions.CountAsync(
-                t => t.Status == WorkflowStatus.AwaitingPayrollApproval
-                     && !t.IsPayrollCaptured, ct)
-            : 0;
+        // ── Payroll queues (capture + approval) ─────────────────────────────
+        // Both sit at AwaitingPayrollApproval, split only by IsPayrollCaptured.
+        // One GroupBy query replaces two COUNT queries.
+        int awaitingPayrollCapture = 0;
+        int awaitingPayrollApproval = 0;
+        if (me.CanAccessPayroll)
+        {
+            var payrollCounts = await _db.OvertimeTransactions
+                .Where(t => t.Status == WorkflowStatus.AwaitingPayrollApproval)
+                .GroupBy(t => t.IsPayrollCaptured)
+                .Select(g => new { IsCaptured = g.Key, Count = g.Count() })
+                .ToListAsync(ct);
 
-        // ── Payroll approval queue ───────────────────────────────────────────
-        // Open queue — any payroll user sees transactions captured but not yet
-        // payroll-approved.
-        var awaitingPayrollApproval = me.CanAccessPayroll
-            ? await _db.OvertimeTransactions.CountAsync(
-                t => t.Status == WorkflowStatus.AwaitingPayrollApproval
-                     && t.IsPayrollCaptured, ct)
-            : 0;
+            awaitingPayrollCapture  = payrollCounts.FirstOrDefault(x => !x.IsCaptured)?.Count ?? 0;
+            awaitingPayrollApproval = payrollCounts.FirstOrDefault(x =>  x.IsCaptured)?.Count ?? 0;
+        }
 
         // ── In-progress captures ─────────────────────────────────────────────
         var capturedByMeInProgress = await _db.OvertimeTransactions.CountAsync(
-            t => t.CapturedBy == me.UserId
+            t => t.CapturedBy != null
+                 && myCaptureIds.Contains(t.CapturedBy)
                  && t.Status != WorkflowStatus.Processed
                  && t.Status != WorkflowStatus.Rejected
                  && t.Status != WorkflowStatus.Returned, ct);
@@ -110,7 +109,9 @@ public class DashboardController : ControllerBase
         // ── Returned to me ───────────────────────────────────────────────────
         var returnedToMe = await _db.OvertimeTransactions.CountAsync(
             t => t.Status == WorkflowStatus.Returned
-                 && (t.CapturedBy == me.UserId || t.CurrentAssigneeUserId == me.UserId), ct);
+                 && ((t.CapturedBy != null && myCaptureIds.Contains(t.CapturedBy))
+                     || (t.CurrentAssigneeUserId != null
+                         && myAssigneeIds.Contains(t.CurrentAssigneeUserId))), ct);
 
         // ── System-wide "at a glance" stats ──────────────────────────────────
         // Derive the tax year date window from AAAA_ConfigSettings.
@@ -135,17 +136,22 @@ public class DashboardController : ControllerBase
             }
         }
 
-        var totalTransactionsThisTaxYear = await _db.OvertimeTransactions.CountAsync(
-            t => t.CreatedAt >= taxYearStart && t.CreatedAt < taxYearEnd, ct);
+        // ── Tax-year at-a-glance stats ────────────────────────────────────────
+        // One GroupBy query replaces three separate COUNT / SUM queries.
+        var taxYearStats = await _db.OvertimeTransactions
+            .Where(t => t.CreatedAt >= taxYearStart && t.CreatedAt < taxYearEnd)
+            .GroupBy(_ => true)
+            .Select(g => new
+            {
+                Total     = g.Count(),
+                Hours     = g.Sum(t => t.Hours),
+                Processed = g.Count(t => t.Status == WorkflowStatus.Processed),
+            })
+            .FirstOrDefaultAsync(ct);
 
-        var totalHoursThisTaxYear = totalTransactionsThisTaxYear == 0 ? 0m
-            : await _db.OvertimeTransactions
-                .Where(t => t.CreatedAt >= taxYearStart && t.CreatedAt < taxYearEnd)
-                .SumAsync(t => t.Hours, ct);
-
-        var totalProcessedThisTaxYear = await _db.OvertimeTransactions.CountAsync(
-            t => t.CreatedAt >= taxYearStart && t.CreatedAt < taxYearEnd
-                 && t.Status == WorkflowStatus.Processed, ct);
+        var totalTransactionsThisTaxYear = taxYearStats?.Total     ?? 0;
+        var totalHoursThisTaxYear        = taxYearStats?.Hours     ?? 0m;
+        var totalProcessedThisTaxYear    = taxYearStats?.Processed ?? 0;
 
         var totalInProgress = await _db.OvertimeTransactions.CountAsync(
             t => t.Status != WorkflowStatus.Processed

@@ -38,17 +38,89 @@ export class OvertimeTransactionsService {
   private http = inject(HttpClient);
   private base = environment.apiBaseUrl;
 
-  listCurrent(page = 1, pageSize = 25): Observable<PaginatedResponse<OvertimeTransactionDto>> {
-    const params = new HttpParams().set('page', page).set('pageSize', pageSize);
+  listCurrent(filters: {
+    page?: number;
+    pageSize?: number;
+    employeeSearch?: string | null;
+    status?: number | null;
+    salaryHeadName?: string | null;
+    departmentId?: string | null;
+    divisionName?: string | null;
+  } = {}): Observable<PaginatedResponse<OvertimeTransactionDto>> {
+    let params = new HttpParams()
+      .set('page',     filters.page     ?? 1)
+      .set('pageSize', filters.pageSize ?? 25);
+    if (filters.employeeSearch) params = params.set('employeeSearch', filters.employeeSearch);
+    if (filters.status      != null) params = params.set('status', filters.status);
+    if (filters.salaryHeadName)      params = params.set('salaryHeadName', filters.salaryHeadName);
+    if (filters.departmentId)        params = params.set('departmentId',   filters.departmentId);
+    if (filters.divisionName)        params = params.set('divisionName',   filters.divisionName);
     return this.http.get<ApiResponse<PaginatedResponse<OvertimeTransactionDto>>>(
       `${this.base}/overtime-transactions/current`, { params }
     ).pipe(map(r => r.data));
   }
 
-  listProcessed(page = 1, pageSize = 25): Observable<PaginatedResponse<OvertimeTransactionDto>> {
-    const params = new HttpParams().set('page', page).set('pageSize', pageSize);
+  listProcessed(filters: {
+    page?: number;
+    pageSize?: number;
+    capturedById?: string | null;
+    employeeSearch?: string | null;
+    status?: number | null;
+    salaryHeadName?: string | null;
+    departmentId?: string | null;
+    divisionName?: string | null;
+  } = {}): Observable<PaginatedResponse<OvertimeTransactionDto>> {
+    let params = new HttpParams()
+      .set('page',     filters.page     ?? 1)
+      .set('pageSize', filters.pageSize ?? 25);
+    if (filters.capturedById)        params = params.set('capturedById',   filters.capturedById);
+    if (filters.employeeSearch)      params = params.set('employeeSearch', filters.employeeSearch);
+    if (filters.status      != null) params = params.set('status', filters.status);
+    if (filters.salaryHeadName)      params = params.set('salaryHeadName', filters.salaryHeadName);
+    if (filters.departmentId)        params = params.set('departmentId',   filters.departmentId);
+    if (filters.divisionName)        params = params.set('divisionName',   filters.divisionName);
     return this.http.get<ApiResponse<PaginatedResponse<OvertimeTransactionDto>>>(
       `${this.base}/overtime-transactions/processed`, { params }
+    ).pipe(map(r => r.data));
+  }
+
+  // ── Export (returns all matching rows in a single server response) ──
+
+  exportCurrent(filters: {
+    employeeSearch?: string | null;
+    status?: number | null;
+    salaryHeadName?: string | null;
+    departmentId?: string | null;
+    divisionName?: string | null;
+  } = {}): Observable<OvertimeTransactionDto[]> {
+    let params = new HttpParams();
+    if (filters.employeeSearch) params = params.set('employeeSearch', filters.employeeSearch);
+    if (filters.status      != null) params = params.set('status', filters.status);
+    if (filters.salaryHeadName)      params = params.set('salaryHeadName', filters.salaryHeadName);
+    if (filters.departmentId)        params = params.set('departmentId',   filters.departmentId);
+    if (filters.divisionName)        params = params.set('divisionName',   filters.divisionName);
+    return this.http.get<ApiResponse<OvertimeTransactionDto[]>>(
+      `${this.base}/overtime-transactions/current/export`, { params }
+    ).pipe(map(r => r.data));
+  }
+
+  exportProcessed(filters: {
+    capturedById?: string | null;
+    employeeSearch?: string | null;
+    status?: number | null;
+    salaryHeadName?: string | null;
+    departmentId?: string | null;
+    divisionName?: string | null;
+  } = {}): Observable<OvertimeTransactionDto[]> {
+    let params = new HttpParams();
+    if (filters.capturedById)        params = params.set('capturedById',   filters.capturedById);
+    if (filters.employeeSearch)      params = params.set('employeeSearch', filters.employeeSearch);
+    if (filters.status      != null) params = params.set('status', filters.status);
+    if (filters.salaryHeadName)      params = params.set('salaryHeadName', filters.salaryHeadName);
+    if (filters.departmentId)        params = params.set('departmentId',   filters.departmentId);
+    if (filters.divisionName)        params = params.set('divisionName',   filters.divisionName);
+    return this.http.get<ApiResponse<OvertimeTransactionDto[]>>(
+      `${this.base}/overtime-transactions/processed/export`, { params }
     ).pipe(map(r => r.data));
   }
 
@@ -59,6 +131,8 @@ export class OvertimeTransactionsService {
     salaryHeadName?: string | null;
     fromDate?: string | null;
     toDate?: string | null;
+    divisionName?: string | null;
+    excludeTerminal?: boolean;
     page?: number;
     pageSize?: number;
   } = {}): Observable<PaginatedResponse<OvertimeTransactionDto>> {
@@ -71,6 +145,8 @@ export class OvertimeTransactionsService {
     if (filters.salaryHeadName)      params = params.set('salaryHeadName', filters.salaryHeadName);
     if (filters.fromDate)            params = params.set('fromDate',       filters.fromDate);
     if (filters.toDate)              params = params.set('toDate',         filters.toDate);
+    if (filters.divisionName)        params = params.set('divisionName',   filters.divisionName);
+    if (filters.excludeTerminal)     params = params.set('excludeTerminal', 'true');
     return this.http.get<ApiResponse<PaginatedResponse<OvertimeTransactionDto>>>(
       `${this.base}/overtime-transactions/enquiry`, { params }
     ).pipe(map(r => r.data));

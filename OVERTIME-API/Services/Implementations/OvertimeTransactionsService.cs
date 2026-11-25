@@ -64,8 +64,21 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
 
     // ---------- Listing ----------
 
-    public async Task<ApiResponse<PaginatedResponse<OvertimeTransactionDto>>> ListCurrentForUserAsync(int page, int pageSize, CancellationToken ct = default)
+    private const int MaxListPageSize = 500;
+    /// Upper bound on page number so (page-1)*pageSize cannot overflow int.
+    /// With MaxListPageSize=500, page 4_000_000 gives skip≈2 billion which
+    /// stays within int range; 10_000 is generous for any real dataset.
+    private const int MaxListPage = 10_000;
+
+    public async Task<ApiResponse<PaginatedResponse<OvertimeTransactionDto>>> ListCurrentForUserAsync(
+        int page, int pageSize,
+        string? employeeSearch = null, int? status = null, string? salaryHeadName = null, string? departmentId = null, string? divisionName = null,
+        CancellationToken ct = default)
     {
+        // Clamp to safe bounds so callers cannot bypass pagination or overflow the skip.
+        page     = Math.Clamp(page,     1, MaxListPage);
+        pageSize = Math.Clamp(pageSize, 1, MaxListPageSize);
+
         // "Current" = anything still in flight assigned to me OR captured by me
         // and not yet terminal. Lets capturers see what they've submitted.
         var me = _user.Current;
@@ -73,27 +86,25 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
 
         // Extend the assignee match to cover positions the current user is
         // actively deputising for via a TemporaryActingAppointment.
-        var actingForUserIds = new List<string>();
+        var actingConfigs = new List<PositionApprovalConfig>();
         if (!string.IsNullOrWhiteSpace(me.EmployeeId))
         {
             var nowUtc = DateTime.UtcNow;
-            var actingConfigs = await _db.PositionApprovalConfigs
+            actingConfigs = await _db.PositionApprovalConfigs
                 .Include(c => c.ActingAppointments)
                 .Where(c => c.ActingAppointments.Any(a =>
                     a.ActingEmployeeId == me.EmployeeId
                     && a.StartDate <= nowUtc && a.EndDate >= nowUtc))
                 .AsNoTracking()
                 .ToListAsync(ct);
-
-            actingForUserIds = actingConfigs
-                .Select(cfg => _user.AllUsers.FirstOrDefault(u =>
-                    string.Equals(u.PositionId, cfg.PositionId, StringComparison.OrdinalIgnoreCase))?.UserId)
-                .Where(uid => !string.IsNullOrWhiteSpace(uid))
-                .Select(uid => uid!)
-                .ToList();
         }
 
-        var myUserIds = new[] { meId }.Concat(actingForUserIds).ToList();
+        // Include both application and payroll identity values for the current
+        // user and active acting appointments. This keeps legacy rows visible
+        // without turning capturer visibility into workflow authority.
+        var myAssigneeIds = WorkflowAssigneeIdentity.ForUserAndActing(
+            me, _user.AllUsers, actingConfigs);
+        var myCaptureIds = WorkflowAssigneeIdentity.ForUser(me);
 
         // Determine whether the current user holds the configured override position.
         // Override users see every in-flight transaction, not just their own queue.
@@ -102,45 +113,212 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
             && !string.IsNullOrWhiteSpace(me.PositionId)
             && string.Equals(me.PositionId, cfg.OverridePositionId, StringComparison.OrdinalIgnoreCase);
 
-        var rows = await _db.OvertimeTransactions
-            .Include(t => t.Documents)
-            .Include(t => t.WorkflowHistory)
-            .AsSplitQuery()
+        // Build the base access-control filter, then layer optional UI filters on top.
+        IQueryable<OvertimeTransaction> q = _db.OvertimeTransactions
             .Where(t => t.Status != WorkflowStatus.Processed
                         && t.Status != WorkflowStatus.Rejected
                         && (isOverrideUser
-                            || myUserIds.Contains(t.CurrentAssigneeUserId)
-                            || t.CapturedBy == meId))
-            .OrderByDescending(t => t.UpdatedAt)
-            .ToListAsync(ct);
-        var actingLookup = await LoadActiveActingLookupAsync(ct);
-        var dto = rows.Select(r => ToDto(r, actingLookup)).ToList();
-        return ApiResponse<PaginatedResponse<OvertimeTransactionDto>>.Success(
-            PaginatedResponse<OvertimeTransactionDto>.Create(dto, page, pageSize));
-    }
+                            || (t.CurrentAssigneeUserId != null
+                                && myAssigneeIds.Contains(t.CurrentAssigneeUserId))
+                            || (t.CapturedBy != null
+                                && myCaptureIds.Contains(t.CapturedBy))));
 
-    public async Task<ApiResponse<PaginatedResponse<OvertimeTransactionDto>>> ListProcessedAsync(int page, int pageSize, CancellationToken ct = default)
-    {
-        // "Processed" = terminal state, visible to everyone (audit view).
-        var rows = await _db.OvertimeTransactions
+        if (!string.IsNullOrWhiteSpace(employeeSearch))
+        {
+            var s = employeeSearch.Trim().ToLower();
+            q = q.Where(t => t.EmployeeId.ToLower().Contains(s) || t.EmployeeName.ToLower().Contains(s));
+        }
+        if (status.HasValue)
+            q = q.Where(t => (int)t.Status == status.Value);
+        if (!string.IsNullOrWhiteSpace(salaryHeadName))
+            q = q.Where(t => t.SalaryHeadName == salaryHeadName);
+        if (!string.IsNullOrWhiteSpace(departmentId))
+            q = q.Where(t => t.DepartmentId == departmentId);
+        if (!string.IsNullOrWhiteSpace(divisionName))
+            q = q.Where(t => t.DivisionName == divisionName || t.LegacyDivisionName == divisionName);
+
+        var ordered = q.OrderByDescending(t => t.UpdatedAt).ThenByDescending(t => t.Id);
+        var total = await ordered.CountAsync(ct);
+        var rows = await ordered
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Include(t => t.Documents)
             .Include(t => t.WorkflowHistory)
             .AsSplitQuery()
-            .Where(t => t.Status == WorkflowStatus.Processed
-                        || t.Status == WorkflowStatus.Rejected)
-            .OrderByDescending(t => t.UpdatedAt)
             .ToListAsync(ct);
         var actingLookup = await LoadActiveActingLookupAsync(ct);
         var dto = rows.Select(r => ToDto(r, actingLookup)).ToList();
         return ApiResponse<PaginatedResponse<OvertimeTransactionDto>>.Success(
-            PaginatedResponse<OvertimeTransactionDto>.Create(dto, page, pageSize));
+            new PaginatedResponse<OvertimeTransactionDto>
+            {
+                Items    = dto,
+                Total    = total,
+                Page     = page,
+                PageSize = pageSize
+            });
     }
+
+    public async Task<ApiResponse<PaginatedResponse<OvertimeTransactionDto>>> ListProcessedAsync(
+        int page, int pageSize,
+        string? capturedById = null, string? employeeSearch = null, int? status = null, string? salaryHeadName = null, string? departmentId = null, string? divisionName = null,
+        CancellationToken ct = default)
+    {
+        // Clamp to safe bounds.
+        page     = Math.Clamp(page,     1, MaxListPage);
+        pageSize = Math.Clamp(pageSize, 1, MaxListPageSize);
+
+        // "Processed" = terminal state. capturedById scopes the view to a single
+        // capturer's own history; omit to see all processed transactions.
+        IQueryable<OvertimeTransaction> q = _db.OvertimeTransactions
+            .Where(t => t.Status == WorkflowStatus.Processed
+                        || t.Status == WorkflowStatus.Rejected);
+
+        if (!string.IsNullOrWhiteSpace(capturedById))
+            q = q.Where(t => t.CapturedBy == capturedById);
+        if (!string.IsNullOrWhiteSpace(employeeSearch))
+        {
+            var s = employeeSearch.Trim().ToLower();
+            q = q.Where(t => t.EmployeeId.ToLower().Contains(s) || t.EmployeeName.ToLower().Contains(s));
+        }
+        if (status.HasValue)
+            q = q.Where(t => (int)t.Status == status.Value);
+        if (!string.IsNullOrWhiteSpace(salaryHeadName))
+            q = q.Where(t => t.SalaryHeadName == salaryHeadName);
+        if (!string.IsNullOrWhiteSpace(departmentId))
+            q = q.Where(t => t.DepartmentId == departmentId);
+        if (!string.IsNullOrWhiteSpace(divisionName))
+            q = q.Where(t => t.DivisionName == divisionName || t.LegacyDivisionName == divisionName);
+
+        var ordered = q.OrderByDescending(t => t.UpdatedAt).ThenByDescending(t => t.Id);
+        var total = await ordered.CountAsync(ct);
+        var rows = await ordered
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Include(t => t.Documents)
+            .Include(t => t.WorkflowHistory)
+            .AsSplitQuery()
+            .ToListAsync(ct);
+        var actingLookup = await LoadActiveActingLookupAsync(ct);
+        var dto = rows.Select(r => ToDto(r, actingLookup)).ToList();
+        return ApiResponse<PaginatedResponse<OvertimeTransactionDto>>.Success(
+            new PaginatedResponse<OvertimeTransactionDto>
+            {
+                Items    = dto,
+                Total    = total,
+                Page     = page,
+                PageSize = pageSize
+            });
+    }
+
+    // ─── Export (no pagination — returns all matching rows) ────────────────
+
+    public async Task<ApiResponse<List<OvertimeTransactionDto>>> ExportCurrentAsync(
+        string? employeeSearch = null, int? status = null, string? salaryHeadName = null, string? departmentId = null, string? divisionName = null,
+        CancellationToken ct = default)
+    {
+        var me = _user.Current;
+
+        var actingConfigs = new List<PositionApprovalConfig>();
+        if (!string.IsNullOrWhiteSpace(me.EmployeeId))
+        {
+            var nowUtc = DateTime.UtcNow;
+            actingConfigs = await _db.PositionApprovalConfigs
+                .Include(c => c.ActingAppointments)
+                .Where(c => c.ActingAppointments.Any(a =>
+                    a.ActingEmployeeId == me.EmployeeId
+                    && a.StartDate <= nowUtc && a.EndDate >= nowUtc))
+                .AsNoTracking()
+                .ToListAsync(ct);
+        }
+
+        var myAssigneeIds = WorkflowAssigneeIdentity.ForUserAndActing(
+            me, _user.AllUsers, actingConfigs);
+        var myCaptureIds = WorkflowAssigneeIdentity.ForUser(me);
+
+        var cfg = await _db.OvertimeConfig.AsNoTracking().FirstOrDefaultAsync(ct);
+        var isOverrideUser = !string.IsNullOrWhiteSpace(cfg?.OverridePositionId)
+            && !string.IsNullOrWhiteSpace(me.PositionId)
+            && string.Equals(me.PositionId, cfg.OverridePositionId, StringComparison.OrdinalIgnoreCase);
+
+        IQueryable<OvertimeTransaction> q = _db.OvertimeTransactions
+            .Where(t => t.Status != WorkflowStatus.Processed
+                        && t.Status != WorkflowStatus.Rejected
+                        && (isOverrideUser
+                            || (t.CurrentAssigneeUserId != null
+                                && myAssigneeIds.Contains(t.CurrentAssigneeUserId))
+                            || (t.CapturedBy != null
+                                && myCaptureIds.Contains(t.CapturedBy))));
+
+        if (!string.IsNullOrWhiteSpace(employeeSearch))
+        {
+            var s = employeeSearch.Trim().ToLower();
+            q = q.Where(t => t.EmployeeId.ToLower().Contains(s) || t.EmployeeName.ToLower().Contains(s));
+        }
+        if (status.HasValue)
+            q = q.Where(t => (int)t.Status == status.Value);
+        if (!string.IsNullOrWhiteSpace(salaryHeadName))
+            q = q.Where(t => t.SalaryHeadName == salaryHeadName);
+        if (!string.IsNullOrWhiteSpace(departmentId))
+            q = q.Where(t => t.DepartmentId == departmentId);
+        if (!string.IsNullOrWhiteSpace(divisionName))
+            q = q.Where(t => t.DivisionName == divisionName || t.LegacyDivisionName == divisionName);
+
+        var rows = await q
+            .OrderByDescending(t => t.UpdatedAt).ThenByDescending(t => t.Id)
+            .Include(t => t.WorkflowHistory)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .ToListAsync(ct);
+        var actingLookup = await LoadActiveActingLookupAsync(ct);
+        return ApiResponse<List<OvertimeTransactionDto>>.Success(rows.Select(r => ToDto(r, actingLookup)).ToList());
+    }
+
+    public async Task<ApiResponse<List<OvertimeTransactionDto>>> ExportProcessedAsync(
+        string? capturedById = null, string? employeeSearch = null, int? status = null, string? salaryHeadName = null, string? departmentId = null, string? divisionName = null,
+        CancellationToken ct = default)
+    {
+        IQueryable<OvertimeTransaction> q = _db.OvertimeTransactions
+            .Where(t => t.Status == WorkflowStatus.Processed || t.Status == WorkflowStatus.Rejected);
+
+        if (!string.IsNullOrWhiteSpace(capturedById))
+            q = q.Where(t => t.CapturedBy == capturedById);
+        if (!string.IsNullOrWhiteSpace(employeeSearch))
+        {
+            var s = employeeSearch.Trim().ToLower();
+            q = q.Where(t => t.EmployeeId.ToLower().Contains(s) || t.EmployeeName.ToLower().Contains(s));
+        }
+        if (status.HasValue)
+            q = q.Where(t => (int)t.Status == status.Value);
+        if (!string.IsNullOrWhiteSpace(salaryHeadName))
+            q = q.Where(t => t.SalaryHeadName == salaryHeadName);
+        if (!string.IsNullOrWhiteSpace(departmentId))
+            q = q.Where(t => t.DepartmentId == departmentId);
+        if (!string.IsNullOrWhiteSpace(divisionName))
+            q = q.Where(t => t.DivisionName == divisionName || t.LegacyDivisionName == divisionName);
+
+        var rows = await q
+            .OrderByDescending(t => t.UpdatedAt).ThenByDescending(t => t.Id)
+            .Include(t => t.WorkflowHistory)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .ToListAsync(ct);
+        var actingLookup = await LoadActiveActingLookupAsync(ct);
+        return ApiResponse<List<OvertimeTransactionDto>>.Success(rows.Select(r => ToDto(r, actingLookup)).ToList());
+    }
+
+    // ─── Enquiry ───────────────────────────────────────────────────────────
 
     public async Task<ApiResponse<PaginatedResponse<OvertimeTransactionDto>>> ListEnquiryAsync(
         int? status, string? departmentId, string? employeeSearch, string? salaryHeadName,
         DateTime? fromDate, DateTime? toDate,
-        int page, int pageSize, CancellationToken ct = default)
+        int page, int pageSize,
+        string? divisionName = null, bool excludeTerminal = false,
+        CancellationToken ct = default)
     {
+        // Clamp to safe bounds.
+        page     = Math.Clamp(page,     1, MaxListPage);
+        pageSize = Math.Clamp(pageSize, 1, MaxListPageSize);
+
         var q = _db.OvertimeTransactions
             .AsNoTracking()
             .Include(t => t.Documents)
@@ -164,8 +342,12 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
             q = q.Where(t => t.OvertimeDate >= fromDate.Value.Date);
         if (toDate.HasValue)
             q = q.Where(t => t.OvertimeDate <= toDate.Value.Date);
+        if (!string.IsNullOrWhiteSpace(divisionName))
+            q = q.Where(t => t.DivisionName == divisionName || t.LegacyDivisionName == divisionName);
+        if (excludeTerminal)
+            q = q.Where(t => t.Status != WorkflowStatus.Processed && t.Status != WorkflowStatus.Rejected);
 
-        var ordered = q.OrderByDescending(t => t.UpdatedAt);
+        var ordered = q.OrderByDescending(t => t.UpdatedAt).ThenByDescending(t => t.Id);
         var total   = await ordered.CountAsync(ct);
         var rows    = await ordered
             .Skip((page - 1) * pageSize)
@@ -608,10 +790,10 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
             }
         }
 
-        // Resolve any payroll classification updates before persisting so a
-        // bad ID doesn't half-mutate the row.
-        var classification = await ResolveClassificationAsync(
-            request.LegacyDepartmentId, request.LegacyDivisionId, ct);
+        // Ordinary edits omit classification. Preserve historical labels unless
+        // explicitly changed, including snapshots of disabled master records.
+        var classification = await ResolveClassificationUpdateAsync(
+            tx, request.LegacyDepartmentId, request.LegacyDivisionId, ct);
         if (!classification.IsSuccess)
             return ApiResponse<OvertimeTransactionDto>.Failure(classification.Message ?? "Invalid payroll classification.");
 
@@ -821,7 +1003,7 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
     /// tables. Cycle and Period are intentionally excluded — they are resolved
     /// from the employee master and must not be stored on the transaction.
     /// </summary>
-    private sealed record PayrollClassificationSnapshot(
+    internal sealed record PayrollClassificationSnapshot(
         int? LegacyDepartmentId, string? LegacyDepartmentName,
         int? LegacyDivisionId, string? LegacyDivisionName)
     {
@@ -837,6 +1019,19 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
     /// Cycle and Period are intentionally excluded — they are resolved from
     /// the employee master and must not be written by the capture form.
     /// </summary>
+    internal async Task<ApiResponse<PayrollClassificationSnapshot>> ResolveClassificationUpdateAsync(
+        OvertimeTransaction transaction, int? departmentId, int? divisionId, CancellationToken ct)
+    {
+        if (departmentId is null && divisionId is null)
+            return ApiResponse<PayrollClassificationSnapshot>.Success(new(
+                transaction.LegacyDepartmentId, transaction.LegacyDepartmentName,
+                transaction.LegacyDivisionId, transaction.LegacyDivisionName));
+
+        return await ResolveClassificationAsync(
+            departmentId ?? transaction.LegacyDepartmentId,
+            divisionId ?? transaction.LegacyDivisionId, ct);
+    }
+
     private async Task<ApiResponse<PayrollClassificationSnapshot>> ResolveClassificationAsync(
         int? legacyDepartmentId, int? legacyDivisionId, CancellationToken ct)
     {

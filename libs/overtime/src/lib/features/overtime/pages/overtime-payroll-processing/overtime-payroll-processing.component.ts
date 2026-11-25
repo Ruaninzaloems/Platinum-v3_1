@@ -11,6 +11,7 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { DateAdapter, MAT_DATE_LOCALE, MAT_DATE_FORMATS, MatDateFormats } from '@angular/material/core';
 import { EnGbDateAdapter } from '../../../../core/utils/en-gb-date-adapter';
 import { firstValueFrom } from 'rxjs';
+import { buildPayrollCsv } from './payroll-csv';
 
 const DATE_FORMATS: MatDateFormats = {
   parse:   { dateInput: { day: '2-digit', month: '2-digit', year: 'numeric' } },
@@ -236,6 +237,7 @@ interface PayrollCyclePeriodDto {
                   <th>Date</th>
                   <th class="col-num">Hours</th>
                   <th class="col-num">Amount</th>
+                  <th>Department</th>
                   <th>Division</th>
                   <th>Recommender</th>
                   <th>Approver</th>
@@ -260,7 +262,8 @@ interface PayrollCyclePeriodDto {
                     <td>{{ row.overtimeDate | date:'dd MMM yyyy' }}</td>
                     <td class="col-num">{{ row.hours | number:'1.2-2' }}</td>
                     <td class="col-num">R {{ row.amount | number:'1.2-2' }}</td>
-                    <td>{{ row.legacyDivisionName || '—' }}</td>
+                    <td>{{ row.departmentName || '—' }}</td>
+                    <td>{{ row.divisionName || '—' }}</td>
                     <td>{{ row.recommenderEmployeeName || '—' }}</td>
                     <td>{{ row.approverEmployeeName || '—' }}</td>
                     <td>
@@ -631,49 +634,7 @@ export class OvertimePayrollProcessingComponent implements OnInit {
 
     if (exportRows.length === 0) return;
 
-    const escape = (val: string | number | null | undefined): string => {
-      let s = val == null ? '' : String(val);
-      if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-      return s.includes(',') || s.includes('"') || s.includes('\n')
-        ? `"${s.replace(/"/g, '""')}"`
-        : s;
-    };
-
-    const headers = [
-      'Employee', 'Employee ID', 'Position',
-      'Date', 'Start', 'End',
-      'OT Type', 'Hours', 'Amount',
-      'Department', 'Division',
-      'Recommender', 'Approver',
-      'Status', 'Excess'
-    ];
-
-    const lines: string[] = [headers.join(',')];
-
-    for (const r of exportRows) {
-      const date = r.overtimeDate
-        ? new Date(r.overtimeDate).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })
-        : '';
-      lines.push([
-        escape(r.employeeName),
-        escape(r.employeeId),
-        escape(r.positionDescription || r.positionId || ''),
-        escape(date),
-        escape(r.startTime || ''),
-        escape(r.endTime || ''),
-        escape(r.salaryHeadName),
-        escape(r.hours),
-        escape(r.amount),
-        escape(r.legacyDepartmentName || ''),
-        escape(r.legacyDivisionName || ''),
-        escape(r.recommenderEmployeeName || ''),
-        escape(r.approverEmployeeName || ''),
-        escape(r.statusLabel),
-        escape(r.isExcess ? 'Yes' : '')
-      ].join(','));
-    }
-
-    const csv = lines.join('\r\n');
+    const csv = buildPayrollCsv(this.rows(), this.selectedIds());
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

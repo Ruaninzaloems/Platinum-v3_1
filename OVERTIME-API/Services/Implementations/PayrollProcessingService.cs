@@ -72,23 +72,24 @@ public class PayrollProcessingService : IPayrollProcessingService
             q = q.Where(t => empIdsInCycle.Contains(t.EmployeeId));
         }
 
-        if (departmentId.HasValue)
-            q = q.Where(t => t.LegacyDepartmentId == departmentId.Value);
-        if (divisionId.HasValue)
-            q = q.Where(t => t.LegacyDivisionId == divisionId.Value);
-
         var transactions = await q.OrderBy(t => t.OvertimeDate)
             .ThenBy(t => t.EmployeeName)
             .ToListAsync(ct);
 
-        // Build position description lookup (string PositionId → PositionDesc).
+        // Build position metadata lookups. Older transactions may not have the
+        // optional legacy division classification or position-division snapshot,
+        // so the current position master is the final display fallback.
         var positionIds = transactions
             .Where(t => !string.IsNullOrWhiteSpace(t.PositionId))
             .Select(t => t.PositionId)
             .Distinct()
             .ToHashSet();
 
-        Dictionary<string, string> posDescMap = new(StringComparer.OrdinalIgnoreCase);
+        var departments = await _db.ConstDepartments.AsNoTracking()
+            .ToDictionaryAsync(d => d.DepartmentId, d => d.DepartmentDesc, ct);
+        var divisions = await _db.ConstDivisions.AsNoTracking()
+            .ToDictionaryAsync(d => d.DivisionId, ct);
+        Dictionary<string, PayrollPosition> positionMap = new(StringComparer.OrdinalIgnoreCase);
         if (positionIds.Count > 0)
         {
             var intIds = positionIds
@@ -101,18 +102,17 @@ public class PayrollProcessingService : IPayrollProcessingService
                 var positions = await _db.PayrollPositions
                     .AsNoTracking()
                     .Where(p => intIds.Contains(p.PositionId))
-                    .Select(p => new { p.PositionId, p.PositionDesc })
                     .ToListAsync(ct);
-
                 foreach (var pos in positions)
-                    posDescMap[pos.PositionId.ToString()] = pos.PositionDesc ?? string.Empty;
+                    positionMap[pos.PositionId.ToString()] = pos;
             }
         }
 
         var rows = transactions.Select(t =>
         {
             int? legacyEmpId = int.TryParse(t.EmployeeId, out var eid) ? eid : (int?)null;
-            posDescMap.TryGetValue(t.PositionId ?? string.Empty, out var posDesc);
+            positionMap.TryGetValue(t.PositionId ?? string.Empty, out var position);
+            var organisation = PayrollOrganisationResolver.Resolve(t, position, departments, divisions);
             return new PayrollProcessingRowDto
             {
                 Id = t.Id,
@@ -123,8 +123,12 @@ public class PayrollProcessingService : IPayrollProcessingService
                 LegacyDepartmentName = t.LegacyDepartmentName,
                 LegacyDivisionId = t.LegacyDivisionId,
                 LegacyDivisionName = t.LegacyDivisionName,
+                DepartmentId = organisation.DepartmentId,
+                DepartmentName = organisation.DepartmentName,
+                DivisionId = organisation.DivisionId,
+                DivisionName = organisation.DivisionName,
                 PositionId = t.PositionId,
-                PositionDescription = posDesc,
+                PositionDescription = position?.PositionDesc,
                 OvertimeDate = t.OvertimeDate,
                 SalaryHeadId = t.SalaryHeadId,
                 SalaryHeadName = t.SalaryHeadName,
@@ -139,7 +143,12 @@ public class PayrollProcessingService : IPayrollProcessingService
                 Status = (int)t.Status,
                 StatusLabel = t.Status.ToLabel()
             };
-        }).ToList();
+        // Resolve before filtering: optional legacy IDs are absent on ordinary
+        // captures. Filtering those fields in SQL would discard valid rows before
+        // their position/snapshot classification can be resolved.
+        }).Where(r => (!departmentId.HasValue || r.DepartmentId == departmentId)
+                  && (!divisionId.HasValue || r.DivisionId == divisionId))
+          .ToList();
 
         var summary = new PayrollProcessingSummaryDto
         {

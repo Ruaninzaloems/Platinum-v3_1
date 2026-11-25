@@ -91,14 +91,16 @@ public class WorkflowService : IWorkflowService
         //                   transaction is still at Requested, Recommended, or Returned
         //                   (allows a capturer to cancel before anyone else acts).
         var meId     = _user.Current.UserId;
-        var isCapturer        = string.Equals(tx.CapturedBy, meId, StringComparison.OrdinalIgnoreCase);
-        var isAssignee        = string.Equals(tx.CurrentAssigneeUserId, meId, StringComparison.OrdinalIgnoreCase);
+        var meEmpId  = _user.Current.EmployeeId; // empty for non-employee portal users
+        var isCapturer = WorkflowAssigneeIdentity.Matches(_user.Current, tx.CapturedBy);
+        // Also match by EmployeeId: ResolveAssignee may have stored a raw employee ID
+        // as a fallback when the directory lookup failed at transition time.
+        var isAssignee = WorkflowAssigneeIdentity.Matches(_user.Current, tx.CurrentAssigneeUserId);
 
         // Also treat the current user as the assignee when they are an active
         // acting deputy for whoever the transaction is currently assigned to.
         if (!isAssignee && !string.IsNullOrWhiteSpace(tx.CurrentAssigneeUserId))
         {
-            var meEmpId = _user.Current.EmployeeId;
             if (!string.IsNullOrWhiteSpace(meEmpId))
             {
                 var now = DateTime.UtcNow;
@@ -115,7 +117,7 @@ public class WorkflowService : IWorkflowService
                     var primary = _users.All.FirstOrDefault(u =>
                         string.Equals(u.PositionId, cfg.PositionId, StringComparison.OrdinalIgnoreCase));
                     return primary != null &&
-                           string.Equals(primary.UserId, tx.CurrentAssigneeUserId, StringComparison.OrdinalIgnoreCase);
+                           WorkflowAssigneeIdentity.Matches(primary, tx.CurrentAssigneeUserId);
                 });
             }
         }
@@ -240,7 +242,7 @@ public class WorkflowService : IWorkflowService
                 tx.CurrentAssigneeUserId = assignee;
 
                 if (next == WorkflowStatus.Processed) break;
-                if (!string.Equals(assignee, meId, StringComparison.OrdinalIgnoreCase)) break;
+                if (!WorkflowAssigneeIdentity.Matches(_user.Current, assignee)) break;
 
                 // Auto-approve once; clear comments so we don't double-stamp.
                 req = new WorkflowActionRequest { Comments = null };
@@ -348,6 +350,13 @@ public class WorkflowService : IWorkflowService
     private string? ResolveAssignee(string? empId)
     {
         if (string.IsNullOrWhiteSpace(empId)) return empId;
-        return _users.FindByUserId(empId)?.UserId ?? empId;
+        var resolved = _users.FindByUserId(empId)?.UserId;
+        if (resolved is null)
+            _log.LogWarning(
+                "ResolveAssignee: directory lookup failed for employee ID '{EmpId}'. " +
+                "Storing raw employee ID as CurrentAssigneeUserId fallback — the assignee " +
+                "may not see this transaction in their queue until the directory reloads.",
+                empId);
+        return resolved ?? empId;
     }
 }
