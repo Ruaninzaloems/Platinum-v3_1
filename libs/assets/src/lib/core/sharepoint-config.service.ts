@@ -1,5 +1,5 @@
 import { Injectable, signal, inject } from '@angular/core';
-import { GraphService } from '@platinumv3/shared/graph';
+import { GraphService, splitLibraryPath, urlSegment } from '@platinumv3/shared/graph';
 
 /**
  * Reads the Assets SharePoint document-storage configuration that is managed
@@ -10,6 +10,13 @@ import { GraphService } from '@platinumv3/shared/graph';
  *   - enabled = true  → documents live in SharePoint (siteUrl + library),
  *                       filtered to an asset via the AssetsID metadata column
  *   - enabled = false → use the asset module's existing local file storage
+ *
+ * The "library" setting may be a plain library name ("UatAssets") or a library plus a
+ * folder path ("WCDM File Plan/Assets Management"): the first segment picks the document
+ * library, the rest is the folder inside it that documents are listed from / uploaded to.
+ *
+ * The target library must have an "AssetsID" single-line-text column (and optionally a
+ * "description" column) — that is how a document is linked to an asset.
  */
 const STORAGE_KEY = 'platinum_module_config';
 
@@ -75,16 +82,37 @@ export class SharePointConfigService {
     const sitePath = u.pathname.replace(/\/$/, '');
     const site   = await this.graph.getSiteByPath(hostname, sitePath);
     const drives = await this.graph.getDrives(site.id);
-    const drive  = drives.find(d => d.name?.toLowerCase() === cfg.library.toLowerCase()) ?? drives[0];
-    if (!drive) throw new Error(`Document library "${cfg.library}" not found on the SharePoint site.`);
+    const { library } = splitLibraryPath(cfg.library);
+    const want = library.toLowerCase();
+    // Match the library's display name OR its URL segment (the two can differ).
+    const drive = drives.find(d => d.name?.toLowerCase() === want || urlSegment(d.webUrl) === want);
+    if (!drive) {
+      // Never fall back to "the first library" — that silently sent uploads to the wrong place.
+      throw new Error(
+        `Document library "${library}" was not found on ${cfg.siteUrl}. ` +
+        `Available libraries: ${drives.map(d => d.name).join(', ') || '(none)'}. ` +
+        `Check Admin → API Config → Assets → SharePoint Configuration.`
+      );
+    }
     this.driveId = drive.id;
     return drive.id;
+  }
+
+  /** Folder inside the library that documents live in ("" = library root). */
+  private folderPath(): string {
+    return splitLibraryPath(this.config().library).folder;
+  }
+
+  /** Children of the configured folder (or library root). */
+  private listFolder(driveId: string): Promise<any[]> {
+    const folder = this.folderPath();
+    return folder ? this.graph.getChildrenByPath(driveId, folder) : this.graph.getChildren(driveId, 'root');
   }
 
   /** List documents for an asset, filtered by the library's AssetsID column. */
   async listAssetDocuments(assetId: number): Promise<SpAssetDoc[]> {
     const driveId = await this.resolveDriveId();
-    const items = await this.graph.getChildren(driveId, 'root');
+    const items = await this.listFolder(driveId);
     await this.discoverFields(driveId, items);
 
     const idField   = this.assetsIdField   || 'AssetsID';
@@ -117,7 +145,7 @@ export class SharePointConfigService {
     const idField   = this.assetsIdField   || 'AssetsID';
     const descField = this.descriptionField || 'description';
 
-    const uploaded = await this.graph.uploadFile(driveId, 'root', file);
+    const uploaded = await this.graph.uploadFileToPath(driveId, this.folderPath(), file);
 
     const fields: Record<string, any> = { [idField]: String(assetId) };
     if (description && description.trim() && description !== 'General') {
@@ -128,7 +156,12 @@ export class SharePointConfigService {
       await this.graph.updateItemFields(driveId, uploaded.id, fields);
     } catch (e: any) {
       console.warn('[SharePointConfig] metadata tag failed for', file.name, ':', e?.message ?? e);
-      throw new Error('File uploaded but metadata (AssetsID/description) could not be saved: ' + (e?.message ?? e));
+      const lib = this.config().library;
+      throw new Error(
+        'File uploaded to "' + lib + '" but metadata (AssetsID/description) could not be saved: ' + (e?.message ?? e) +
+        '. The library needs an "AssetsID" single-line-text column (and optionally "description") — ' +
+        'add it in SharePoint (Library settings → Create column), then retry.'
+      );
     }
   }
 

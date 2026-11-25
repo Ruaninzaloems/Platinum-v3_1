@@ -41,3 +41,20 @@ export function nameContainsAll(name: string, input: string): boolean {
   const terms = searchTerms(input);
   return terms.length > 0 && terms.every(t => n.includes(t.toLowerCase()));
 }
+
+/**
+ * Split a "document library" setting into the library name and an optional folder path.
+ *   "UatAssets"                         → { library: "UatAssets", folder: "" }
+ *   "WCDM File Plan/Assets Management"  → { library: "WCDM File Plan", folder: "Assets Management" }
+ * Backslashes are treated as slashes; empty segments are dropped.
+ */
+export function splitLibraryPath(setting: string): { library: string; folder: string } {
+  const parts = (setting || '').replace(/\\/g, '/').split('/').map(p => p.trim()).filter(Boolean);
+  return { library: parts[0] ?? '', folder: parts.slice(1).join('/') };
+}
+
+/** Last path segment of a URL, decoded and lower-cased — a library's URL segment (e.g. "wcdm file plan"). */
+export function urlSegment(url?: string): string {
+  const seg = (url || '').replace(/\/+$/, '').split('/').pop() || '';
+  try { return decodeURIComponent(seg).toLowerCase(); } catch { return seg.toLowerCase(); }
+}

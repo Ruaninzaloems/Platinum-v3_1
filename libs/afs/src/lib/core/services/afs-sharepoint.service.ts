@@ -9,16 +9,18 @@ import { GraphService } from '@platinumv3/shared/graph';
  *
  *   Library columns written:  AFSID, description, Classification, Category, Tags
  *
- * Three independent libraries are supported, each with its own enable toggle:
+ * Five independent libraries are supported, each with its own enable toggle:
  *   • 'afs'            → working-paper / general AFS documents   (default lib: UatAFS)
  *   • 'adjustments'    → adjustment supporting documents         (default lib: UatAFSAdjustments)
  *   • 'administration' → AFS administration documents            (default lib: UatAFSAdministration)
+ *   • 'compilations'   → AFS compilation documents               (default lib: UatAFSCompilations)
+ *   • 'workingpapers'  → AFS working-paper documents             (default lib: UatAFSWorkingPapers)
  *
  * Mirrors the Assets SharePointConfigService / Overtime OvertimeSharePointService.
  */
 const STORAGE_KEY = 'platinum_module_config';
 
-export type AfsSpVariant = 'afs' | 'adjustments' | 'administration';
+export type AfsSpVariant = 'afs' | 'adjustments' | 'administration' | 'compilations' | 'workingpapers';
 
 export interface AfsSharePointConfig {
   enabled: boolean;
@@ -51,6 +53,8 @@ const DEFAULT_CONFIGS: Record<AfsSpVariant, AfsSharePointConfig> = {
   // "UatAFSAdjustments" but that name was taken, so SharePoint suffixed the URL with 1).
   adjustments: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFSAdjustments1' },
   administration: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFSAdministration' },
+  compilations: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFSCompilations' },
+  workingpapers: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFSWorkingPapers' },
 };
 
 interface AfsDocMeta {
@@ -71,6 +75,8 @@ const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   afs: { key: 'afsid', defaultName: 'AFSID' },
   adjustments: { key: 'adjid', defaultName: 'ADJID' },
   administration: { key: 'afsid', defaultName: 'AFSID' },
+  compilations: { key: 'afsid', defaultName: 'AFSID' },
+  workingpapers: { key: 'afsid', defaultName: 'AFSID' },
 };
 
 @Injectable({ providedIn: 'root' })
@@ -83,18 +89,24 @@ export class AfsSharePointService {
   readonly adjustmentsConfig = signal<AfsSharePointConfig>(this.read('adjustments'));
   /** Administration library config. */
   readonly administrationConfig = signal<AfsSharePointConfig>(this.read('administration'));
+  /** Compilations library config. */
+  readonly compilationsConfig = signal<AfsSharePointConfig>(this.read('compilations'));
+  /** Working-Papers library config. */
+  readonly workingPapersConfig = signal<AfsSharePointConfig>(this.read('workingpapers'));
 
-  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, administration: null };
+  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, administration: null, compilations: null, workingpapers: null };
   private fieldsByVariant: Record<AfsSpVariant, Record<string, string | null>> = {
-    afs: emptyFields(), adjustments: emptyFields(), administration: emptyFields(),
+    afs: emptyFields(), adjustments: emptyFields(), administration: emptyFields(), compilations: emptyFields(), workingpapers: emptyFields(),
   };
 
   refresh(): void {
     this.config.set(this.read('afs'));
     this.adjustmentsConfig.set(this.read('adjustments'));
     this.administrationConfig.set(this.read('administration'));
-    this.driveIds = { afs: null, adjustments: null, administration: null };
-    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), administration: emptyFields() };
+    this.compilationsConfig.set(this.read('compilations'));
+    this.workingPapersConfig.set(this.read('workingpapers'));
+    this.driveIds = { afs: null, adjustments: null, administration: null, compilations: null, workingpapers: null };
+    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), administration: emptyFields(), compilations: emptyFields(), workingpapers: emptyFields() };
   }
 
   isEnabled(variant: AfsSpVariant = 'afs'): boolean {
@@ -108,6 +120,8 @@ export class AfsSharePointService {
     const cfg = this.read(variant);
     (variant === 'adjustments' ? this.adjustmentsConfig
       : variant === 'administration' ? this.administrationConfig
+      : variant === 'compilations' ? this.compilationsConfig
+      : variant === 'workingpapers' ? this.workingPapersConfig
       : this.config).set(cfg);
     const u = new URL(cfg.siteUrl);
     const site = await this.graph.getSiteByPath(u.hostname, u.pathname.replace(/\/$/, ''));
@@ -420,6 +434,22 @@ export class AfsSharePointService {
             siteUrl: p.afsAdministrationSharePointSiteUrl || d.siteUrl,
             library: p.afsAdministrationSharePointLibrary || d.library,
             linkColumn: (p.afsAdministrationSharePointLinkColumn || '').trim() || undefined,
+          };
+        }
+        if (variant === 'compilations') {
+          return {
+            enabled: p.afsCompilationsSharePointEnabled ?? d.enabled,
+            siteUrl: p.afsCompilationsSharePointSiteUrl || d.siteUrl,
+            library: p.afsCompilationsSharePointLibrary || d.library,
+            linkColumn: (p.afsCompilationsSharePointLinkColumn || '').trim() || undefined,
+          };
+        }
+        if (variant === 'workingpapers') {
+          return {
+            enabled: p.afsWorkingPapersSharePointEnabled ?? d.enabled,
+            siteUrl: p.afsWorkingPapersSharePointSiteUrl || d.siteUrl,
+            library: p.afsWorkingPapersSharePointLibrary || d.library,
+            linkColumn: (p.afsWorkingPapersSharePointLinkColumn || '').trim() || undefined,
           };
         }
         return {

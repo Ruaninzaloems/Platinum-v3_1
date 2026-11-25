@@ -41,6 +41,16 @@ export interface ModuleApiConfig {
   afsAdministrationSharePointSiteUrl : string;
   afsAdministrationSharePointLibrary : string;
   afsAdministrationSharePointLinkColumn : string;
+  // AFS Compilations SharePoint document storage (separate library, "UatAFSCompilations")
+  afsCompilationsSharePointEnabled : boolean;
+  afsCompilationsSharePointSiteUrl : string;
+  afsCompilationsSharePointLibrary : string;
+  afsCompilationsSharePointLinkColumn : string;
+  // AFS WorkingPapers SharePoint document storage (separate library, "UatAFSWorkingPapers")
+  afsWorkingPapersSharePointEnabled : boolean;
+  afsWorkingPapersSharePointSiteUrl : string;
+  afsWorkingPapersSharePointLibrary : string;
+  afsWorkingPapersSharePointLinkColumn : string;
   // AFS PostgreSQL database (maps to AZURE_POSTGRES_URL read by AFS-UI/api)
   afsDbHost     : string;
   afsDbPort     : string;
@@ -98,6 +108,18 @@ const DEFAULTS: ModuleApiConfig = {
   afsAdministrationSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsAdministrationSharePointLibrary : 'UatAFSAdministration',
   afsAdministrationSharePointLinkColumn : '',
+  // AFS Compilations → separate SharePoint library (URL segment "UatAFSCompilations").
+  // Link column left blank = auto-detect from the library schema, falling back to AFSID.
+  afsCompilationsSharePointEnabled : false,
+  afsCompilationsSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  afsCompilationsSharePointLibrary : 'UatAFSCompilations',
+  afsCompilationsSharePointLinkColumn : '',
+  // AFS WorkingPapers → separate SharePoint library (URL segment "UatAFSWorkingPapers").
+  // Link column left blank = auto-detect from the library schema, falling back to AFSID.
+  afsWorkingPapersSharePointEnabled : false,
+  afsWorkingPapersSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  afsWorkingPapersSharePointLibrary : 'UatAFSWorkingPapers',
+  afsWorkingPapersSharePointLinkColumn : '',
   // AFS database — separate "AFS" PostgreSQL on Azure
   afsDbHost     : 'platinum-postgre-sql.postgres.database.azure.com',
   afsDbPort     : '5432',
@@ -306,7 +328,7 @@ const MODULES: ModuleDef[] = [
                      [disabled]="!cfg.assetsSharePointEnabled"
                      placeholder="UatAssets"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">Default library: <strong>UatAssets</strong></div>
+              <div class="field-hint">Default library: <strong>UatAssets</strong>. To use a folder inside a library, enter <strong>Library/Folder</strong> (e.g. <code>WCDM File Plan/Assets Management</code>). The library needs an <strong>AssetsID</strong> text column.</div>
             </div>
           </div>
 
@@ -601,6 +623,148 @@ const MODULES: ModuleDef[] = [
           <div class="actions" style="margin-top:0">
             <button class="btn-secondary" [disabled]="spTesting() || !cfg.afsAdministrationSharePointEnabled || !cfg.afsAdministrationSharePointSiteUrl"
                     (click)="testSharePointAfsAdministration()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Compilations SharePoint library (separate from working-paper, adjustment and administration docs) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Compilations SharePoint Configuration</span>
+          </div>
+
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.afsCompilationsSharePointEnabled"
+                    (click)="cfg.afsCompilationsSharePointEnabled = !cfg.afsCompilationsSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.afsCompilationsSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for compilation documents</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, AFS compilation documents are stored in the dedicated Compilations SharePoint library (with metadata) instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.afsCompilationsSharePointEnabled">
+              {{ cfg.afsCompilationsSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <div class="field-grid" [class.sp-disabled]="!cfg.afsCompilationsSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.afsCompilationsSharePointSiteUrl"
+                     [disabled]="!cfg.afsCompilationsSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.afsCompilationsSharePointLibrary"
+                     [disabled]="!cfg.afsCompilationsSharePointEnabled"
+                     placeholder="UatAFSCompilations"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatAFSCompilations</strong> (use the library's URL segment, e.g. the "UatAFSCompilations" in its address)</div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.afsCompilationsSharePointLinkColumn"
+                     [disabled]="!cfg.afsCompilationsSharePointEnabled"
+                     placeholder="AFSID"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Optional. The column that stores the entity id. Leave blank to auto-detect it (falls back to <strong>AFSID</strong>); otherwise use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.afsCompilationsSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — compilation documents use the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.afsCompilationsSharePointEnabled || !cfg.afsCompilationsSharePointSiteUrl"
+                    (click)="testSharePointAfsCompilations()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- WorkingPapers SharePoint library (separate from working-paper, adjustment and administration docs) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Working-Papers SharePoint Configuration</span>
+          </div>
+
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.afsWorkingPapersSharePointEnabled"
+                    (click)="cfg.afsWorkingPapersSharePointEnabled = !cfg.afsWorkingPapersSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.afsWorkingPapersSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for working-paper documents</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, AFS working-paper documents are stored in the dedicated WorkingPapers SharePoint library (with metadata) instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.afsWorkingPapersSharePointEnabled">
+              {{ cfg.afsWorkingPapersSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <div class="field-grid" [class.sp-disabled]="!cfg.afsWorkingPapersSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.afsWorkingPapersSharePointSiteUrl"
+                     [disabled]="!cfg.afsWorkingPapersSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.afsWorkingPapersSharePointLibrary"
+                     [disabled]="!cfg.afsWorkingPapersSharePointEnabled"
+                     placeholder="UatAFSWorkingPapers"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatAFSWorkingPapers</strong> (use the library's URL segment, e.g. the "UatAFSWorkingPapers" in its address)</div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.afsWorkingPapersSharePointLinkColumn"
+                     [disabled]="!cfg.afsWorkingPapersSharePointEnabled"
+                     placeholder="AFSID"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Optional. The column that stores the entity id. Leave blank to auto-detect it (falls back to <strong>AFSID</strong>); otherwise use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.afsWorkingPapersSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — working-paper documents use the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.afsWorkingPapersSharePointEnabled || !cfg.afsWorkingPapersSharePointSiteUrl"
+                    (click)="testSharePointAfsWorkingPapers()">
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
@@ -1112,6 +1276,34 @@ export class AdminSettingsComponent implements OnInit {
       this.spTesting.set(false);
       if (ok) {
         this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsAdministrationSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointAfsCompilations() {
+    this.spTesting.set(true);
+    const url = this.cfg.afsCompilationsSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsCompilationsSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointAfsWorkingPapers() {
+    this.spTesting.set(true);
+    const url = this.cfg.afsWorkingPapersSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsWorkingPapersSharePointLibrary}`, 'OK', { duration: 4000 });
       } else {
         this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
       }

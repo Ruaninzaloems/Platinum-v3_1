@@ -5,6 +5,11 @@ import { MsAuthService } from '@platinumv3/shared/auth';
 
 import { searchTerms, buildDocumentQuery, locationFromUrl, nameContainsAll } from './document-search';
 
+/** "A/B c/D" → "A/B%20c/D": URL-encode each segment, drop empty ones. */
+function encodeFolderPath(path: string): string {
+  return (path || '').split('/').map(p => p.trim()).filter(Boolean).map(encodeURIComponent).join('/');
+}
+
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 
 export interface GraphUser {
@@ -206,6 +211,51 @@ export class GraphService {
     const path = `${base}?$expand=listItem($expand=fields)`;
     const resp = await this.get<{ value: DriveItem[] }>(path);
     return resp.value;
+  }
+
+  /**
+   * List files/folders in a folder addressed by PATH within a drive (e.g. "Assets Management" or
+   * "Assets Management/2026"), with SharePoint metadata expanded. A missing folder returns [].
+   * An empty path lists the drive root.
+   */
+  async getChildrenByPath(driveId: string, folderPath: string): Promise<DriveItem[]> {
+    const clean = encodeFolderPath(folderPath);
+    if (!clean) return this.getChildren(driveId, 'root');
+    try {
+      const resp = await this.get<{ value: DriveItem[] }>(
+        `/drives/${driveId}/root:/${clean}:/children?$expand=listItem($expand=fields)`
+      );
+      return resp.value;
+    } catch (err: any) {
+      if (err?.status === 404) return [];
+      throw err;
+    }
+  }
+
+  /**
+   * Upload a file (≤4 MB) into a folder addressed by PATH within a drive. Graph creates any
+   * missing folders in the path automatically. An empty path uploads to the drive root.
+   */
+  async uploadFileToPath(driveId: string, folderPath: string, file: File): Promise<DriveItem> {
+    if (!driveId) throw new Error('Drive ID is not set — library may still be loading. Please wait and try again.');
+    const token   = await this.msAuth.getGraphToken();
+    const headers = new HttpHeaders({
+      Authorization : `Bearer ${token}`,
+      'Content-Type': file.type || 'application/octet-stream',
+    });
+    const clean = encodeFolderPath(folderPath);
+    const path = `/drives/${driveId}/root:/${clean ? clean + '/' : ''}${encodeURIComponent(file.name)}:/content`;
+    try {
+      return await firstValueFrom(this.http.put<DriveItem>(`${GRAPH}${path}`, file, { headers }));
+    } catch (err: any) {
+      const graphMsg = err?.error?.error?.message ?? err?.error?.message ?? null;
+      const status   = err?.status ?? '';
+      throw new Error(
+        graphMsg
+          ? `Graph API error ${status}: ${graphMsg}`
+          : `Upload failed (HTTP ${status}). Check that the app has Files.ReadWrite.All permission and admin consent has been granted.`
+      );
+    }
   }
 
   /** Get a single drive item (file or folder) by ID. */

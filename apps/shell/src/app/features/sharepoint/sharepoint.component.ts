@@ -109,11 +109,11 @@ const PINNED_SITES: PinnedSite[] = [
 
             <!-- All sites search -->
             <div class="panel-section-header">
-              <mat-icon>search</mat-icon> All Sites
+              <mat-icon>language</mat-icon> Find a site
             </div>
             <div class="search-box">
               <mat-icon>search</mat-icon>
-              <input type="text" placeholder="Find a site by name…"
+              <input type="text" placeholder="Site name…"
                      [(ngModel)]="siteQuery" (input)="searchSites()">
             </div>
 
@@ -133,6 +133,10 @@ const PINNED_SITES: PinnedSite[] = [
                 }
                 @if (sites().length === 0 && siteQuery) {
                   <li class="empty">No sites found</li>
+                  <li class="empty search-docs-link" (click)="searchDocsFromSiteBox()">
+                    <mat-icon>description</mat-icon>
+                    <span>Looking for a file? Search documents for “{{ siteQuery }}”</span>
+                  </li>
                 }
                 @if (sites().length === 0 && !siteQuery) {
                   <li class="empty">Type to search sites</li>
@@ -153,8 +157,11 @@ const PINNED_SITES: PinnedSite[] = [
                      (keydown.enter)="runDocSearch()">
               <select class="ds-scope" [ngModel]="docScope()" (ngModelChange)="onDocScopeChange($event)"
                       aria-label="Search scope">
+                @if (selectedSite() && selectedDrive()) {
+                  <option value="library">This library ({{ selectedDrive()?.name }})</option>
+                }
                 @if (selectedSite()) {
-                  <option value="site">This site ({{ selectedSite()?.displayName || selectedSite()?.name }})</option>
+                  <option value="site">This site — all libraries ({{ selectedSite()?.displayName || selectedSite()?.name }})</option>
                 }
                 <option value="all">All sites</option>
               </select>
@@ -173,7 +180,7 @@ const PINNED_SITES: PinnedSite[] = [
                 <div class="ds-summary">
                   {{ docResults().length }} result{{ docResults().length === 1 ? '' : 's' }}
                   for “{{ docQueryRan() }}” in
-                  {{ docScopeRan() === 'site' ? 'this site' : 'all sites' }}
+                  {{ docScopeRan() === 'library' ? 'this library' : docScopeRan() === 'site' ? 'this site' : 'all sites' }}
                   @if (docResults().length >= 50) { <span> (showing the first 50 — refine your search)</span> }
                 </div>
                 <div class="file-grid">
@@ -454,6 +461,9 @@ const PINNED_SITES: PinnedSite[] = [
       border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc;
       font-size: .8rem; padding: .3rem .4rem; color: #334155; max-width: 240px;
     }
+    .search-docs-link { color: #3f51b5; cursor: pointer; text-align: left; align-items: center; gap: .4rem; }
+    .search-docs-link:hover { background: #eef2ff; }
+    .search-docs-link mat-icon { font-size: 18px; width: 18px; height: 18px; flex-shrink: 0; }
     .ds-summary { font-size: .85rem; color: #475569; }
     .ds-hint { font-size: .8rem; max-width: 460px; text-align: center; margin: 0; }
     .file-loc { font-size: .72rem; color: #64748b; margin-top: .1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -488,11 +498,13 @@ export class SharepointComponent implements OnInit {
 
   // ── Document search (files across all libraries) ──────────────────────────
   docQuery      = signal('');
-  docScope      = signal<'site' | 'all'>('site');
+  docScope      = signal<'library' | 'site' | 'all'>('site');
   docSearching  = signal(false);
   docResults    = signal<DocumentHit[]>([]);
   docQueryRan   = signal('');
-  docScopeRan   = signal<'site' | 'all'>('site');
+  docScopeRan   = signal<'library' | 'site' | 'all'>('site');
+  /** The document library currently open in the picker (for the "This library" scope). */
+  selectedDrive = computed(() => this.drives().find(d => d.id === this.selectedDriveId()) ?? null);
   /** True while a (non-blank) document search is shown instead of the folder view. */
   docSearchActive = computed(() => this.docQuery().trim().length >= 2);
   private docTimer: ReturnType<typeof setTimeout> | null = null;
@@ -587,7 +599,13 @@ export class SharepointComponent implements OnInit {
     this.docTimer = setTimeout(() => this.runDocSearch(), 450); // debounce while typing
   }
 
-  onDocScopeChange(scope: 'site' | 'all'): void {
+  /** From the site finder's empty state: run the same text as a DOCUMENT search instead. */
+  searchDocsFromSiteBox(): void {
+    this.onDocQueryChange(this.siteQuery);
+    this.runDocSearch();
+  }
+
+  onDocScopeChange(scope: 'library' | 'site' | 'all'): void {
     this.docScope.set(scope);
     if (this.docSearchActive()) this.runDocSearch();
   }
@@ -596,14 +614,17 @@ export class SharepointComponent implements OnInit {
     if (this.docTimer) { clearTimeout(this.docTimer); this.docTimer = null; }
     const q = this.docQuery().trim();
     if (q.length < 2) return;
-    // "This site" only makes sense once a site is selected; otherwise search everything.
-    const scope: 'site' | 'all' = this.docScope() === 'site' && this.selectedSite() ? 'site' : 'all';
+    // Narrow scopes only make sense once a site/library is selected; otherwise search everything.
+    let scope: 'library' | 'site' | 'all' = this.docScope();
+    if (scope === 'library' && !this.selectedDrive()) scope = this.selectedSite() ? 'site' : 'all';
+    if (scope === 'site' && !this.selectedSite()) scope = 'all';
+    const scopeUrl = scope === 'library' ? this.selectedDrive()!.webUrl
+                   : scope === 'site' ? this.selectedSite()!.webUrl
+                   : null;
     const seq = ++this.docSeq; // ignore out-of-order responses from earlier keystrokes
     this.docSearching.set(true);
     try {
-      const hits = await this.graph.searchDocuments(
-        q, scope === 'site' ? this.selectedSite()!.webUrl : null
-      );
+      const hits = await this.graph.searchDocuments(q, scopeUrl);
       if (seq !== this.docSeq) return;
       this.docResults.set(hits);
       this.docQueryRan.set(q);
