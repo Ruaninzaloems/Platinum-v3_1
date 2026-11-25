@@ -190,10 +190,21 @@ export class GraphService {
     return this.get<SharePointSite>(`/sites/${hostname}:${sitePath}`);
   }
 
-  /** List document libraries (drives) for a site. */
+  /**
+   * List document libraries (drives) for a site.
+   * Follows @odata.nextLink — sites with many libraries are paged, and libraries created
+   * most recently land on later pages, so reading only the first page misses them.
+   */
   async getDrives(siteId: string): Promise<Drive[]> {
-    const resp = await this.get<{ value: Drive[] }>(`/sites/${siteId}/drives`);
-    return resp.value;
+    const all: Drive[] = [];
+    let path: string | null = `/sites/${siteId}/drives`;
+    while (path) {
+      const resp: { value: Drive[]; '@odata.nextLink'?: string } = await this.get(path);
+      all.push(...(resp.value || []));
+      const next = resp['@odata.nextLink'];
+      path = next ? next.replace(GRAPH, '') : null;
+    }
+    return all;
   }
 
   // ── Files & Folders ────────────────────────────────────────────────────────

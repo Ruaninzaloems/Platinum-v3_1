@@ -197,103 +197,103 @@ const DEFAULTS: ModuleApiConfig = {
   idpSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpSharePointLibrary : 'UatIDP',
   // IDP Institutional Capacity Assessment → separate SharePoint library
-  idpInstitutionalSharePointEnabled : false,
+  idpInstitutionalSharePointEnabled : true,
   idpInstitutionalSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpInstitutionalSharePointLibrary : 'UatIDPInstitutional capacity assessment completed',
   idpInstitutionalSharePointLinkColumn : 'institutionalid',
   // IDP Situational Analysis Report → separate SharePoint library
-  idpSituationalSharePointEnabled : false,
+  idpSituationalSharePointEnabled : true,
   idpSituationalSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpSituationalSharePointLibrary : 'UatIDPSituational analysis report finalised',
   idpSituationalSharePointLinkColumn : 'Situationalid',
   // IDP Spatial Analysis and Development → separate SharePoint library
-  idpSpatialSharePointEnabled : false,
+  idpSpatialSharePointEnabled : true,
   idpSpatialSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpSpatialSharePointLibrary : 'UatIDPSpatial analysis and development profile finalised',
   idpSpatialSharePointLinkColumn : 'spartialid',
   // IDP SWOT Analysis → separate SharePoint library
-  idpSwotSharePointEnabled : false,
+  idpSwotSharePointEnabled : true,
   idpSwotSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpSwotSharePointLibrary : 'UatIDPSWOT analysis completed',
   idpSwotSharePointLinkColumn : 'swotid',
   // IDP Priority Issues → separate SharePoint library
-  idpPrioritySharePointEnabled : false,
+  idpPrioritySharePointEnabled : true,
   idpPrioritySharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpPrioritySharePointLibrary : 'UatIDPPriority issues identified and documented',
   idpPrioritySharePointLinkColumn : 'priorityid',
-  idpStrategicSharePointEnabled : false,
+  idpStrategicSharePointEnabled : true,
   idpStrategicSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpStrategicSharePointLibrary : 'UatIDPStrategic objectives approved by Council',
   idpStrategicSharePointLinkColumn : 'Strategicid',
-  idpVisionSharePointEnabled : false,
+  idpVisionSharePointEnabled : true,
   idpVisionSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpVisionSharePointLibrary : 'UatIDPVision and mission reviewed and confirmed',
   idpVisionSharePointLinkColumn : 'visionid',
-  idpKpiSharePointEnabled : false,
+  idpKpiSharePointEnabled : true,
   idpKpiSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpKpiSharePointLibrary : 'UatIDPKPI framework aligned with PGDS targets',
   idpKpiSharePointLinkColumn : 'kpiid',
-  idpDevelopmentSharePointEnabled : false,
+  idpDevelopmentSharePointEnabled : true,
   idpDevelopmentSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpDevelopmentSharePointLibrary : 'UatIDPDevelopment strategies aligned with NDP/PGDS',
   idpDevelopmentSharePointLinkColumn : 'developmentid',
-  idpSdfSharePointEnabled : false,
+  idpSdfSharePointEnabled : true,
   idpSdfSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpSdfSharePointLibrary : 'UatIDPSpatial Development Framework alignment verified',
   idpSdfSharePointLinkColumn : 'spartialdevid',
-  idpCapitalSharePointEnabled : false,
+  idpCapitalSharePointEnabled : true,
   idpCapitalSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpCapitalSharePointLibrary : 'UatIDPCapital projects identified and costed',
   idpCapitalSharePointLinkColumn : 'capitalid',
-  idpOperationalSharePointEnabled : false,
+  idpOperationalSharePointEnabled : true,
   idpOperationalSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpOperationalSharePointLibrary : 'UatIDPOperational plans drafted per department',
   idpOperationalSharePointLinkColumn : 'operationalid',
-  idpMscoaSharePointEnabled : false,
+  idpMscoaSharePointEnabled : true,
   idpMscoaSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpMscoaSharePointLibrary : 'UatIDPMSCOA alignment verification',
   idpMscoaSharePointLinkColumn : 'mscoaid',
-  idpProjectPrioritisationSharePointEnabled : false,
+  idpProjectPrioritisationSharePointEnabled : true,
   idpProjectPrioritisationSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpProjectPrioritisationSharePointLibrary : 'UatIDPProject prioritisation scoring completed',
   idpProjectPrioritisationSharePointLinkColumn : 'projectid',
-  idpFinancialSharePointEnabled : false,
+  idpFinancialSharePointEnabled : true,
   idpFinancialSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpFinancialSharePointLibrary : 'UatIDPFinancial plan and MTREF aligned with IDP',
   idpFinancialSharePointLinkColumn : 'financialid',
-  idpDocumentSharePointEnabled : false,
+  idpDocumentSharePointEnabled : true,
   idpDocumentSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpDocumentSharePointLibrary : 'UatIDPIDP document compiled and reviewed internally',
   idpDocumentSharePointLinkColumn : 'idpid',
-  idpSectorSharePointEnabled : false,
+  idpSectorSharePointEnabled : true,
   idpSectorSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpSectorSharePointLibrary : 'UatIDPSector plan integration review',
   idpSectorSharePointLinkColumn : 'sectorid',
-  idpBudgetAlignmentSharePointEnabled : false,
+  idpBudgetAlignmentSharePointEnabled : true,
   idpBudgetAlignmentSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpBudgetAlignmentSharePointLibrary : 'UatIDPBudget-IDP alignment confirmed by CFO',
   idpBudgetAlignmentSharePointLinkColumn : 'budgetid',
-  idpPublicCommentSharePointEnabled : false,
+  idpPublicCommentSharePointEnabled : true,
   idpPublicCommentSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpPublicCommentSharePointLibrary : 'UatIDPIDP advertised for public comment (21 days)',
   idpPublicCommentSharePointLinkColumn : 'idpadvid',
-  idpMecSharePointEnabled : false,
+  idpMecSharePointEnabled : true,
   idpMecSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpMecSharePointLibrary : 'UatIDPMEC assessment response addressed',
   idpMecSharePointLinkColumn : 'mecid',
-  idpFinalSubmissionSharePointEnabled : false,
+  idpFinalSubmissionSharePointEnabled : true,
   idpFinalSubmissionSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpFinalSubmissionSharePointLibrary : 'UatIDPFinal IDP submitted to MEC',
   idpFinalSubmissionSharePointLinkColumn : 'finalid',
-  idpPublicCommentPeriodSharePointEnabled : false,
+  idpPublicCommentPeriodSharePointEnabled : true,
   idpPublicCommentPeriodSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpPublicCommentPeriodSharePointLibrary : 'UatIDPPublic comment period completed',
   idpPublicCommentPeriodSharePointLinkColumn : 'publicid',
-  idpCouncilAdoptionSharePointEnabled : false,
+  idpCouncilAdoptionSharePointEnabled : true,
   idpCouncilAdoptionSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpCouncilAdoptionSharePointLibrary : 'UatIDPCouncil adoption resolution',
   idpCouncilAdoptionSharePointLinkColumn : 'councilid',
-  idpCommunityNeedsSharePointEnabled : false,
+  idpCommunityNeedsSharePointEnabled : true,
   idpCommunityNeedsSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   idpCommunityNeedsSharePointLibrary : 'UatIDPCommunity needs assessment completed',
   idpCommunityNeedsSharePointLinkColumn : 'communityid',
@@ -331,7 +331,29 @@ const DEFAULTS: ModuleApiConfig = {
   payrollDbSslMode  : 'Require',
 };
 
+/**
+ * One-time switch-on of the IDP milestone SharePoint panels. They shipped turned off and the
+ * Admin save stores every field, so browsers that saved before keep "off" unless flipped here.
+ * Keep the flag name in sync with IdpSharePointService.
+ */
+const IDP_SP_ACTIVATED_FLAG = 'idpMilestoneSharePointActivatedV1';
+export function activateIdpMilestoneSharePoint(): void {
+  try {
+    if (localStorage.getItem(IDP_SP_ACTIVATED_FLAG)) return;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const cfg = JSON.parse(raw);
+      for (const key of Object.keys(DEFAULTS)) {
+        if (/^idp[A-Z]\w*SharePointEnabled$/.test(key)) cfg[key] = true;
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+    }
+    localStorage.setItem(IDP_SP_ACTIVATED_FLAG, '1');
+  } catch {}
+}
+
 export function loadModuleConfig(): ModuleApiConfig {
+  activateIdpMilestoneSharePoint();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
