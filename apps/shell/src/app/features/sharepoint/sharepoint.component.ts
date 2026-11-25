@@ -304,6 +304,23 @@ interface EditColumn {
                 <button mat-raised-button color="primary" (click)="fileInput.click()">
                   <mat-icon>upload</mat-icon> Upload
                 </button>
+                <span class="sort-group">
+                  <span class="sort-label">Order by</span>
+                  <button class="sort-btn" [class.on]="sortField() === 'name'" (click)="setSortField('name')"
+                          matTooltip="Sort by name (click again to reverse)">
+                    Name
+                    @if (sortField() === 'name') {
+                      <mat-icon>{{ sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+                    }
+                  </button>
+                  <button class="sort-btn" [class.on]="sortField() === 'modified'" (click)="setSortField('modified')"
+                          matTooltip="Sort by modified date (click again to reverse)">
+                    Modified
+                    @if (sortField() === 'modified') {
+                      <mat-icon>{{ sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+                    }
+                  </button>
+                </span>
               </div>
             }
 
@@ -499,6 +516,16 @@ interface EditColumn {
     .file-name { font-size: .9rem; font-weight: 600; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .file-info { font-size: .75rem; color: #94a3b8; margin-top: .15rem; }
     .file-actions { display: flex; gap: .25rem; }
+    .sort-group { margin-left: auto; display: inline-flex; align-items: center; gap: .35rem; }
+    .sort-label { font-size: .8rem; color: #64748b; margin-right: .15rem; }
+    .sort-btn {
+      display: inline-flex; align-items: center; gap: .15rem;
+      padding: .3rem .75rem; border: 1px solid #cbd5e1; border-radius: 999px;
+      background: #fff; color: #475569; font-size: .8rem; cursor: pointer;
+    }
+    .sort-btn mat-icon { font-size: 15px; width: 15px; height: 15px; }
+    .sort-btn:hover { background: #eef2ff; border-color: #3f51b5; color: #3f51b5; }
+    .sort-btn.on { background: #e0e7ff; border-color: #3f51b5; color: #3f51b5; font-weight: 600; }
     .pin-lib {
       display: inline-flex; align-items: center; gap: .25rem; margin-left: .5rem;
       padding: .25rem .65rem; border: 1px solid #cbd5e1; border-radius: 999px;
@@ -605,10 +632,37 @@ export class SharepointComponent implements OnInit {
   filesLoading = signal(false);
   breadcrumbs  = signal<BreadcrumbItem[]>([]);
 
-  sortedItems = computed(() => [
-    ...this.items().filter(i =>  i.folder),
-    ...this.items().filter(i => !i.folder),
-  ]);
+  // Sort order for the file list (folders always stay above files).
+  sortField = signal<'name' | 'modified'>('name');
+  sortDir   = signal<'asc' | 'desc'>('asc');
+
+  sortedItems = computed(() => {
+    const field = this.sortField();
+    const dir = this.sortDir() === 'asc' ? 1 : -1;
+    const cmp = (a: DriveItem, b: DriveItem): number => {
+      if (field === 'modified') {
+        const d = (Date.parse(a.lastModifiedDateTime) || 0) - (Date.parse(b.lastModifiedDateTime) || 0);
+        if (d !== 0) return d * dir;
+      }
+      // Natural, case-insensitive name order ("2 Reports" before "10 Reports")
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }) * (field === 'name' ? dir : 1);
+    };
+    return [
+      ...this.items().filter(i =>  i.folder).sort(cmp),
+      ...this.items().filter(i => !i.folder).sort(cmp),
+    ];
+  });
+
+  setSortField(field: 'name' | 'modified'): void {
+    if (this.sortField() === field) { this.toggleSortDir(); return; }
+    this.sortField.set(field);
+    // Names read best A→Z, dates newest first.
+    this.sortDir.set(field === 'name' ? 'asc' : 'desc');
+  }
+
+  toggleSortDir(): void {
+    this.sortDir.update(d => (d === 'asc' ? 'desc' : 'asc'));
+  }
 
   // ─────────────────────────────────────────────────────────────────────────
 
