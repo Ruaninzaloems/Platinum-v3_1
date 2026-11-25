@@ -1,8 +1,10 @@
 import { Component, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
+import { firstValueFrom } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { CycleStateService } from '../../core/services/cycle-state.service';
+import { IdpSharePointService } from '../../core/services/idp-sharepoint.service';
 import { IdpProcessPhase, IdpMilestone } from '../../core/models/idp.models';
 import { environment } from '../../environment';
 
@@ -110,6 +112,12 @@ import { environment } from '../../environment';
                     <div class="evidence-attached-row">
                       <span class="material-icon" style="font-size:16px; color:#2e7d32;">check_circle</span>
                       <span class="evidence-filename">{{ getEvidenceFilename(m.evidenceUrl) }}</span>
+                      <span *ngIf="isSharePointUrl(m.evidenceUrl)" class="sharepoint-badge"
+                            [attr.title]="'Stored in SharePoint: ' + getSharePointLibraryName(m.evidenceUrl)">SharePoint</span>
+                      <a *ngIf="isSharePointUrl(m.evidenceUrl)" class="evidence-action-btn view-btn" [href]="getSharePointLibraryUrl(m.evidenceUrl)" target="_blank"
+                         [attr.title]="'Open the ' + getSharePointLibraryName(m.evidenceUrl) + ' library'" [attr.data-testid]="'link-open-library-' + m.id">
+                        <span class="material-icon" style="font-size:14px;">folder_open</span> Library
+                      </a>
                       <a class="evidence-action-btn view-btn" [href]="getEvidenceViewUrl(m.evidenceUrl)" target="_blank" [attr.data-testid]="'link-view-evidence-' + m.id">
                         <span class="material-icon" style="font-size:14px;">visibility</span> View
                       </a>
@@ -118,15 +126,26 @@ import { environment } from '../../environment';
                       </a>
                       <label class="evidence-action-btn replace-btn" [attr.data-testid]="'button-reupload-' + m.id">
                         <span class="material-icon" style="font-size:14px;">cloud_upload</span> Replace
-                        <input type="file" (change)="onUploadEvidence(m, $event)" style="display:none;" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" />
+                        <input type="file" (change)="isSharePointUrl(m.evidenceUrl) || isSharePointEnabled(m) ? onUploadEvidenceToSharePoint(m, $event) : onUploadEvidence(m, $event)" style="display:none;" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" />
                       </label>
                     </div>
                   </div>
                   <div class="milestone-evidence" *ngIf="!m.evidenceUrl">
-                    <label class="upload-evidence-btn" [attr.data-testid]="'button-upload-' + m.id">
+                    <!-- Local upload is hidden while the milestone's SharePoint panel is enabled. -->
+                    <label *ngIf="!isSharePointEnabled(m)" class="upload-evidence-btn" [attr.data-testid]="'button-upload-' + m.id">
                       <span class="material-icon" style="font-size:16px;">cloud_upload</span>
-                      {{ uploadingMilestoneId === m.id ? 'Uploading...' : 'Upload evidence' }}
+                      {{ uploadingMilestoneId === m.id && uploadingTarget === 'local' ? 'Uploading...' : 'Upload evidence' }}
                       <input type="file" (change)="onUploadEvidence(m, $event)" style="display:none;" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" />
+                    </label>
+                    <label *ngIf="hasSharePointLibrary(m)" class="upload-evidence-btn sharepoint-upload-btn"
+                           [class.disabled]="!isSharePointEnabled(m)"
+                           [class.solo]="isSharePointEnabled(m)"
+                           [attr.title]="sharePointUploadTitle(m)"
+                           (click)="onSharePointUploadClick(m, $event)"
+                           [attr.data-testid]="'button-upload-sharepoint-' + m.id">
+                      <span class="material-icon" style="font-size:16px;">cloud_upload</span>
+                      {{ uploadingMilestoneId === m.id && uploadingTarget === 'sharepoint' ? 'Uploading...' : (isSharePointEnabled(m) ? 'Upload evidence' : 'SharePoint upload') }}
+                      <input type="file" (change)="onUploadEvidenceToSharePoint(m, $event)" style="display:none;" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" />
                     </label>
                     <span *ngIf="m.isMandatory" class="no-evidence"><span class="material-icon" style="font-size:14px;">warning</span> Required</span>
                   </div>
@@ -214,6 +233,11 @@ import { environment } from '../../environment';
     .replace-btn:hover { background: #ffe0b2; }
     .upload-evidence-btn { display: inline-flex; align-items: center; gap: 4px; color: var(--platinum-primary); cursor: pointer; font-size: 12px; padding: 6px 14px; border: 1px dashed var(--platinum-primary); border-radius: 6px; transition: all .15s; }
     .upload-evidence-btn:hover { background: rgba(0,90,150,.06); }
+    .sharepoint-upload-btn { margin-left: 8px; }
+    .sharepoint-upload-btn.solo { margin-left: 0; }
+    .sharepoint-badge { font-size: 10px; font-weight: 600; color: #036c70; background: #e0f2f1; border: 1px solid #80cbc4; border-radius: 10px; padding: 1px 7px; white-space: nowrap; }
+    .sharepoint-upload-btn.disabled { opacity: .5; cursor: not-allowed; }
+    .sharepoint-upload-btn.disabled:hover { background: none; }
     .no-evidence { color: #ef6c00; display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; font-size: 12px; }
     .milestone-actions { display: flex; align-items: center; gap: 6px; }
     .milestone-actions select { font-size: 11px; padding: 3px 6px; }
@@ -231,10 +255,11 @@ export class ProcessPlanComponent implements OnInit {
   showMilestoneForm = signal(false);
   editingMilestoneId: number | null = null;
   uploadingMilestoneId: number | null = null;
+  uploadingTarget: 'local' | 'sharepoint' | null = null;
   mf: any = { title: '', assignedTo: '', dueDate: '', isMandatory: false };
   private _progressCheck = signal<any>(null);
 
-  constructor(private api: ApiService, private cycleState: CycleStateService) {}
+  constructor(private api: ApiService, private cycleState: CycleStateService, private sharePoint: IdpSharePointService) {}
 
   ngOnInit() {
     this.cycleState.ensureActiveCycle().then(c => { if (c) this.load(c.id); });
@@ -289,16 +314,63 @@ export class ProcessPlanComponent implements OnInit {
     const file = input.files?.[0];
     if (!file) return;
     this.uploadingMilestoneId = m.id;
+    this.uploadingTarget = 'local';
+    input.value = '';
+
     this.api.uploadMilestoneEvidence(m.id, file).subscribe({
       next: () => {
         this.uploadingMilestoneId = null;
+        this.uploadingTarget = null;
         this.load(this.cycleState.activeCycleId());
       },
       error: (err: any) => {
         this.uploadingMilestoneId = null;
+        this.uploadingTarget = null;
         alert(typeof err.error === 'string' ? err.error : 'Upload failed');
       }
     });
+  }
+
+  /** The milestone has a SharePoint panel in Admin → IDP (shown whether or not it is enabled). */
+  hasSharePointLibrary(m: IdpMilestone): boolean {
+    return !!this.sharePoint.configFor(m.title);
+  }
+
+  isSharePointEnabled(m: IdpMilestone): boolean {
+    return this.sharePoint.isEnabledFor(m.title);
+  }
+
+  sharePointUploadTitle(m: IdpMilestone): string {
+    return this.isSharePointEnabled(m)
+      ? "Upload to this milestone's SharePoint library"
+      : 'SharePoint is turned off for this milestone. Enable it in Admin → IDP.';
+  }
+
+  /** Stops the file picker opening when the milestone's SharePoint panel is turned off. */
+  onSharePointUploadClick(m: IdpMilestone, event: MouseEvent) {
+    if (this.uploadingMilestoneId !== null || !this.isSharePointEnabled(m)) event.preventDefault();
+  }
+
+  /** Same flow as "Upload evidence", but the file goes to the milestone's SharePoint library. */
+  async onUploadEvidenceToSharePoint(m: IdpMilestone, event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    this.uploadingMilestoneId = m.id;
+    this.uploadingTarget = 'sharepoint';
+    try {
+      const { webUrl } = await this.sharePoint.uploadEvidence(m.title, m.id, file);
+      // Record the SharePoint link on the milestone (PUT keeps the other fields as sent).
+      await firstValueFrom(this.api.updateMilestone(m.id, { ...m, evidenceUrl: webUrl }));
+      this.load(this.cycleState.activeCycleId());
+    } catch (err: any) {
+      console.error('[IDP] SharePoint evidence upload failed:', err);
+      alert(`SharePoint upload failed: ${err?.message ?? err}`);
+    } finally {
+      this.uploadingMilestoneId = null;
+      this.uploadingTarget = null;
+    }
   }
 
   getEvidenceViewUrl(url: string): string {
@@ -309,16 +381,35 @@ export class ProcessPlanComponent implements OnInit {
     return `${environment.apiPrefix}/api/milestones/evidence-file?path=${encodeURIComponent(url)}`;
   }
 
+  isSharePointUrl(url: string | undefined): boolean {
+    if (!url) return false;
+    try { return new URL(url).hostname.toLowerCase().endsWith('.sharepoint.com'); } catch { return false; }
+  }
+
+  /** The library folder that holds a SharePoint evidence file (the file URL minus its name). */
+  getSharePointLibraryUrl(url: string): string {
+    const clean = url.split('?')[0];
+    return clean.substring(0, clean.lastIndexOf('/'));
+  }
+
+  getSharePointLibraryName(url: string): string {
+    const lib = this.getSharePointLibraryUrl(url);
+    const seg = lib.substring(lib.lastIndexOf('/') + 1);
+    try { return decodeURIComponent(seg); } catch { return seg; }
+  }
+
   getEvidenceDownloadUrl(url: string): string {
     if (!url) return '';
+    if (this.isSharePointUrl(url)) return `${url.split('?')[0]}?download=1`;
     if (url.startsWith('http')) return url;
     return `${environment.apiPrefix}/api/milestones/evidence-file?path=${encodeURIComponent(url)}&download=true`;
   }
 
   getEvidenceFilename(url: string): string {
     if (!url) return '';
-    const parts = url.split('/');
-    return parts[parts.length - 1] || 'evidence';
+    const parts = url.split('?')[0].split('/');
+    const last = parts[parts.length - 1] || 'evidence';
+    try { return decodeURIComponent(last); } catch { return last; }
   }
 
   saveMilestone() {
