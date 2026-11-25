@@ -15,6 +15,7 @@ import { registerCommunicationsRoutes } from "./communications.routes";
 import { registerAnalyticsRoutes } from "./analytics.routes";
 import { registerModulesRoutes } from "./modules.routes";
 import { registerSecurityRoutes } from "./security.routes";
+import { registerPlatformSettingsRoutes } from "./platform-settings.routes";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -35,6 +36,7 @@ export async function registerRoutes(
   registerAnalyticsRoutes(app, httpServer);
   registerModulesRoutes(app, httpServer);
   registerSecurityRoutes(app, httpServer);
+  registerPlatformSettingsRoutes(app, httpServer);
 
   return httpServer;
 }

@@ -5,6 +5,7 @@ import { ActivatedRoute } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { SharePointConfigService } from '@platinumv3/assets';
+import { ModuleConfigSyncService } from './module-config-sync.service';
 
 const STORAGE_KEY = 'platinum_module_config';
 
@@ -3148,6 +3149,7 @@ export class AdminSettingsComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private snack = inject(MatSnackBar);
   private spConfig = inject(SharePointConfigService);
+  private sync = inject(ModuleConfigSyncService);
 
   cfg: ModuleApiConfig = loadModuleConfig();
   dirty = signal(false);
@@ -3158,6 +3160,8 @@ export class AdminSettingsComponent implements OnInit {
   activeMod = computed(() => MODULES.find(m => m.key === this.activeKey()) ?? MODULES[0]);
 
   ngOnInit() {
+    // Show the SharePoint settings saved on the server (shared by all users), not just this browser's.
+    this.sync.pull().then(ok => { if (ok && !this.dirty()) this.cfg = loadModuleConfig(); });
     this.route.params.subscribe(p => {
       const mod = p['module'];
       if (mod && MODULES.find(m => m.key === mod)) {
@@ -3180,6 +3184,12 @@ export class AdminSettingsComponent implements OnInit {
         ? 'Saved. SharePoint config applied. Restart the dev server to apply API proxy changes.'
         : 'Saved. Restart the dev server to apply proxy changes.';
       this.snack.open(note, 'OK', { duration: 4000 });
+      // Share the SharePoint settings with every user (server-side); the rest stays in this browser.
+      this.sync.push(this.cfg as unknown as Record<string, unknown>).then(ok => {
+        if (!ok) {
+          this.snack.open('Saved in this browser only - could not reach the server, so other users will not see this change yet.', 'Close', { duration: 8000 });
+        }
+      });
     } catch {
       this.snack.open('Failed to save.', 'Close', { duration: 3000 });
     }

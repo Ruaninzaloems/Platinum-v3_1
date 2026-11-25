@@ -10,6 +10,7 @@ import { AuthService } from '@platinumv3/shared/auth';
 import { DatabaseToggleService, OrgSettingsService } from '@platinumv3/assets';
 import { UserContextService, type MeDto } from '@platinumv3/overtime';
 import { PinnedLibrariesService, type PinnedLibrary } from '../features/sharepoint/pinned-libraries.service';
+import { ModuleConfigSyncService } from '../features/admin/module-config-sync.service';
 import { filter, Subscription } from 'rxjs';
 
 interface NavItem {
@@ -665,9 +666,12 @@ export class ShellComponent implements OnInit, OnDestroy {
     public orgSettings: OrgSettingsService,
     private injector: Injector,
     public pinnedLibs: PinnedLibrariesService,
+    private moduleConfigSync: ModuleConfigSyncService,
   ) {}
 
   ngOnInit() {
+    // Apply the SharePoint settings saved on the server (retries while sign-in finishes).
+    this.moduleConfigSync.pullWithRetry();
     this.syncModuleFromUrl(this.router.url);
     this.routeSub = this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))

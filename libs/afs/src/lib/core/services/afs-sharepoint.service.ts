@@ -81,6 +81,13 @@ const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
 
 @Injectable({ providedIn: 'root' })
 export class AfsSharePointService {
+  constructor() {
+    // Server-side SharePoint settings were merged into the local module config: re-read them.
+    if (typeof window !== 'undefined') {
+      window.addEventListener('platinum-module-config-changed', () => this.refresh());
+    }
+  }
+
   private graph = inject(GraphService);
 
   /** Working-paper / general AFS library config. */

@@ -46,6 +46,13 @@ const DEFAULT_CONFIG: AssetsSharePointConfig = {
 
 @Injectable({ providedIn: 'root' })
 export class SharePointConfigService {
+  constructor() {
+    // Server-side SharePoint settings were merged into the local module config: re-read them.
+    if (typeof window !== 'undefined') {
+      window.addEventListener('platinum-module-config-changed', () => this.refresh());
+    }
+  }
+
   private graph = inject(GraphService);
 
   /** Reactive snapshot of the current SharePoint config. */

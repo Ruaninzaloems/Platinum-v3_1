@@ -172,7 +172,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     const userName = auth.user()?.userName;
     if (userName) headers['x-user'] = userName;
   }
-  if (isGlobalJwtTarget(req.url)) {
+  // POS-API's server-side platform settings (SharePoint config) verify the global JWT; the
+  // session cookie (withCredentials, below) is the fallback when the JWT is not available yet.
+  if (isGlobalJwtTarget(req.url) || req.url.startsWith('/pos-app/api/platform-settings')) {
     const token = auth.getGlobalToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
