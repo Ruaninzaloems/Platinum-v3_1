@@ -5,6 +5,7 @@
       <p class="page-subtitle">Manage asset class definitions ({{totalItems()}} total)</p>
     </div>
     <div class="header-actions">
+      <button mat-stroked-button (click)="exportToExcel()"><mat-icon>download</mat-icon> Export to Excel</button>
       <button mat-stroked-button (click)="openImport()"><mat-icon>upload_file</mat-icon> Import from Excel</button>
       <button mat-flat-button class="btn-primary" (click)="openAdd()"><mat-icon>add</mat-icon> Add Class</button>
     </div>
@@ -19,8 +20,8 @@
       <label>Asset Type</label>
       <select class="form-input" (change)="onFilterTypeChange($any($event.target).value)">
         <option value="">All Types</option>
-        @for (t of assetTypes(); track t.assetType_ID) {
-          <option [value]="t.assetType_ID">{{t.assetTypeDesc}}</option>
+        @for (t of assetTypes(); track t.assetTypeId) {
+          <option [value]="t.assetTypeId">{{t.assetTypeDesc}}</option>
         }
       </select>
     </div>
@@ -28,8 +29,8 @@
       <label>Category</label>
       <select class="form-input" (change)="onFilterCategoryChange($any($event.target).value)" [disabled]="!filterTypeId()">
         <option value="">All Categories</option>
-        @for (c of filterCategories(); track c.assetCategoryID) {
-          <option [value]="c.assetCategoryID">{{c.assetCategoryDesc}}</option>
+        @for (c of filterCategories(); track c.assetCategoryId) {
+          <option [value]="c.assetCategoryId">{{c.assetCategoryDesc}}</option>
         }
       </select>
     </div>
@@ -38,77 +39,130 @@
   @if (showForm()) {
     <div class="form-card">
       <h3 class="form-title">{{editingId() ? 'Edit' : 'Add'}} Asset Class</h3>
+
+      @if (isDefaultRecord()) {
+        <div class="default-notice">
+          <mat-icon>lock</mat-icon>
+          <span>This is a default system record and cannot be edited.</span>
+        </div>
+      }
+
       <div class="form-row">
         <div class="form-field">
           <label>Asset Class *</label>
-          <input type="text" class="form-input" [(ngModel)]="formData.assetClassDesc" placeholder="Enter class description">
+          <input type="text" class="form-input" [(ngModel)]="formData.assetClassDesc"
+            placeholder="Enter class description" [disabled]="isDefaultRecord()">
         </div>
         <div class="form-field">
-          <label>Useful Life (Months) *</label>
-          <input type="number" class="form-input" [(ngModel)]="formData.usefulLifeInMonths" placeholder="e.g. 360">
+          <label>Useful Life (Months) {{!ignoreUsefulLife() ? '*' : ''}}</label>
+          <input type="number" class="form-input" [(ngModel)]="formData.usefulLifeInMonths"
+            placeholder="e.g. 360" [disabled]="ignoreUsefulLife() || isDefaultRecord()">
         </div>
       </div>
       <div class="form-row">
         <div class="form-field">
           <label>Asset Type *</label>
-          <select class="form-input" [ngModel]="formData.typeID" (ngModelChange)="onFormTypeChange($event)">
+          <select class="form-input" [ngModel]="formData.typeID"
+            (ngModelChange)="onFormTypeChange($event)" [disabled]="isDefaultRecord()">
             <option [ngValue]="null" disabled>Select type</option>
-            @for (t of assetTypes(); track t.assetType_ID) {
-              <option [ngValue]="t.assetType_ID">{{t.assetTypeDesc}}</option>
+            @for (t of assetTypes(); track t.assetTypeId) {
+              <option [ngValue]="t.assetTypeId">{{t.assetTypeDesc}}</option>
             }
           </select>
         </div>
         <div class="form-field">
-          <label>Category *</label>
-          <select class="form-input" [ngModel]="formData.assetCategoryID" (ngModelChange)="onFormCategoryChange($event)" [disabled]="!formData.typeID">
+          <label>Category {{categoryEnabled() ? '*' : ''}}</label>
+          <select class="form-input" [ngModel]="formData.assetCategoryID"
+            (ngModelChange)="onFormCategoryChange($event)"
+            [disabled]="!formData.typeID || !categoryEnabled() || isDefaultRecord()">
             <option [ngValue]="null" disabled>Select category</option>
-            @for (c of formCategories(); track c.assetCategoryID) {
-              <option [ngValue]="c.assetCategoryID">{{c.assetCategoryDesc}}</option>
+            @for (c of formCategories(); track c.assetCategoryId) {
+              <option [ngValue]="c.assetCategoryId">{{c.assetCategoryDesc}}</option>
             }
           </select>
         </div>
         <div class="form-field">
-          <label>Sub Category *</label>
-          <select class="form-input" [(ngModel)]="formData.asset_SubCategory_ID" [disabled]="!formData.assetCategoryID">
+          <label>Sub Category {{subCatEnabled() ? '*' : ''}}</label>
+          <select class="form-input" [(ngModel)]="formData.asset_SubCategory_ID"
+            [disabled]="!subCatEnabled() || isDefaultRecord()">
             <option [ngValue]="null" disabled>Select sub category</option>
-            @for (sc of formSubCategories(); track sc.asset_SubCategory_ID) {
-              <option [ngValue]="sc.asset_SubCategory_ID">{{sc.asset_SubCategoryDescription}}</option>
+            @for (sc of formSubCategories(); track sc.assetSubCategoryId) {
+              <option [ngValue]="sc.assetSubCategoryId">{{sc.assetSubCategoryDesc}}</option>
             }
           </select>
         </div>
       </div>
       <div class="form-row">
         <div class="form-field">
-          <label>Measurement Type</label>
-          <select class="form-input" [(ngModel)]="formData.assetMeasurement_ID">
+          <label>Measurement Type {{measurementEnabled() ? '*' : ''}}</label>
+          <select class="form-input" [ngModel]="formData.assetMeasurement_ID"
+            (ngModelChange)="onFormMeasurementChange($event)"
+            [disabled]="!measurementEnabled() || isDefaultRecord()">
             <option [ngValue]="null">None</option>
-            @for (m of measurementTypes(); track m.assetMeasurement_ID) {
-              <option [ngValue]="m.assetMeasurement_ID">{{m.name}}</option>
+            @for (m of (formMeasurementTypes().length ? formMeasurementTypes() : measurementTypes()); track m.measurementTypeId) {
+              <option [ngValue]="m.measurementTypeId">{{m.measurementTypeDesc}}</option>
             }
           </select>
         </div>
         <div class="form-field">
-          <label>Asset Status *</label>
-          <select class="form-input" [(ngModel)]="formData.assetStatus_ID">
+          <label>Asset Status {{statusRequired() ? '*' : ''}}</label>
+          <select class="form-input" [(ngModel)]="formData.assetStatus_ID"
+            [disabled]="!statusRequired() || isDefaultRecord()">
             <option [ngValue]="null" disabled>Select status</option>
-            @for (s of statuses(); track s.assetStatus_ID) {
-              <option [ngValue]="s.assetStatus_ID">{{s.assetStatusDesc}}</option>
+            @for (s of statuses(); track s.assetStatusId) {
+              <option [ngValue]="s.assetStatusId">{{s.assetStatusDesc}}</option>
             }
           </select>
         </div>
         <div class="form-field">
           <label>Depreciation Method</label>
-          <select class="form-input" [(ngModel)]="formData.assetDepreciationMethod_ID">
+          <select class="form-input" [(ngModel)]="formData.assetDepreciationMethod_ID"
+            [disabled]="!depreciationEnabled() || isDefaultRecord()">
             <option [ngValue]="null">None</option>
-            @for (d of depreciationMethods(); track d.assetDepreciationMethod_ID) {
-              <option [ngValue]="d.assetDepreciationMethod_ID">{{d.assetDepreciationMethodDesc}}</option>
+            @for (d of depreciationMethods(); track d.assetDepreciationMethodId) {
+              <option [ngValue]="d.assetDepreciationMethodId">{{d.assetDepreciationMethodDesc}}</option>
             }
           </select>
         </div>
       </div>
+
+      @if (showRevaluationMethod()) {
+        <div class="form-row">
+          <div class="form-field">
+            <label>Revaluation Method *</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                <input type="radio" name="revaluationMethod" value="restatement"
+                  [checked]="revaluationMethod() === 'restatement'"
+                  (change)="onRevaluationMethodChange('restatement')"
+                  [disabled]="isDefaultRecord()">
+                Restatement
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="revaluationMethod" value="elimination"
+                  [checked]="revaluationMethod() === 'elimination'"
+                  (change)="onRevaluationMethodChange('elimination')"
+                  [disabled]="isDefaultRecord()">
+                Elimination
+              </label>
+            </div>
+          </div>
+        </div>
+      }
+
+      <div class="form-row">
+        <div class="form-field">
+          <label class="checkbox-label">
+            <input type="checkbox" [checked]="formData.enabled === 1"
+              (change)="onEnabledChange($event)" [disabled]="isDefaultRecord()"> Active
+          </label>
+        </div>
+      </div>
       <div class="form-actions">
         <button mat-stroked-button (click)="cancelForm()">Cancel</button>
-        <button mat-flat-button class="btn-primary" (click)="save()" [disabled]="!formData.assetClassDesc || !formData.typeID">{{editingId() ? 'Update' : 'Create'}}</button>
+        @if (!isDefaultRecord()) {
+          <button mat-flat-button class="btn-primary" (click)="save()">{{editingId() ? 'Update' : 'Create'}}</button>
+        }
       </div>
     </div>
   }
@@ -132,11 +186,13 @@
             <tr>
               <td class="id-cell">{{item.assetClass_ID}}</td>
               <td class="desc-cell">{{item.assetClassDesc}}</td>
-              <td>{{item.usefulLifeInMonths}} months</td>
+              <td>{{item.usefulLifeInMonths ? item.usefulLifeInMonths + ' months' : '—'}}</td>
               <td><span class="status-badge" [class.active]="item.enabled === 1">{{item.enabled === 1 ? 'Active' : 'Inactive'}}</span></td>
               <td class="actions-cell">
                 <button mat-icon-button (click)="openEdit(item)"><mat-icon class="action-icon edit">edit</mat-icon></button>
-                <button mat-icon-button (click)="confirmDelete(item)"><mat-icon class="action-icon delete">delete</mat-icon></button>
+                @if (!(item['default'] === 1 || item.isDefault === 1 || item.isDefault === true)) {
+                  <button mat-icon-button (click)="confirmDelete(item)"><mat-icon class="action-icon delete">delete</mat-icon></button>
+                }
               </td>
             </tr>
           }

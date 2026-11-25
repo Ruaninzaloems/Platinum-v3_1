@@ -13,6 +13,7 @@ import { DateSaPipe } from '../../../shared/pipes/date-sa.pipe';
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent, DateInputComponent, StatusBadgeComponent, DateSaPipe],
   templateUrl: './payroll-cycles.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './payroll-cycles.component.css'
 })
 export class PayrollCyclesComponent implements OnInit {

@@ -70,7 +70,7 @@
     <h2><mat-icon>business</mat-icon> Projects Register</h2>
   </div>
   <div class="table-wrap">
-    <table class="data-table" *ngIf="projects.length > 0">
+    <table class="data-table" *ngIf="!projectsLoading && projects.length > 0">
       <thead>
         <tr>
           <th>Code</th>
@@ -86,7 +86,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let p of projects" class="clickable-row" (click)="openProjectDetail(p)">
+        <tr *ngFor="let p of projects" class="clickable-row" (click)="captureEditProject(p)">
           <td><span class="project-code">{{p.projectCode}}</span></td>
           <td class="name-cell">{{p.projectName}}</td>
           <td><span class="type-badge" [ngClass]="'type-' + p.type.toLowerCase()">{{p.type}}</span></td>
@@ -97,14 +97,18 @@
           <td class="text-right value-cell">{{formatCurrency(p.totalBudgetYear2)}}</td>
           <td class="text-right value-cell">{{formatCurrency(p.totalBudgetYear3)}}</td>
           <td class="action-cell">
-            <button mat-icon-button (click)="openProjectDetail(p); $event.stopPropagation()">
+            <button mat-icon-button (click)="captureEditProject(p); $event.stopPropagation()">
               <mat-icon>chevron_right</mat-icon>
             </button>
           </td>
         </tr>
       </tbody>
     </table>
-    <div class="empty-state" *ngIf="projects.length === 0">
+    <div class="empty-state" *ngIf="projectsLoading">
+      <mat-icon class="empty-icon" style="animation:spin 1.2s linear infinite">autorenew</mat-icon>
+      <p>Loading projects...</p>
+    </div>
+    <div class="empty-state" *ngIf="!projectsLoading && projects.length === 0">
       <mat-icon class="empty-icon">business</mat-icon>
       <p>No projects found. Create a new project to get started.</p>
     </div>

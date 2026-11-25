@@ -122,6 +122,212 @@
   padding-top: 8px;
   border-top: 1px solid var(--platinum-border);
 }
+.expanded-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.expanded-header .rfi-description {
+  flex: 1;
+  margin-bottom: 0;
+}
+.status-control {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 160px;
+}
+.status-control-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--platinum-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.status-select {
+  width: 150px;
+}
+.status-saving {
+  font-size: 11px;
+  color: var(--platinum-primary, #1976d2);
+  font-weight: 500;
+}
+.composer-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--platinum-border);
+}
+.composer-section h4 {
+  margin-bottom: 12px;
+}
+.composer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.composer-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--platinum-border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 80px;
+  background: white;
+  color: var(--platinum-text);
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.composer-textarea:focus {
+  border-color: var(--platinum-primary, #1976d2);
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
+}
+.drop-zone {
+  border: 2px dashed var(--platinum-border);
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #fafbfc;
+}
+.drop-zone:hover {
+  border-color: var(--platinum-primary, #1976d2);
+  background: #f0f7ff;
+}
+.drop-zone-active {
+  border-color: var(--platinum-primary, #1976d2) !important;
+  background: #e3f2fd !important;
+  border-style: solid;
+}
+.drop-zone-icon {
+  font-size: 32px;
+  width: 32px;
+  height: 32px;
+  color: var(--platinum-text-muted);
+  margin-bottom: 4px;
+}
+.drop-zone-active .drop-zone-icon {
+  color: var(--platinum-primary, #1976d2);
+}
+.drop-zone-text {
+  font-size: 13px;
+  color: var(--platinum-text);
+  font-weight: 500;
+}
+.drop-zone-hint {
+  font-size: 11px;
+  color: var(--platinum-text-muted);
+  margin-top: 4px;
+}
+.pending-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pending-file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 6px 10px;
+  background: #f5f5f5;
+  border-radius: 6px;
+}
+.file-type-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: var(--platinum-text-muted);
+}
+.pending-file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pending-file-size {
+  color: #999;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.file-done-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: #4caf50;
+}
+.file-progress-pct {
+  color: var(--platinum-primary, #1976d2);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.remove-file-btn {
+  width: 24px !important;
+  height: 24px !important;
+  line-height: 24px !important;
+}
+.remove-file-btn mat-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+}
+.file-progress-bar {
+  height: 3px;
+  background: #e0e0e0;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: -2px;
+}
+.file-progress-fill {
+  height: 100%;
+  background: var(--platinum-primary, #1976d2);
+  transition: width 0.2s;
+}
+.upload-status {
+  font-size: 12px;
+  color: var(--platinum-primary, #1976d2);
+  font-weight: 500;
+}
+.composer-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
+}
+.spin-icon {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.attachments-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--platinum-border);
+}
+.attachments-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.attachments-header h4 {
+  margin: 0;
+}
+.response-attachments {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+}
 @media (max-width: 900px) {
   .rfi-table {
     table-layout: auto;

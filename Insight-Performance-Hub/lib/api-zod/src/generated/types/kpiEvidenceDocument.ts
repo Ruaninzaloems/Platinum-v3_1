@@ -9,6 +9,7 @@
 export interface KpiEvidenceDocument {
   id: number;
   kpiId: number;
+  periodType?: string;
   quarter: number;
   fileName: string;
   fileSize: number;

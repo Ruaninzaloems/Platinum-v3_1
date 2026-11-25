@@ -120,9 +120,41 @@ using Microsoft.AspNetCore.Mvc;
           return item == null ? NotFound() : Ok(item);
       }
 
+      [HttpGet("plan-project/by-name")]
+      public async Task<IActionResult> GetPlan_ProjectByName([FromQuery] string finYear, [FromQuery] string name)
+      {
+          if (string.IsNullOrWhiteSpace(finYear) || string.IsNullOrWhiteSpace(name)) return BadRequest();
+          var match = await _db.Plan_Project
+              .Where(p => p.FinYear == finYear && p.ProjectName != null && p.ProjectName.ToLower() == name.ToLower())
+              .Select(p => new { p.Project_ID })
+              .FirstOrDefaultAsync();
+          return match == null ? NotFound() : Ok(match);
+      }
+
       [HttpPost("plan-project")]
       public async Task<IActionResult> CreatePlan_Project([FromBody] Plan_Project model)
       {
+          // Uniqueness: ProjectName per FinYear (excluding self if Project_ID > 0)
+          var selfId = model.Project_ID;
+          var nameExists = await _db.Plan_Project.AnyAsync(p =>
+              p.Project_ID != selfId &&
+              p.ProjectName != null &&
+              p.ProjectName.ToLower() == model.ProjectName!.ToLower() &&
+              p.FinYear == model.FinYear);
+          if (nameExists)
+              return Conflict("A project with this name already exists for the selected financial year.");
+
+          // Auto-assign ProjectCode (uses ProjectCode index on both tables)
+          var maxCode = await _db.Database
+              .SqlQuery<int>($"""
+                  SELECT GREATEST(
+                      COALESCE((SELECT MAX("ProjectCode") FROM "Plan_Project"), 0),
+                      COALESCE((SELECT MAX("ProjectCode") FROM "Plan_AdjustmentProject"), 0)
+                  ) AS "Value"
+              """)
+              .FirstOrDefaultAsync();
+          model.ProjectCode = maxCode + 1;
+
           _db.Plan_Project.Add(model);
           await _db.SaveChangesAsync();
           return CreatedAtAction(nameof(GetPlan_ProjectById), new { id = model.Project_ID }, model);
@@ -132,6 +164,16 @@ using Microsoft.AspNetCore.Mvc;
       public async Task<IActionResult> UpdatePlan_Project(int id, [FromBody] Plan_Project model)
       {
           if (id != model.Project_ID) return BadRequest("ID mismatch");
+
+          // Uniqueness: ProjectName per FinYear (excluding self)
+          var nameExists = await _db.Plan_Project.AnyAsync(p =>
+              p.Project_ID != id &&
+              p.ProjectName != null &&
+              p.ProjectName.ToLower() == model.ProjectName!.ToLower() &&
+              p.FinYear == model.FinYear);
+          if (nameExists)
+              return Conflict("A project with this name already exists for the selected financial year.");
+
           _db.Entry(model).State = EntityState.Modified;
           try { await _db.SaveChangesAsync(); } catch (DbUpdateConcurrencyException) { if (!await _db.Plan_Project.AnyAsync(e => e.Project_ID == id)) return NotFound(); throw; }
           return NoContent();
@@ -282,140 +324,151 @@ using Microsoft.AspNetCore.Mvc;
           return NoContent();
       }
 
-      // === Plan_ProjectFunctions ===
-      [HttpGet("plan-projectfunctions")]
-      public async Task<IActionResult> GetAllPlan_ProjectFunctions([FromQuery] int page = 1, [FromQuery] int pageSize = 200)
+
+      // === Plan_ProjectScoaFunds ===
+      [HttpGet("plan-project-scoa-funds")]
+      public async Task<IActionResult> GetAllPlan_ProjectScoaFunds([FromQuery] int page = 1, [FromQuery] int pageSize = 200)
       {
-          var q = _db.Plan_ProjectFunctions.AsQueryable();
+          var q = _db.Plan_ProjectScoaFunds.AsQueryable();
           var total = await q.CountAsync();
           var items = await q.Skip((page-1)*pageSize).Take(pageSize).ToListAsync();
           Response.Headers["X-Total-Count"] = total.ToString();
           return Ok(items);
       }
 
-      [HttpGet("plan-projectfunctions/{id}")]
-      public async Task<IActionResult> GetPlan_ProjectFunctionsById(int id)
+      [HttpGet("plan-project-scoa-funds/{id}")]
+      public async Task<IActionResult> GetPlan_ProjectScoaFundsById(int id)
       {
-          var item = await _db.Plan_ProjectFunctions.FindAsync(id);
+          var item = await _db.Plan_ProjectScoaFunds.FindAsync(id);
           return item == null ? NotFound() : Ok(item);
       }
 
-      [HttpPost("plan-projectfunctions")]
-      public async Task<IActionResult> CreatePlan_ProjectFunctions([FromBody] Plan_ProjectFunctions model)
+      [HttpPost("plan-project-scoa-funds")]
+      public async Task<IActionResult> CreatePlan_ProjectScoaFunds([FromBody] Plan_ProjectScoaFunds model)
       {
-          _db.Plan_ProjectFunctions.Add(model);
+          _db.Plan_ProjectScoaFunds.Add(model);
           await _db.SaveChangesAsync();
-          return CreatedAtAction(nameof(GetPlan_ProjectFunctionsById), new { id = model.ProjectFunction_ID }, model);
+          await SyncPlanProjectItemField(model.ProjectID, pi => { pi.SCOAFundId = model.ScoaFundID; });
+          return CreatedAtAction(nameof(GetPlan_ProjectScoaFundsById), new { id = model.ProjectScoaFund_ID }, model);
       }
 
-      [HttpPut("plan-projectfunctions/{id}")]
-      public async Task<IActionResult> UpdatePlan_ProjectFunctions(int id, [FromBody] Plan_ProjectFunctions model)
+      [HttpPut("plan-project-scoa-funds/{id}")]
+      public async Task<IActionResult> UpdatePlan_ProjectScoaFunds(int id, [FromBody] Plan_ProjectScoaFunds model)
       {
-          if (id != model.ProjectFunction_ID) return BadRequest("ID mismatch");
+          if (id != model.ProjectScoaFund_ID) return BadRequest("ID mismatch");
           _db.Entry(model).State = EntityState.Modified;
-          try { await _db.SaveChangesAsync(); } catch (DbUpdateConcurrencyException) { if (!await _db.Plan_ProjectFunctions.AnyAsync(e => e.ProjectFunction_ID == id)) return NotFound(); throw; }
+          try { await _db.SaveChangesAsync(); } catch (DbUpdateConcurrencyException) { if (!await _db.Plan_ProjectScoaFunds.AnyAsync(e => e.ProjectScoaFund_ID == id)) return NotFound(); throw; }
+          await SyncPlanProjectItemField(model.ProjectID, pi => { pi.SCOAFundId = model.ScoaFundID; });
           return NoContent();
       }
 
-      [HttpDelete("plan-projectfunctions/{id}")]
-      public async Task<IActionResult> DeletePlan_ProjectFunctions(int id)
+      [HttpDelete("plan-project-scoa-funds/{id}")]
+      public async Task<IActionResult> DeletePlan_ProjectScoaFunds(int id)
       {
-          var item = await _db.Plan_ProjectFunctions.FindAsync(id);
+          var item = await _db.Plan_ProjectScoaFunds.FindAsync(id);
           if (item == null) return NotFound();
-          _db.Plan_ProjectFunctions.Remove(item);
+          _db.Plan_ProjectScoaFunds.Remove(item);
           await _db.SaveChangesAsync();
+          await SyncPlanProjectItemField(item.ProjectID, pi => { pi.SCOAFundId = null; });
           return NoContent();
       }
 
-      // === Plan_ProjectFund ===
-      [HttpGet("plan-projectfund")]
-      public async Task<IActionResult> GetAllPlan_ProjectFund([FromQuery] int page = 1, [FromQuery] int pageSize = 200)
+      // === Plan_ProjectScoaRegions ===
+      [HttpGet("plan-project-scoa-regions")]
+      public async Task<IActionResult> GetAllPlan_ProjectScoaRegions([FromQuery] int page = 1, [FromQuery] int pageSize = 200)
       {
-          var q = _db.Plan_ProjectFund.AsQueryable();
+          var q = _db.Plan_ProjectScoaRegions.AsQueryable();
           var total = await q.CountAsync();
           var items = await q.Skip((page-1)*pageSize).Take(pageSize).ToListAsync();
           Response.Headers["X-Total-Count"] = total.ToString();
           return Ok(items);
       }
 
-      [HttpGet("plan-projectfund/{id}")]
-      public async Task<IActionResult> GetPlan_ProjectFundById(int id)
+      [HttpGet("plan-project-scoa-regions/{id}")]
+      public async Task<IActionResult> GetPlan_ProjectScoaRegionsById(int id)
       {
-          var item = await _db.Plan_ProjectFund.FindAsync(id);
+          var item = await _db.Plan_ProjectScoaRegions.FindAsync(id);
           return item == null ? NotFound() : Ok(item);
       }
 
-      [HttpPost("plan-projectfund")]
-      public async Task<IActionResult> CreatePlan_ProjectFund([FromBody] Plan_ProjectFund model)
+      [HttpPost("plan-project-scoa-regions")]
+      public async Task<IActionResult> CreatePlan_ProjectScoaRegions([FromBody] Plan_ProjectScoaRegions model)
       {
-          _db.Plan_ProjectFund.Add(model);
+          _db.Plan_ProjectScoaRegions.Add(model);
           await _db.SaveChangesAsync();
-          return CreatedAtAction(nameof(GetPlan_ProjectFundById), new { id = model.ProjectFund_ID }, model);
+          await SyncPlanProjectItemField(model.ProjectID, pi => { pi.SCOARegionId = model.ScoaRegionID; });
+          return CreatedAtAction(nameof(GetPlan_ProjectScoaRegionsById), new { id = model.ProjectScoaRegion_ID }, model);
       }
 
-      [HttpPut("plan-projectfund/{id}")]
-      public async Task<IActionResult> UpdatePlan_ProjectFund(int id, [FromBody] Plan_ProjectFund model)
+      [HttpPut("plan-project-scoa-regions/{id}")]
+      public async Task<IActionResult> UpdatePlan_ProjectScoaRegions(int id, [FromBody] Plan_ProjectScoaRegions model)
       {
-          if (id != model.ProjectFund_ID) return BadRequest("ID mismatch");
+          if (id != model.ProjectScoaRegion_ID) return BadRequest("ID mismatch");
           _db.Entry(model).State = EntityState.Modified;
-          try { await _db.SaveChangesAsync(); } catch (DbUpdateConcurrencyException) { if (!await _db.Plan_ProjectFund.AnyAsync(e => e.ProjectFund_ID == id)) return NotFound(); throw; }
+          try { await _db.SaveChangesAsync(); } catch (DbUpdateConcurrencyException) { if (!await _db.Plan_ProjectScoaRegions.AnyAsync(e => e.ProjectScoaRegion_ID == id)) return NotFound(); throw; }
+          await SyncPlanProjectItemField(model.ProjectID, pi => { pi.SCOARegionId = model.ScoaRegionID; });
           return NoContent();
       }
 
-      [HttpDelete("plan-projectfund/{id}")]
-      public async Task<IActionResult> DeletePlan_ProjectFund(int id)
+      [HttpDelete("plan-project-scoa-regions/{id}")]
+      public async Task<IActionResult> DeletePlan_ProjectScoaRegions(int id)
       {
-          var item = await _db.Plan_ProjectFund.FindAsync(id);
+          var item = await _db.Plan_ProjectScoaRegions.FindAsync(id);
           if (item == null) return NotFound();
-          _db.Plan_ProjectFund.Remove(item);
+          _db.Plan_ProjectScoaRegions.Remove(item);
           await _db.SaveChangesAsync();
+          await SyncPlanProjectItemField(item.ProjectID, pi => { pi.SCOARegionId = null; });
           return NoContent();
       }
 
-      // === Plan_ProjectFundYear ===
-      [HttpGet("plan-projectfundyear")]
-      public async Task<IActionResult> GetAllPlan_ProjectFundYear([FromQuery] int page = 1, [FromQuery] int pageSize = 200)
+
+      // === Plan_ProjectScoaItem ===
+      [HttpGet("plan-project-scoa-item")]
+      public async Task<IActionResult> GetAllPlan_ProjectScoaItem([FromQuery] int page = 1, [FromQuery] int pageSize = 200)
       {
-          var q = _db.Plan_ProjectFundYear.AsQueryable();
+          var q = _db.Plan_ProjectScoaItem.AsQueryable();
           var total = await q.CountAsync();
-          var items = await q.Skip((page-1)*pageSize).Take(pageSize).ToListAsync();
-          Response.Headers["X-Total-Count"] = total.ToString();
-          return Ok(items);
+          var data  = await q.OrderBy(x => x.ProjectScoaItem_ID).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+          return Ok(new { total, data });
       }
 
-      [HttpGet("plan-projectfundyear/{id}")]
-      public async Task<IActionResult> GetPlan_ProjectFundYearById(int id)
+      [HttpGet("plan-project-scoa-item/{id}")]
+      public async Task<IActionResult> GetPlan_ProjectScoaItemById(int id)
       {
-          var item = await _db.Plan_ProjectFundYear.FindAsync(id);
+          var item = await _db.Plan_ProjectScoaItem.FindAsync(id);
           return item == null ? NotFound() : Ok(item);
       }
 
-      [HttpPost("plan-projectfundyear")]
-      public async Task<IActionResult> CreatePlan_ProjectFundYear([FromBody] Plan_ProjectFundYear model)
+      [HttpPost("plan-project-scoa-item")]
+      public async Task<IActionResult> CreatePlan_ProjectScoaItem([FromBody] Plan_ProjectScoaItem model)
       {
-          _db.Plan_ProjectFundYear.Add(model);
+          _db.Plan_ProjectScoaItem.Add(model);
           await _db.SaveChangesAsync();
-          return CreatedAtAction(nameof(GetPlan_ProjectFundYearById), new { id = model.ProjectFundYear_ID }, model);
+          await SyncPlanProjectItemField(model.ProjectID, pi => { pi.SCOAItemID = model.ScoaItemID; });
+          return CreatedAtAction(nameof(GetPlan_ProjectScoaItemById), new { id = model.ProjectScoaItem_ID }, model);
       }
 
-      [HttpPut("plan-projectfundyear/{id}")]
-      public async Task<IActionResult> UpdatePlan_ProjectFundYear(int id, [FromBody] Plan_ProjectFundYear model)
+      [HttpPut("plan-project-scoa-item/{id}")]
+      public async Task<IActionResult> UpdatePlan_ProjectScoaItem(int id, [FromBody] Plan_ProjectScoaItem model)
       {
-          if (id != model.ProjectFundYear_ID) return BadRequest("ID mismatch");
+          if (id != model.ProjectScoaItem_ID) return BadRequest();
           _db.Entry(model).State = EntityState.Modified;
-          try { await _db.SaveChangesAsync(); } catch (DbUpdateConcurrencyException) { if (!await _db.Plan_ProjectFundYear.AnyAsync(e => e.ProjectFundYear_ID == id)) return NotFound(); throw; }
+          try { await _db.SaveChangesAsync(); } catch (DbUpdateConcurrencyException) { if (!await _db.Plan_ProjectScoaItem.AnyAsync(e => e.ProjectScoaItem_ID == id)) return NotFound(); throw; }
+          await SyncPlanProjectItemField(model.ProjectID, pi => { pi.SCOAItemID = model.ScoaItemID; });
           return NoContent();
       }
 
-      [HttpDelete("plan-projectfundyear/{id}")]
-      public async Task<IActionResult> DeletePlan_ProjectFundYear(int id)
+      [HttpDelete("plan-project-scoa-item/{id}")]
+      public async Task<IActionResult> DeletePlan_ProjectScoaItem(int id)
       {
-          var item = await _db.Plan_ProjectFundYear.FindAsync(id);
+          var item = await _db.Plan_ProjectScoaItem.FindAsync(id);
           if (item == null) return NotFound();
-          _db.Plan_ProjectFundYear.Remove(item);
+          _db.Plan_ProjectScoaItem.Remove(item);
           await _db.SaveChangesAsync();
+          await SyncPlanProjectItemField(item.ProjectID, pi => { pi.SCOAItemID = 0; });
           return NoContent();
       }
+
 
       // === Plan_ProjectIDP ===
       [HttpGet("plan-projectidp")]
@@ -484,6 +537,8 @@ using Microsoft.AspNetCore.Mvc;
       public async Task<IActionResult> CreatePlan_ProjectItem([FromBody] Plan_ProjectItem model)
       {
           _db.Plan_ProjectItem.Add(model);
+          await _db.SaveChangesAsync();
+          model.PlanProjectItemCode = model.PlanProjectItem_ID;
           await _db.SaveChangesAsync();
           return CreatedAtAction(nameof(GetPlan_ProjectItemById), new { id = model.PlanProjectItem_ID }, model);
       }
@@ -642,49 +697,14 @@ using Microsoft.AspNetCore.Mvc;
           return NoContent();
       }
 
-      // === Plan_ProjectRegions ===
-      [HttpGet("plan-projectregions")]
-      public async Task<IActionResult> GetAllPlan_ProjectRegions([FromQuery] int page = 1, [FromQuery] int pageSize = 200)
-      {
-          var q = _db.Plan_ProjectRegions.AsQueryable();
-          var total = await q.CountAsync();
-          var items = await q.Skip((page-1)*pageSize).Take(pageSize).ToListAsync();
-          Response.Headers["X-Total-Count"] = total.ToString();
-          return Ok(items);
-      }
 
-      [HttpGet("plan-projectregions/{id}")]
-      public async Task<IActionResult> GetPlan_ProjectRegionsById(int id)
+      // ── Helper: sync a SCOA segment field back to every Plan_ProjectItem row for the given project ──
+      private async Task SyncPlanProjectItemField(int projectId, Action<Plan_ProjectItem> applyField)
       {
-          var item = await _db.Plan_ProjectRegions.FindAsync(id);
-          return item == null ? NotFound() : Ok(item);
-      }
-
-      [HttpPost("plan-projectregions")]
-      public async Task<IActionResult> CreatePlan_ProjectRegions([FromBody] Plan_ProjectRegions model)
-      {
-          _db.Plan_ProjectRegions.Add(model);
+          var rows = await _db.Plan_ProjectItem.Where(pi => pi.ProjectID == projectId).ToListAsync();
+          if (!rows.Any()) return;
+          foreach (var row in rows) applyField(row);
           await _db.SaveChangesAsync();
-          return CreatedAtAction(nameof(GetPlan_ProjectRegionsById), new { id = model.ProjectRegion_ID }, model);
-      }
-
-      [HttpPut("plan-projectregions/{id}")]
-      public async Task<IActionResult> UpdatePlan_ProjectRegions(int id, [FromBody] Plan_ProjectRegions model)
-      {
-          if (id != model.ProjectRegion_ID) return BadRequest("ID mismatch");
-          _db.Entry(model).State = EntityState.Modified;
-          try { await _db.SaveChangesAsync(); } catch (DbUpdateConcurrencyException) { if (!await _db.Plan_ProjectRegions.AnyAsync(e => e.ProjectRegion_ID == id)) return NotFound(); throw; }
-          return NoContent();
-      }
-
-      [HttpDelete("plan-projectregions/{id}")]
-      public async Task<IActionResult> DeletePlan_ProjectRegions(int id)
-      {
-          var item = await _db.Plan_ProjectRegions.FindAsync(id);
-          if (item == null) return NotFound();
-          _db.Plan_ProjectRegions.Remove(item);
-          await _db.SaveChangesAsync();
-          return NoContent();
       }
   }
   

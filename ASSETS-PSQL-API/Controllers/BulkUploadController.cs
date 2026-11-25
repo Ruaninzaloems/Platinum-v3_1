@@ -18,10 +18,11 @@ public class BulkUploadController : ControllerBase
     private readonly TransactionService _txnService;
     private readonly LookupService _lookupService;
     private readonly InternalApiClient _internalApi;
+    private readonly EmailService _emailService;
 
     private static readonly ConcurrentDictionary<string, ProgressInfo> _progressTracker = new();
 
-    public BulkUploadController(DbConnectionFactory db, BulkUploadValidationService validator, IWebHostEnvironment env, TransactionService txnService, LookupService lookupService, InternalApiClient internalApi)
+    public BulkUploadController(DbConnectionFactory db, BulkUploadValidationService validator, IWebHostEnvironment env, TransactionService txnService, LookupService lookupService, InternalApiClient internalApi, EmailService emailService)
     {
         _db = db;
         _validator = validator;
@@ -29,6 +30,7 @@ public class BulkUploadController : ControllerBase
         _txnService = txnService;
         _lookupService = lookupService;
         _internalApi = internalApi;
+        _emailService = emailService;
     }
 
     [HttpGet("progress/{key}")]
@@ -177,36 +179,6 @@ public class BulkUploadController : ControllerBase
 
         if (totalErrors > 0)
         {
-            var errorKeyToColumn = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                { "AssetType_ID", "AssetType" },
-                { "AssetCategory_ID", "AssetCategory" },
-                { "Asset_SubCategory_ID", "AssetSub_Category" },
-                { "AssetClass_ID", "AssetClass" },
-                { "AssetStatus_ID", "AssetStatus" },
-                { "MeasurementType_ID", "MeasurementType" },
-                { "CIDMSSubComponentTypeID", "CIDMSSubComponentType" },
-                { "latitude", "Lattitude" },
-                { "longitude", "Longitude" },
-                { "InserviceDate", "InServiceDate" },
-                { "DateOfDisposal", "DisposalDate" },
-                { "Impairment_Date", "ImpairmentDate" },
-                { "VerificationDate", "VerifiedDate" },
-                { "PurchaseAmount", "PurchaseAmount_Cost" },
-                { "AccumulatedDepreciationClosingBalance", "AccumulatedDepreciation" },
-                { "AccumulatedImpairmentClosingBalance", "AccumulatedImpairment" },
-                { "CarryingAmountClosingBalance", "CarryingAmount" },
-                { "RemainingUsefulLife", "RemainingUsefulLifeMonthComponent" },
-                { "Remaining_Useful_Life_Year", "RemainingUsefulLifeYearComponent" },
-                { "Financial_Status_ID", "FinancialStatus" },
-                { "AssetCondition_ID", "AssetCondition" },
-                { "RevaluationReserveMovement", "MovementInRevaluationReserve" },
-                { "ErfSizeM2", "ErfsizeM2" },
-                { "MunicipalDepartment_ID", "MunicipalDepartment" },
-                { "Custodian_ID", "CustodianName" },
-                { "DebitPlanProjectItemID", "DebitPlanProjectItemID" }
-            };
-
             _progressTracker[progressKey] = new ProgressInfo { Phase = "saving_errors", Percent = 75, Message = "Saving " + totalErrors + " validation errors..." };
             for (int i = 0; i < validationResults.Count; i++)
             {
@@ -219,13 +191,25 @@ public class BulkUploadController : ControllerBase
                 parms.Add("RowNumber", vr.rowNum);
                 foreach (var err in vr.errors)
                 {
-                    var colName = errorKeyToColumn.ContainsKey(err.Key) ? errorKeyToColumn[err.Key] : err.Key;
+                    var colName = BulkUploadValidationService.GetBulkValidationColumnName(err.Key);
+                    if (!BulkUploadValidationService.ValidBulkValidationColumns.Contains(colName))
+                        continue;
                     cols.Add(@"""" + colName + @"""");
                     vals.Add("@p_" + colName);
                     var errMsg = err.Value ?? "";
                     if (errMsg.Length > 100) errMsg = errMsg.Substring(0, 97) + "...";
                     parms.Add("p_" + colName, errMsg);
                 }
+                // Always include Component ID as a reference identifier, even when it has no error
+                if (!vr.errors.ContainsKey("ComponentID_AssetRegisterID") &&
+                    vr.raw.TryGetValue("ComponentID_AssetRegisterID", out var compId) &&
+                    !string.IsNullOrWhiteSpace(compId))
+                {
+                    cols.Add(@"""ComponentID_AssetRegisterID""");
+                    vals.Add("@p_ComponentID_AssetRegisterID");
+                    parms.Add("p_ComponentID_AssetRegisterID", compId);
+                }
+                if (cols.Count <= 2) continue;
                 var sql = "INSERT INTO \"Asset_BulkValidation\" (" + string.Join(", ", cols) + ") VALUES (" + string.Join(", ", vals) + ")";
                 try { await conn.ExecuteAsync(sql, parms); }
                 catch (Exception ex) { Console.WriteLine("Error inserting validation row " + vr.rowNum + ": " + ex.Message); }
@@ -418,39 +402,73 @@ public class BulkUploadController : ControllerBase
         var errors = (await conn.QueryAsync(@"SELECT * FROM ""Asset_BulkValidation"" WHERE ""Upload_JobID"" = @id ORDER BY ""RowNumber""", new { id })).ToList();
         if (errors.Count == 0) return NotFound(new { error = "No validation errors found" });
 
+        // Build Excel-header → Asset_BulkValidation column-name lookup
+        var headerToValCol = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < BulkUploadValidationService.ExcelHeaders.Length; i++)
+            headerToValCol[BulkUploadValidationService.ExcelHeaders[i]] =
+                BulkUploadValidationService.GetBulkValidationColumnName(BulkUploadValidationService.DbColumns[i]);
+
+        // Determine column order from the original upload file
+        var fileColumns = new List<(string excelHeader, string valCol)>();
+        if (!string.IsNullOrEmpty(job.ValidationError_Path) && System.IO.File.Exists(job.ValidationError_Path))
+        {
+            try
+            {
+                using var uploadWb = new XLWorkbook(job.ValidationError_Path);
+                var uploadWs = uploadWb.Worksheets.First();
+                var lastCol = uploadWs.Row(1).LastCellUsed()?.Address.ColumnNumber ?? 0;
+                for (int c = 1; c <= lastCol; c++)
+                {
+                    var hdr = uploadWs.Cell(1, c).GetString().Trim();
+                    if (!string.IsNullOrWhiteSpace(hdr) && headerToValCol.TryGetValue(hdr, out var vc))
+                        fileColumns.Add((hdr, vc));
+                }
+            }
+            catch { /* file unreadable — fall through to fallback */ }
+        }
+
+        // Fallback: if upload file is unavailable, use all non-internal columns that have errors
+        if (fileColumns.Count == 0)
+        {
+            var skipCols = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                { "Asset_BulkValidation_ID", "Upload_JobID", "AssetSetting_ID", "FileName", "Description", "RunID", "RowNumber" };
+            var firstRow = (IDictionary<string, object>)errors[0];
+            foreach (var key in firstRow.Keys)
+            {
+                if (skipCols.Contains(key)) continue;
+                if (errors.Any(r => { var v = ((IDictionary<string, object>)r)[key]; return v != null && !(v is DBNull); }))
+                    fileColumns.Add((key, key));
+            }
+        }
+
         using var workbook = new ClosedXML.Excel.XLWorkbook();
         var ws = workbook.Worksheets.Add("Validation Errors");
 
-        var skipCols = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            { "Asset_BulkValidation_ID", "Upload_JobID", "AssetSetting_ID", "FileName", "Description", "RunID" };
-
-        var firstRow = (IDictionary<string, object>)errors[0];
-        var columns = new List<string>();
-        foreach (var key in firstRow.Keys)
+        // Header row: RowNumber + one column per upload file column
+        ws.Cell(1, 1).Value = "Row Number";
+        ws.Cell(1, 1).Style.Font.Bold = true;
+        ws.Cell(1, 1).Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromHtml("#1e3a5f");
+        ws.Cell(1, 1).Style.Font.FontColor = ClosedXML.Excel.XLColor.White;
+        for (int c = 0; c < fileColumns.Count; c++)
         {
-            if (skipCols.Contains(key)) continue;
-            columns.Add(key);
-        }
-
-        for (int c = 0; c < columns.Count; c++)
-        {
-            var cell = ws.Cell(1, c + 1);
-            cell.Value = columns[c];
+            var cell = ws.Cell(1, c + 2);
+            cell.Value = fileColumns[c].excelHeader;
             cell.Style.Font.Bold = true;
             cell.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromHtml("#1e3a5f");
             cell.Style.Font.FontColor = ClosedXML.Excel.XLColor.White;
         }
 
+        // Data rows
         for (int r = 0; r < errors.Count; r++)
         {
             var row = (IDictionary<string, object>)errors[r];
-            for (int c = 0; c < columns.Count; c++)
+            ws.Cell(r + 2, 1).Value = row.ContainsKey("RowNumber") ? row["RowNumber"]?.ToString() ?? "" : "";
+            for (int c = 0; c < fileColumns.Count; c++)
             {
-                var val = row.ContainsKey(columns[c]) ? row[columns[c]] : null;
-                if (val != null)
-                {
-                    ws.Cell(r + 2, c + 1).Value = val.ToString();
-                }
+                var vc = fileColumns[c].valCol;
+                var val = row.ContainsKey(vc) ? row[vc] : null;
+                if (val != null && !(val is DBNull))
+                    ws.Cell(r + 2, c + 2).Value = val.ToString();
             }
         }
 
@@ -723,7 +741,7 @@ public class BulkUploadController : ControllerBase
 
         _progressTracker[approveKey] = new ProgressInfo { Phase = "transactions", Percent = 80, Message = "Creating transaction summary records..." };
 
-        var currentPeriod = await _txnService.GetProcessingMonth(conn, 1, txn);
+        var currentPeriod = await _txnService.GetProcessingMonth(conn, request?.UserId ?? 1, txn);
 
         for (int idx = 0; idx < newAssetIds.Count; idx++)
         {
@@ -763,6 +781,17 @@ public class BulkUploadController : ControllerBase
             SET ""Job_Status"" = 'Approved', ""ApprovedByID"" = 1, ""ApprovedDate"" = NOW(), ""ProcessDate"" = NOW()
             WHERE ""ID"" = @id", new { id });
 
+        try
+        {
+            var approveEmailType = await conn.QueryFirstOrDefaultAsync<string>(
+                @"SELECT COALESCE(""TypeDesc"", ""ID""::VARCHAR) FROM ""Asset_UploadType"" WHERE ""ID"" = @id",
+                new { id = job.UploadType ?? 1 }) ?? "Bulk Upload";
+            _ = _emailService.SendTransactionEmailsAsync(approveEmailType);
+        }
+        catch (Exception emailEx)
+        {
+            Console.Error.WriteLine($"[BulkUploadController] Failed to send approval email: {emailEx.Message}");
+        }
         _ = Task.Delay(5000).ContinueWith(t => { ProgressInfo? removed; _progressTracker.TryRemove(approveKey, out removed); });
         return Ok(new { success = 1, approvedRecords = insertCount, progressKey = approveKey });
     }
@@ -955,7 +984,7 @@ public class BulkUploadController : ControllerBase
 
         _progressTracker[approveKey] = new ProgressInfo { Phase = "transactions", Percent = 50, Message = "Creating transaction summary records..." };
 
-        var currentPeriod = await _txnService.GetProcessingMonth(conn, 1, txn);
+        var currentPeriod = await _txnService.GetProcessingMonth(conn, request?.UserId ?? 1, txn);
 
         for (int idx = 0; idx < newAssetIds.Count; idx++)
         {
@@ -1464,6 +1493,17 @@ public class BulkUploadController : ControllerBase
             SET ""Job_Status"" = 'Approved', ""ApprovedByID"" = 1, ""ApprovedDate"" = NOW(), ""ProcessDate"" = NOW()
             WHERE ""ID"" = @id", new { id });
 
+        try
+        {
+            var wipEmailType = await conn.QueryFirstOrDefaultAsync<string>(
+                @"SELECT COALESCE(""TypeDesc"", ""ID""::VARCHAR) FROM ""Asset_UploadType"" WHERE ""ID"" = @id",
+                new { id = job.UploadType ?? 1 }) ?? "Bulk Upload WIP";
+            _ = _emailService.SendTransactionEmailsAsync(wipEmailType);
+        }
+        catch (Exception emailEx)
+        {
+            Console.Error.WriteLine($"[BulkUploadController] Failed to send WIP approval email: {emailEx.Message}");
+        }
         _ = Task.Delay(5000).ContinueWith(t => { ProgressInfo? removed; _progressTracker.TryRemove(approveKey, out removed); });
         return Ok(new { success = 1, approvedRecords = insertCount, progressKey = approveKey });
     }

@@ -19,4 +19,5 @@ public class AssetClass
     public int? AssetCategoryID { get; set; }
     public int? AssetStatus_ID { get; set; }
     public int? AssetMeasurement_ID { get; set; }
+    public string? RevaluationMethod { get; set; }
 }

@@ -1,3 +1,9 @@
+@if (isLocked) {
+  <div style="background:#fff8e1;border:1px solid #f59e0b;border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:10px;margin-bottom:12px;color:#92400e;font-size:13px;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    <span><strong>Payroll locked</strong> — This cycle is in Trial Lockdown. View only. Unlock the Trial Run to add or remove transactions.</span>
+  </div>
+}
 @if (!showPayslip) {
   <div class="page-header">
     <h2>Employee Payslip View</h2>
@@ -93,8 +99,46 @@
     }
   </div>
 
+  @if (structureError) {
+    <div class="structure-error-banner">
+      <div class="structure-error-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+      <div class="structure-error-content">
+        <div class="structure-error-title">Salary Structure Unbalanced</div>
+        <div class="structure-error-msg">{{ structureError }}</div>
+      </div>
+      <button class="structure-error-action" (click)="goToSalaryStructure()">
+        Fix Structure
+      </button>
+    </div>
+  }
+
   @if (payslipLoading) {
     <div class="loading"><div class="spinner"></div> Calculating payslip...</div>
+  } @else if (payslipError && !payslipData) {
+    <div class="payslip-error-state">
+      <div class="payslip-error-icon">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </div>
+      <div class="payslip-error-title">Unable to load payslip</div>
+      <div class="payslip-error-desc">The payslip could not be calculated. Check the error details above or try again.</div>
+      <button class="payslip-retry-btn" (click)="retryPayslip()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
+          <polyline points="1 4 1 10 7 10"/>
+          <path d="M3.51 15a9 9 0 1 0 .49-4.5"/>
+        </svg>
+        Retry
+      </button>
+    </div>
   } @else if (payslipData) {
     <div class="payslip-container">
       <div class="payslip-header">
@@ -109,8 +153,14 @@
               </span>
             }
           </h3>
-          <p>{{ payslipData.employee.employee_code }} &bull; {{ payslipData.employee.position_title || 'No Position' }} &bull; {{ payslipData.employee.department_name || '' }}</p>
+          <p>{{ payslipData.employee.id }} | {{ payslipData.employee.employee_code }} &bull; {{ payslipData.employee.position_title || 'No Position' }} &bull; {{ payslipData.employee.department_name || '' }}</p>
         </div>
+        <button class="btn-emp-master" (click)="openEmployeeMaster()" title="Go to Employee Master">
+          <app-icon name="user" [size]="14"></app-icon> Employee Master
+        </button>
+        <button class="btn-emp-master" (click)="loadPayslip(selectedEmployee.id)" title="Recalculate payslip" [disabled]="payslipLoading">
+          <app-icon name="refresh" [size]="14"></app-icon> Refresh
+        </button>
         <div class="nav-controls">
           <button class="nav-btn" [disabled]="selectedEmployeeIndex <= 0" (click)="navigateEmployee(-1)">
             <app-icon name="chevronLeft" [size]="12"></app-icon> Previous
@@ -137,7 +187,7 @@
               <div class="tab-panel">
                 <div class="section-header">
                   <h4>Earnings</h4>
-                  <button class="add-btn" (click)="openAddTransaction('EARNING')">+ Add</button>
+                  @if (!isLocked) { <button class="add-btn" (click)="openAddTransaction('EARNING')">+ Add</button> }
                 </div>
                 <div class="line-items">
                   @for (item of payslipData.earnings; track $index) {
@@ -150,7 +200,7 @@
                       </span>
                       <span class="item-amount">
                         {{ formatCurrency(item.amount) }}
-                        @if (!item.is_system && item.est_id) {
+                        @if (!item.is_system && item.est_id && !isLocked) {
                           <button class="remove-btn" (click)="removeTransaction(item)" title="Remove">&times;</button>
                         }
                       </span>
@@ -168,13 +218,21 @@
               <div class="tab-panel">
                 <div class="section-header">
                   <h4>Deductions</h4>
-                  <button class="add-btn" (click)="openAddTransaction('DEDUCTION')">+ Add</button>
+                  @if (!isLocked) { <button class="add-btn" (click)="openAddTransaction('DEDUCTION')">+ Add</button> }
                 </div>
                 <div class="line-items">
                   @for (item of payslipData.deductions; track $index) {
-                    <div class="line-item">
+                    <div class="line-item" [class.instalment-line]="item.is_instalment_transaction">
                       <span class="item-name">
-                        {{ item.head_name }}
+                        @if (item.is_instalment_transaction) {
+                          <span class="instalment-icon">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+                          </span>
+                        }
+                        {{ item.instalment_description || item.head_name }}
+                        @if (item.is_instalment_transaction && item.instalment_description && item.instalment_description !== item.head_name) {
+                          <span class="instalment-head-label">({{ item.head_name }})</span>
+                        }
                         @if (item.is_system) {
                           <span class="system-badge">sys</span>
                         }
@@ -184,11 +242,31 @@
                       </span>
                       <span class="item-amount">
                         {{ formatCurrency(item.amount) }}
-                        @if (!item.is_system && item.est_id) {
+                        @if (!item.is_system && item.est_id && !isLocked) {
                           <button class="remove-btn" (click)="removeTransaction(item)" title="Remove">&times;</button>
                         }
                       </span>
                     </div>
+                    @if (item.is_instalment_transaction) {
+                      <div class="instalment-detail-row">
+                        <span class="instalment-detail-pill">
+                          <span class="instalment-detail-label">Original</span>
+                          <span class="instalment-detail-value">{{ formatCurrency(item.instalment_total_amount) }}</span>
+                        </span>
+                        <span class="instalment-detail-pill">
+                          <span class="instalment-detail-label">Monthly</span>
+                          <span class="instalment-detail-value">{{ formatCurrency(item.instalment_monthly) }}</span>
+                        </span>
+                        <span class="instalment-detail-pill">
+                          <span class="instalment-detail-label">Balance before</span>
+                          <span class="instalment-detail-value">{{ formatCurrency(item.instalment_balance_before) }}</span>
+                        </span>
+                        <span class="instalment-detail-pill instalment-balance-after">
+                          <span class="instalment-detail-label">Balance after</span>
+                          <span class="instalment-detail-value">{{ formatCurrency(item.instalment_balance_after) }}</span>
+                        </span>
+                      </div>
+                    }
                   }
                 </div>
                 <div class="section-total">
@@ -202,7 +280,7 @@
               <div class="tab-panel">
                 <div class="section-header">
                   <h4>Company Contributions</h4>
-                  <button class="add-btn" (click)="openAddTransaction('COMPANY_CONTRIBUTION')">+ Add</button>
+                  @if (!isLocked) { <button class="add-btn" (click)="openAddTransaction('COMPANY_CONTRIBUTION')">+ Add</button> }
                 </div>
                 <div class="line-items">
                   @for (item of payslipData.company_contributions; track $index) {
@@ -215,7 +293,7 @@
                       </span>
                       <span class="item-amount">
                         {{ formatCurrency(item.amount) }}
-                        @if (!item.is_system && item.est_id) {
+                        @if (!item.is_system && item.est_id && !isLocked) {
                           <button class="remove-btn" (click)="removeTransaction(item)" title="Remove">&times;</button>
                         }
                       </span>
@@ -233,7 +311,7 @@
               <div class="tab-panel">
                 <div class="section-header">
                   <h4>Fringe Benefits</h4>
-                  <button class="add-btn" (click)="openAddTransaction('FRINGE_BENEFIT')">+ Add</button>
+                  @if (!isLocked) { <button class="add-btn" (click)="openAddTransaction('FRINGE_BENEFIT')">+ Add</button> }
                 </div>
                 <div class="line-items">
                   @if (payslipData.fringe_benefits.length === 0) {
@@ -249,7 +327,7 @@
                       </span>
                       <span class="item-amount">
                         {{ formatCurrency(item.amount) }}
-                        @if (!item.is_system && item.est_id) {
+                        @if (!item.is_system && item.est_id && !isLocked) {
                           <button class="remove-btn" (click)="removeTransaction(item)" title="Remove">&times;</button>
                         }
                       </span>
@@ -469,7 +547,7 @@
 
           <div class="form-row">
             <div class="form-group">
-              <label>Amount (Rand) - Monthly</label>
+              <label>Value</label>
               <input type="number" step="0.01" [(ngModel)]="addTxForm.amount" placeholder="0.00">
             </div>
             <div class="form-group">

@@ -182,6 +182,10 @@ export class MaintenanceRequestDetailComponent implements OnInit {
 
   goBack() { this.router.navigate(['/assets/maintenance/requests']); }
 
+  openWorkOrderDetail(woId: number) {
+    this.router.navigate(['/assets/maintenance/work-orders', woId]);
+  }
+
   setTab(tab: 'details' | 'workorders') { this.activeTab.set(tab); }
 
   loadWorkOrders() {

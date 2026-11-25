@@ -1,0 +1,399 @@
+$navy: #0f2b46;
+$gold: #c9a84c;
+$border: #e8ecf1;
+$surface: #f8f9fb;
+$red: #d32f2f;
+$green: #2e7d32;
+
+.page-container { padding: 24px; }
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  h1 { font-size: 22px; font-weight: 600; color: $navy; margin: 0; }
+  .subtitle { margin: 4px 0 0; color: #6b7280; font-size: 14px; }
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lock-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  background: #e8f5e9;
+  color: $green;
+  border: 1px solid #a5d6a7;
+  mat-icon { font-size: 16px; width: 16px; height: 16px; }
+
+  &.locked {
+    background: #fff3e0;
+    color: #e65100;
+    border-color: #ffcc80;
+  }
+}
+
+.btn-lock {
+  padding: 7px 18px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  background: $navy;
+  color: #fff;
+  border: 1px solid $navy;
+  &:hover { background: lighten($navy, 8%); }
+  &.btn-unlock {
+    background: #e65100;
+    border-color: #e65100;
+    &:hover { background: lighten(#e65100, 8%); }
+  }
+}
+
+.alert {
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-bottom: 16px;
+  &-success { background: #e8f5e9; color: $green; border: 1px solid #a5d6a7; }
+  &-error { background: #ffebee; color: $red; border: 1px solid #ef9a9a; }
+}
+
+.main-card {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #6b7a8d;
+  color: #fff;
+  padding: 9px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.btn-add {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: $gold;
+  color: #fff;
+  border: none;
+  &:hover:not(:disabled) { background: darken($gold, 8%); }
+  &:disabled { opacity: 0.5; cursor: default; }
+  mat-icon { font-size: 16px; width: 16px; height: 16px; }
+}
+
+// ── Add range form ──────────────────────────────────────────────────────────
+.add-range-form {
+  padding: 16px 24px;
+  background: $surface;
+  border-bottom: 1px solid $border;
+}
+
+.form-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  label { font-size: 12px; font-weight: 600; color: #374151; }
+}
+
+.num-input {
+  width: 180px;
+  padding: 7px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 14px;
+  color: $navy;
+  &:focus { outline: none; border-color: $navy; }
+}
+
+.num-input-sm {
+  width: 140px;
+  padding: 5px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 13px;
+  color: $navy;
+  &:focus { outline: none; border-color: $navy; }
+}
+
+.form-btns {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.btn-save {
+  padding: 7px 20px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  background: $navy;
+  color: #fff;
+  border: 1px solid $navy;
+  &:hover:not(:disabled) { background: lighten($navy, 8%); }
+  &:disabled { opacity: 0.5; cursor: default; }
+}
+
+.btn-cancel {
+  padding: 7px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  background: #fff;
+  color: $navy;
+  border: 1px solid $navy;
+  &:hover { background: #f1f5f9; }
+}
+
+.inline-error {
+  margin-top: 6px;
+  font-size: 12px;
+  color: $red;
+}
+
+// ── Loading / empty ─────────────────────────────────────────────────────────
+.loading-row, .empty-row {
+  padding: 40px 24px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+// ── Ranges table ─────────────────────────────────────────────────────────────
+.table-wrapper { overflow-x: auto; }
+
+.ranges-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+
+  thead tr {
+    background: #f1f5f9;
+    th {
+      padding: 10px 16px;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 700;
+      color: #374151;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      border-bottom: 1px solid $border;
+    }
+  }
+
+  tbody tr {
+    border-bottom: 1px solid $border;
+    &:last-child { border-bottom: none; }
+    td { padding: 10px 16px; vertical-align: middle; }
+  }
+
+  .range-row {
+    cursor: pointer;
+    transition: background 0.12s;
+    &:hover { background: #f8f9fb; }
+    &.selected { background: #eff6ff; }
+  }
+}
+
+.col-min  { width: 200px; }
+.col-max  { width: 200px; }
+.col-approvers { width: 140px; }
+.col-actions { width: 100px; }
+
+.amount-cell { color: $navy; font-weight: 500; }
+
+.approver-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: $navy;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+.expand-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: #6b7280;
+  vertical-align: middle;
+  transition: transform 0.2s;
+  &.rotated { transform: rotate(180deg); }
+}
+
+.actions-cell {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+  &.btn-edit { color: $navy; &:hover { background: #e0f2fe; } }
+  &.btn-delete { color: $red; &:hover { background: #ffebee; } }
+  &.btn-save-sm { color: $green; &:hover { background: #e8f5e9; } }
+  &.btn-cancel-sm { color: #6b7280; &:hover { background: #f3f4f6; } }
+}
+
+// ── Approvers panel ─────────────────────────────────────────────────────────
+.approvers-panel-row td { padding: 0 !important; }
+
+.approvers-panel {
+  background: #fafbfc;
+  border-top: 2px solid $gold;
+  padding: 16px 24px 20px;
+}
+
+.approvers-panel-header {
+  font-size: 13px;
+  font-weight: 700;
+  color: $navy;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid $border;
+}
+
+// ── Add approver form ────────────────────────────────────────────────────────
+.add-approver-form {
+  margin-bottom: 16px;
+}
+
+.form-field-sm {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  label { font-size: 12px; font-weight: 600; color: #374151; }
+}
+
+.form-field-lg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  label { font-size: 12px; font-weight: 600; color: #374151; }
+}
+
+.select-sm {
+  padding: 7px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 13px;
+  color: $navy;
+  background: #fff;
+  min-width: 140px;
+  &:focus { outline: none; border-color: $navy; }
+}
+
+.form-btns-sm { display: flex; align-items: flex-end; }
+
+.btn-save-sm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  background: $navy;
+  color: #fff;
+  border: 1px solid $navy;
+  mat-icon { font-size: 16px; width: 16px; height: 16px; }
+  &:hover:not(:disabled) { background: lighten($navy, 8%); }
+  &:disabled { opacity: 0.5; cursor: default; }
+}
+
+.no-approvers {
+  color: #6b7280;
+  font-size: 13px;
+  font-style: italic;
+  padding: 8px 0;
+}
+
+// ── Approvers sub-table ──────────────────────────────────────────────────────
+.approvers-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  border: 1px solid $border;
+  border-radius: 6px;
+  overflow: hidden;
+
+  thead tr {
+    background: #f1f5f9;
+    th {
+      padding: 8px 14px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      color: #374151;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+  }
+
+  tbody tr {
+    border-top: 1px solid $border;
+    td { padding: 8px 14px; vertical-align: middle; }
+    &:hover { background: #f8f9fb; }
+  }
+}
+
+.col-level { width: 120px; }
+.col-approver-name { }
+.col-remove { width: 48px; text-align: center; }
+
+.level-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 12px;
+  font-weight: 600;
+}

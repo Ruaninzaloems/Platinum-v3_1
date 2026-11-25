@@ -8,18 +8,28 @@
       <p class="page-subtitle">{{ mode === 'create' ? 'Create a new employee record' : 'ID: ' + emp.id + (emp.employee_code ? ' | Code: ' + emp.employee_code : '') }}</p>
     </div>
     <div class="header-actions">
-      <button class="btn" routerLink="/employees"><app-icon name="chevronLeft" [size]="14"></app-icon> Back</button>
+      @if (fromPayslip) {
+        <button class="btn btn-payslip-back" (click)="backToPayslip()"><app-icon name="chevronLeft" [size]="14"></app-icon> Back to Payslip</button>
+      }
+      <button class="btn" routerLink="/payroll/employees"><app-icon name="chevronLeft" [size]="14"></app-icon> Back</button>
       @if (mode === 'view') {
-        <button class="btn btn-primary" (click)="startEdit()"><app-icon name="edit" [size]="14"></app-icon> Edit</button>
+        <button class="btn btn-primary" (click)="startEdit()" [disabled]="isPayrollLocked"><app-icon name="edit" [size]="14"></app-icon> Edit</button>
       }
       @if (isEditable) {
         <button class="btn" (click)="cancelEdit()">Cancel</button>
-        <button class="btn btn-primary" (click)="save()" [disabled]="saving">{{ saving ? 'Saving...' : 'Save' }}</button>
+        <button class="btn btn-primary" (click)="save()" [disabled]="saving || isPayrollLocked">{{ saving ? 'Saving...' : 'Save' }}</button>
       }
     </div>
   </div>
 
   @if (error) { <div class="alert alert-danger">{{ error }}</div> }
+
+  @if (isPayrollLocked) {
+    <div style="background:#fff8e1;border:1px solid #f59e0b;border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:10px;margin-bottom:12px;color:#92400e;font-size:13px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <span><strong>Payroll locked</strong> — {{ lockMsg }}</span>
+    </div>
+  }
 
   @if (mode !== 'create') {
     <div class="emp-profile-banner">
@@ -43,7 +53,7 @@
           <div class="emp-profile-name">{{ (emp.first_name || '') + ' ' + (emp.surname || '') }}</div>
           <div class="emp-profile-position">{{ emp.position_code ? emp.position_code + ' - ' : '' }}{{ emp.position_title || 'No position assigned' }}</div>
           <div class="emp-profile-meta">
-            <span class="emp-meta-chip">{{ emp.employee_code || '-' }}</span>
+            <span class="emp-meta-chip">{{ emp.id }} | {{ emp.employee_code || '-' }}</span>
             <span class="emp-meta-chip">{{ emp.department_name || lookupName(lookups.departments, emp.department_id) || 'No dept' }}</span>
             @if (emp.division_name || emp.division_id) {
               <span class="emp-meta-chip">{{ emp.division_name || lookupName(lookups.divisions, emp.division_id) }}</span>
@@ -81,7 +91,7 @@
     </div>
   }
 
-  <div class="card detail-card emp-detail-main">
+  <div class="card detail-card emp-detail-main" [attr.data-group]="activeGroup">
     <div class="main-tabs">
       <button class="main-tab" [class.active]="activeGroup === 'employee'" (click)="switchGroup('employee')">Employee</button>
       <button class="main-tab" [class.active]="activeGroup === 'employment'" (click)="switchGroup('employment')">Employment</button>
@@ -89,28 +99,36 @@
         <button class="main-tab" [class.active]="activeGroup === 'payroll'" (click)="switchGroup('payroll')">Payroll</button>
         <button class="main-tab" [class.active]="activeGroup === 'benefits'" (click)="switchGroup('benefits')">Benefits</button>
       }
+      <button class="main-tab" [class.active]="activeGroup === 'leave'" (click)="switchGroup('leave')">Leave</button>
     </div>
     <div class="sub-tabs">
       @if (activeGroup === 'employee') {
         <button class="sub-tab" [class.active]="activeSubTab === 'personal'" (click)="activeSubTab = 'personal'; cdr.detectChanges()">Personal Details</button>
         <button class="sub-tab" [class.active]="activeSubTab === 'contact'" (click)="activeSubTab = 'contact'; cdr.detectChanges()">Contact Details</button>
         <button class="sub-tab" [class.active]="activeSubTab === 'address'" (click)="activeSubTab = 'address'; cdr.detectChanges()">Address Details</button>
+        <button class="sub-tab" [class.active]="activeSubTab === 'banking'" (click)="switchToBanking()">Banking Details</button>
       } @else if (activeGroup === 'employment') {
         <button class="sub-tab" [class.active]="activeSubTab === 'employment'" (click)="activeSubTab = 'employment'; cdr.detectChanges()">Employment Details</button>
         <button class="sub-tab" [class.active]="activeSubTab === 'hours-rates'" (click)="activeSubTab = 'hours-rates'; cdr.detectChanges()">Hours &amp; Rates</button>
+        @if (mode !== 'create') {
+          <button class="sub-tab" [class.active]="activeSubTab === 'shift-assignment'" (click)="switchToShiftAssignment()">Shift Assignment</button>
+        }
       } @else if (activeGroup === 'payroll') {
         <button class="sub-tab" [class.active]="activeSubTab === 'salary-transactions'" (click)="switchToSalaryTransactions()">Salary Transactions</button>
       } @else if (activeGroup === 'benefits') {
         <button class="sub-tab" [class.active]="activeSubTab === 'medical-aid'" (click)="switchToMedicalAid()">Medical Aid</button>
         <button class="sub-tab" [class.active]="activeSubTab === 'retirement-funds'" (click)="switchToRetirementFunds()">Retirement Funds</button>
         <button class="sub-tab" [class.active]="activeSubTab === 'unions'" (click)="switchToUnions()">Unions</button>
+      } @else if (activeGroup === 'leave') {
+        <button class="sub-tab" [class.active]="activeSubTab === 'leave-scheme'" (click)="activeSubTab = 'leave-scheme'; cdr.detectChanges()">Leave Scheme</button>
+        <button class="sub-tab" [class.active]="activeSubTab === 'leave-balances'" (click)="activeSubTab = 'leave-balances'; loadLeaveBalances(); cdr.detectChanges()">Leave Balances</button>
       }
     </div>
 
     @if (activeSubTab === 'employment') {
       <div class="sub-tab-content">
-        <div class="emp-section-group">
-          <div class="emp-section-heading">Employee Identification</div>
+        <div class="detail-card">
+          <div class="section-title">Employee Identification</div>
           <div class="form-row">
             <div class="form-group">
               <label>Employee ID</label>
@@ -118,8 +136,8 @@
             </div>
             <div class="form-group">
               <label>Employee Code</label>
-              @if (isEditable && mode === 'create' && emp.employee_create_type === 'Take-On Employee') {
-                <input class="form-control" [(ngModel)]="emp.employee_code" placeholder="Enter old system code">
+              @if (isEditable) {
+                <input class="form-control" [(ngModel)]="emp.employee_code" placeholder="Auto-generated if blank">
               } @else {
                 <div class="field-value">{{ emp.employee_code || 'Auto-generated' }}</div>
               }
@@ -142,53 +160,89 @@
           </div>
         </div>
 
-        <div class="emp-section-group">
-          <div class="emp-section-heading">Organisational Placement</div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Department</label>
-              @if (isEditable && mode === 'create') {
-                <select class="form-control" [(ngModel)]="emp.department_id" (ngModelChange)="onDepartmentChange()">
-                  <option [ngValue]="null">-- Select Department --</option>
-                  @for (d of lookups.departments; track d.id) { <option [ngValue]="d.id">{{ d.name }}</option> }
-                </select>
-              } @else {
-                <div class="field-value">{{ emp.department_name || lookupName(lookups.departments, emp.department_id) }}</div>
-              }
-            </div>
-            <div class="form-group">
-              <label>Division</label>
-              @if (isEditable && mode === 'create') {
-                <select class="form-control" [(ngModel)]="emp.division_id" (ngModelChange)="onDivisionChange()">
-                  <option [ngValue]="null">-- Select Division --</option>
-                  @for (d of filteredDivisions; track d.id) { <option [ngValue]="d.id">{{ d.name }}</option> }
-                </select>
-              } @else {
-                <div class="field-value">{{ emp.division_name || lookupName(lookups.divisions, emp.division_id) }}</div>
-              }
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Position</label>
-              @if (isEditable && mode === 'create') {
+        <div class="detail-card">
+          <div class="section-title">Organisational Placement</div>
+          <!-- In create mode: select position first; dept/division/job profile auto-populate -->
+          @if (mode === 'create' && isEditable) {
+            <div class="form-row">
+              <div class="form-group" style="grid-column: span 2">
+                <label>Position <span class="required">*</span></label>
                 <select class="form-control" [(ngModel)]="emp.position_id" (ngModelChange)="onPositionChange()">
                   <option [ngValue]="null">-- Select Vacant Position --</option>
-                  @for (p of filteredPositions; track p.id) { <option [ngValue]="p.id">{{ p.position_code }} - {{ p.title }}{{ p.funded === false ? ' (Unfunded)' : '' }}</option> }
+                  @for (p of filteredPositions; track p.id) {
+                    <option [ngValue]="p.id">{{ p.position_code }} - {{ p.title }}{{ p.funded === false ? ' (Unfunded)' : '' }}{{ p.department_name ? ' | ' + p.department_name : '' }}{{ p.division_name ? ' / ' + p.division_name : '' }}</option>
+                  }
                 </select>
-              } @else {
-                <div class="field-value">{{ emp.position_code ? emp.position_code + ' - ' : '' }}{{ emp.position_title || '-' }}</div>
-              }
+                @if (filteredPositions.length === 0) {
+                  <div class="field-hint">No vacant positions found. Create positions first.</div>
+                }
+              </div>
             </div>
-            <div class="form-group">
-              <label>Job Profile</label>
-              <div class="field-value derived">{{ emp.job_title || '-' }}</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Department</label>
+                <div class="field-value derived">{{ emp.department_name || (emp.position_id ? '-' : 'Auto-populated from position') }}</div>
+              </div>
+              <div class="form-group">
+                <label>Division</label>
+                <div class="field-value derived">{{ emp.division_name || (emp.position_id ? '-' : 'Auto-populated from position') }}</div>
+              </div>
             </div>
-          </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Job Profile</label>
+                <div class="field-value derived">{{ emp.job_title || (emp.position_id ? '-' : 'Auto-populated from position') }}</div>
+              </div>
+              <div class="form-group"></div>
+            </div>
+          } @else {
+            <!-- View / edit mode: show all fields normally -->
+            <div class="form-row">
+              <div class="form-group">
+                <label>Department</label>
+                @if (isEditable) {
+                  <select class="form-control" [(ngModel)]="emp.department_id" (ngModelChange)="onDepartmentChange()">
+                    <option [ngValue]="null">-- Select Department --</option>
+                    @for (d of lookups.departments; track d.id) { <option [ngValue]="d.id">{{ d.name }}</option> }
+                  </select>
+                } @else {
+                  <div class="field-value">{{ emp.department_name || lookupName(lookups.departments, emp.department_id) }}</div>
+                }
+              </div>
+              <div class="form-group">
+                <label>Division</label>
+                @if (isEditable) {
+                  <select class="form-control" [(ngModel)]="emp.division_id" (ngModelChange)="onDivisionChange()">
+                    <option [ngValue]="null">-- Select Division --</option>
+                    @for (d of filteredDivisions; track d.id) { <option [ngValue]="d.id">{{ d.name }}</option> }
+                  </select>
+                } @else {
+                  <div class="field-value">{{ emp.division_name || lookupName(lookups.divisions, emp.division_id) }}</div>
+                }
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Position</label>
+                @if (isEditable) {
+                  <select class="form-control" [(ngModel)]="emp.position_id" (ngModelChange)="onPositionChange()">
+                    <option [ngValue]="null">-- Select Vacant Position --</option>
+                    @for (p of filteredPositions; track p.id) { <option [ngValue]="p.id">{{ p.position_code }} - {{ p.title }}{{ p.funded === false ? ' (Unfunded)' : '' }}</option> }
+                  </select>
+                } @else {
+                  <div class="field-value">{{ emp.position_code ? emp.position_code + ' - ' : '' }}{{ emp.position_title || '-' }}</div>
+                }
+              </div>
+              <div class="form-group">
+                <label>Job Profile</label>
+                <div class="field-value derived">{{ emp.job_title || '-' }}</div>
+              </div>
+            </div>
+          }
         </div>
 
-        <div class="emp-section-group">
-          <div class="emp-section-heading">Classification</div>
+        <div class="detail-card">
+          <div class="section-title">Classification</div>
           <div class="form-row">
             <div class="form-group">
               <label>Employee Type</label>
@@ -208,13 +262,13 @@
           </div>
         </div>
 
-        <div class="emp-section-group">
-          <div class="emp-section-heading">Service Dates</div>
+        <div class="detail-card">
+          <div class="section-title">Service Dates</div>
           <div class="form-row">
             <div class="form-group">
               <label>Start Date</label>
               @if (isEditable) {
-                <input type="date" class="form-control" [(ngModel)]="emp.joining_date">
+                <app-date-input [(ngModel)]="emp.joining_date"></app-date-input>
               } @else {
                 <div class="field-value">{{ formatDate(emp.joining_date) }}</div>
               }
@@ -222,7 +276,7 @@
             <div class="form-group">
               <label>End Date</label>
               @if (isEditable) {
-                <input type="date" class="form-control" [(ngModel)]="emp.end_date">
+                <app-date-input [(ngModel)]="emp.end_date"></app-date-input>
               } @else {
                 <div class="field-value">{{ emp.end_date === '9999-12-31' ? 'Open-ended' : formatDate(emp.end_date) }}</div>
               }
@@ -234,8 +288,8 @@
 
     @if (activeSubTab === 'personal') {
       <div class="sub-tab-content">
-        <div class="emp-section-group">
-          <div class="emp-section-heading">Identification</div>
+        <div class="detail-card">
+          <div class="section-title">Identification</div>
           <div class="form-row form-row-3">
             <div class="form-group">
               <label>ID Number</label>
@@ -266,8 +320,8 @@
           </div>
         </div>
 
-        <div class="emp-section-group">
-          <div class="emp-section-heading">Personal Information</div>
+        <div class="detail-card">
+          <div class="section-title">Personal Information</div>
           @if (emp.id && (mode === 'view' || mode === 'edit') && !emp.photo_url && isEditable) {
             <div style="margin-bottom:8px">
               <label class="btn btn-sm photo-upload-btn">
@@ -333,7 +387,7 @@
             <div class="form-group">
               <label>Date of Birth</label>
               @if (isEditable && !dobLocked) {
-                <input type="date" class="form-control" [(ngModel)]="emp.date_of_birth">
+                <app-date-input [(ngModel)]="emp.date_of_birth"></app-date-input>
               } @else {
                 <div class="field-value">{{ formatDate(emp.date_of_birth) }}</div>
               }
@@ -342,8 +396,8 @@
           </div>
         </div>
 
-        <div class="emp-section-group">
-          <div class="emp-section-heading">Demographics</div>
+        <div class="detail-card">
+          <div class="section-title">Demographics</div>
           <div class="form-row form-row-3">
             <div class="form-group">
               <label>Age</label>
@@ -388,7 +442,7 @@
               <div class="form-group">
                 <label>Marital Date</label>
                 @if (isEditable) {
-                  <input type="date" class="form-control" [(ngModel)]="emp.marital_date">
+                  <app-date-input [(ngModel)]="emp.marital_date"></app-date-input>
                 } @else {
                   <div class="field-value">{{ formatDate(emp.marital_date) }}</div>
                 }
@@ -441,8 +495,8 @@
 
     @if (activeSubTab === 'contact') {
       <div class="sub-tab-content">
-        <div class="emp-section-group">
-          <div class="emp-section-heading">Contact Numbers</div>
+        <div class="detail-card">
+          <div class="section-title">Contact Numbers</div>
           <div class="form-row">
             <div class="form-group">
               <label>Cell Number</label>
@@ -474,8 +528,8 @@
           </div>
         </div>
 
-        <div class="emp-section-group">
-          <div class="emp-section-heading">Payroll &amp; Payslip</div>
+        <div class="detail-card">
+          <div class="section-title">Payroll &amp; Payslip</div>
           <div class="form-row">
             <div class="form-group">
               <label>Pay Point</label>
@@ -512,8 +566,8 @@
     @if (activeSubTab === 'address') {
       <div class="sub-tab-content">
         <div class="address-columns">
-          <div class="address-col">
-            <div class="emp-section-heading">Physical Address</div>
+          <div class="detail-card address-col">
+            <div class="section-title">Physical Address</div>
             <div class="form-group">
               <label>Address Line 1</label>
               @if (isEditable) { <input class="form-control" [(ngModel)]="emp.physical_address_1"> } @else { <div class="field-value">{{ emp.physical_address_1 || '-' }}</div> }
@@ -536,8 +590,8 @@
             </div>
           </div>
 
-          <div class="address-col">
-            <div class="emp-section-heading">
+          <div class="detail-card address-col">
+            <div class="section-title">
               Postal Address
               @if (isEditable) {
                 <label class="checkbox-label address-same-check"><input type="checkbox" [(ngModel)]="emp.postal_same_as_physical" (ngModelChange)="onPostalSameAsPhysical()"> Same as Physical</label>
@@ -572,10 +626,101 @@
       </div>
     }
 
+    @if (activeSubTab === 'banking') {
+      <div class="sub-tab-content">
+        <div class="detail-card">
+          <div class="section-title">Banking Details</div>
+          @if (bankLookupError) {
+            <div class="alert alert-warning" style="margin-bottom: 12px;">
+              {{ bankLookupError }}
+              <button type="button" class="btn btn-sm btn-link" (click)="loadBankLookups()">Retry</button>
+            </div>
+          }
+          <div class="form-row">
+            <div class="form-group">
+              <label>Bank</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="emp.bank_id" (ngModelChange)="onBankChange()" [disabled]="bankLookupLoading">
+                  <option [ngValue]="null">-- Select Bank --</option>
+                  @for (b of banks; track b.bankId) { <option [ngValue]="b.bankId">{{ b.name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ selectedBankName() || emp.bank_name || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Branch Code</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="emp.bank_branch_code_id" (ngModelChange)="onBranchChange()" [disabled]="!emp.bank_id || bankLookupLoading">
+                  <option [ngValue]="null">-- Select Branch --</option>
+                  @for (br of filteredBranches; track br.bankBranchCodeId) { <option [ngValue]="br.bankBranchCodeId">{{ br.branchCode }}{{ br.description ? ' - ' + br.description : '' }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ selectedBranchLabel() || emp.bank_branch_code || '-' }}</div>
+              }
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Account Type</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="emp.bank_account_type_id" (ngModelChange)="onAccountTypeChange()" [disabled]="bankLookupLoading">
+                  <option [ngValue]="null">-- Select Account Type --</option>
+                  @for (t of accountTypes; track t.bankAccountTypeId) { <option [ngValue]="t.bankAccountTypeId">{{ t.name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ selectedAccountTypeName() || emp.bank_account_type || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Account Number</label>
+              @if (isEditable) {
+                <input class="form-control" [(ngModel)]="emp.bank_account_number" maxlength="16" inputmode="numeric"
+                       pattern="[0-9]{6,16}" placeholder="6-16 digits"
+                       (input)="onAccountNumberInput($event)">
+                @if (bankingErrors.account_number) {
+                  <div class="field-error">{{ bankingErrors.account_number }}</div>
+                }
+              } @else {
+                <div class="field-value">{{ emp.bank_account_number || '-' }}</div>
+              }
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Account Holder Name</label>
+              @if (isEditable) {
+                <input class="form-control" [(ngModel)]="emp.bank_account_holder" maxlength="200" placeholder="Full name as per bank" (ngModelChange)="validateAccountHolder()">
+                @if (bankingErrors.account_holder) {
+                  <div class="field-error">{{ bankingErrors.account_holder }}</div>
+                }
+              } @else {
+                <div class="field-value">{{ emp.bank_account_holder || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Account Holder Relationship</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="emp.account_holder_relationship">
+                  <option [ngValue]="null">-- Select --</option>
+                  <option value="SELF">Self</option>
+                  <option value="SPOUSE">Spouse</option>
+                  <option value="CHILD">Child</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              } @else {
+                <div class="field-value">{{ relationshipLabel(emp.account_holder_relationship) }}</div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
     @if (activeSubTab === 'hours-rates') {
       <div class="sub-tab-content">
-        <div class="emp-section-group">
-          <div class="emp-section-heading">Payroll &amp; Salary</div>
+        <div class="detail-card">
+          <div class="section-title">Payroll &amp; Salary</div>
           <div class="form-row">
             <div class="form-group">
               <label>Payroll Cycle</label>
@@ -665,8 +810,8 @@
           </div>
         </div>
 
-        <div class="emp-section-group">
-          <div class="emp-section-heading">Working Hours &amp; Rates</div>
+        <div class="detail-card">
+          <div class="section-title">Working Hours &amp; Rates</div>
           @if (payStructureType === 'Rate Based') {
           <div class="form-row">
             <div class="form-group">
@@ -744,8 +889,8 @@
           </div>
         </div>
 
-        <div class="emp-section-group">
-          <div class="emp-section-heading">Tax &amp; Settings</div>
+        <div class="detail-card">
+          <div class="section-title">Tax &amp; Settings</div>
           <div class="form-row">
             <div class="form-group">
               <label>Method of Tax Calculation</label>
@@ -784,8 +929,8 @@
           </div>
         </div>
 
-        <div class="emp-section-group">
-          <div class="emp-section-heading">Bonus Configuration</div>
+        <div class="detail-card">
+          <div class="section-title">Bonus Configuration</div>
           <div class="form-row">
             <div class="form-group">
               <div class="emp-flags-row">
@@ -870,8 +1015,166 @@
       </div>
     }
 
+    @if (activeSubTab === 'shift-assignment') {
+      <div class="sub-tab-content">
+
+        <div class="detail-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h4 style="font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#0f2b46; margin:0;">Shift Rotation Assignment</h4>
+            <button class="btn btn-primary btn-sm" (click)="openAddShiftAssign()">
+              <app-icon name="plus" [size]="13"></app-icon> Assign Rotation
+            </button>
+          </div>
+
+          @if (shiftAssignmentsLoading) {
+            <div style="padding:24px; text-align:center; color:#64748b; font-size:13px;"><div class="spinner"></div>Loading assignments...</div>
+          } @else {
+
+            @if (activeShiftAssignment) {
+              <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:14px 16px; margin-bottom:16px; display:flex; align-items:flex-start; gap:14px;">
+                <div style="flex:1;">
+                  <div style="font-size:11px; text-transform:uppercase; color:#166534; letter-spacing:.4px; margin-bottom:4px;">Current Active Rotation</div>
+                  <div style="font-size:15px; font-weight:700; color:#0f2b46;">{{ activeShiftAssignment.rotation_name }}</div>
+                  @if (activeShiftAssignment.rotation_short_desc) {
+                    <div style="font-size:12px; color:#64748b; margin-top:2px;">{{ activeShiftAssignment.rotation_short_desc }}</div>
+                  }
+                  <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:12px;">
+                    <span style="font-size:12px; color:#374151;"><strong>Weeks:</strong> {{ activeShiftAssignment.no_of_weeks || '-' }}</span>
+                    <span style="font-size:12px; color:#374151;"><strong>From:</strong> {{ formatDate(activeShiftAssignment.effective_from) }}</span>
+                    <span style="font-size:12px; color:#374151;"><strong>To:</strong> {{ activeShiftAssignment.effective_to >= '9999-01-01' ? 'Ongoing' : formatDate(activeShiftAssignment.effective_to) }}</span>
+                  </div>
+                  @if (activeShiftAssignment.notes) {
+                    <div style="font-size:12px; color:#64748b; margin-top:6px; font-style:italic;">{{ activeShiftAssignment.notes }}</div>
+                  }
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px; flex-shrink:0;">
+                  <button class="btn btn-sm" (click)="openEditShiftAssign(activeShiftAssignment)" title="Edit">
+                    <app-icon name="edit" [size]="12"></app-icon>
+                  </button>
+                  <button class="btn btn-sm" (click)="deleteShiftAssign(activeShiftAssignment)" title="Remove" style="color:#dc2626;">
+                    <app-icon name="trash" [size]="12"></app-icon>
+                  </button>
+                </div>
+              </div>
+            } @else {
+              <div style="padding:20px 0; font-size:13px; color:#94a3b8; font-style:italic; margin-bottom:12px;">No active shift rotation assigned to this employee.</div>
+            }
+
+            @if (shiftAssignments.length > 0) {
+              <div style="margin-top:8px;">
+                <div style="font-size:11px; text-transform:uppercase; color:#64748b; letter-spacing:.4px; margin-bottom:8px;">Assignment History</div>
+                <div class="st-table-wrap">
+                  <table class="st-table">
+                    <thead>
+                      <tr>
+                        <th>Rotation</th>
+                        <th>Effective From</th>
+                        <th>Effective To</th>
+                        <th>Weeks</th>
+                        <th>Status</th>
+                        <th>Notes</th>
+                        <th style="width:80px;">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (a of shiftAssignments; track a.id) {
+                        @let badge = shiftAssignStatusBadge(a);
+                        <tr>
+                          <td style="font-weight:500;">{{ a.rotation_name }}</td>
+                          <td>{{ formatDate(a.effective_from) }}</td>
+                          <td>{{ a.effective_to >= '9999-01-01' ? 'Ongoing' : formatDate(a.effective_to) }}</td>
+                          <td>{{ a.no_of_weeks || '-' }}</td>
+                          <td>
+                            <span class="status-badge" [ngClass]="{
+                              'badge-success': badge.cls === 'badge-success',
+                              'badge-neutral': badge.cls === 'badge-neutral',
+                              'badge-info': badge.cls === 'badge-info',
+                              'badge-warning': badge.cls === 'badge-warning'
+                            }">{{ badge.label }}</span>
+                          </td>
+                          <td style="color:#64748b; font-size:12px;">{{ a.notes || '-' }}</td>
+                          <td>
+                            <button class="btn btn-sm" (click)="openEditShiftAssign(a)" title="Edit" style="margin-right:4px;"><app-icon name="edit" [size]="12"></app-icon></button>
+                            <button class="btn btn-sm" (click)="deleteShiftAssign(a)" title="Remove" style="color:#dc2626;"><app-icon name="trash" [size]="12"></app-icon></button>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+
+          }
+        </div>
+
+        @if (mode !== 'create' && emp?.id) {
+          <div class="detail-card" style="margin-top:12px;">
+            <div style="font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#0f2b46; margin-bottom:14px;">Expected Roster Preview</div>
+            <div style="display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-bottom:14px;">
+              <div class="form-group" style="margin:0; min-width:150px;">
+                <label>From Date</label>
+                <app-date-input [(ngModel)]="shiftRosterFrom"></app-date-input>
+              </div>
+              <div class="form-group" style="margin:0; min-width:150px;">
+                <label>To Date</label>
+                <app-date-input [(ngModel)]="shiftRosterTo"></app-date-input>
+              </div>
+              <button class="btn btn-primary btn-sm" (click)="loadShiftRoster()" [disabled]="shiftRosterLoading" style="align-self:flex-end; margin-bottom:2px;">
+                {{ shiftRosterLoading ? 'Loading...' : 'Generate Roster' }}
+              </button>
+            </div>
+
+            @if (shiftRosterError) {
+              <div style="padding:10px 14px; background:#fef2f2; border:1px solid #fca5a5; border-radius:6px; color:#991b1b; font-size:13px; margin-bottom:12px;">{{ shiftRosterError }}</div>
+            }
+
+            @if (shiftRoster.length > 0) {
+              <div class="st-table-wrap">
+                <table class="st-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Day</th>
+                      <th>Week</th>
+                      <th>Shift</th>
+                      <th>Start</th>
+                      <th>End</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (r of shiftRoster; track r.date) {
+                      <tr [style.opacity]="r.is_off ? '0.55' : '1'">
+                        <td>{{ formatDate(r.date) }}</td>
+                        <td style="text-transform:capitalize; font-size:12px;">{{ r.day_of_week }}</td>
+                        <td>{{ r.week_no }}</td>
+                        <td style="font-weight:500;">{{ r.shift_name }}</td>
+                        <td>{{ r.shift_start || '-' }}</td>
+                        <td>{{ r.shift_end || '-' }}</td>
+                        <td>
+                          @if (r.is_off) {
+                            <span class="status-badge badge-neutral">Off</span>
+                          } @else {
+                            <span class="status-badge badge-success">Scheduled</span>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              <div style="font-size:12px; color:#64748b; margin-top:8px;">{{ shiftRoster.length }} day(s) in preview</div>
+            }
+          </div>
+        }
+
+      </div>
+    }
+
     @if (activeSubTab === 'salary-transactions') {
       <div class="sub-tab-content">
+       <div class="detail-card">
         @if (salaryTxnsLoading) {
           <div class="st-loading"><div class="spinner"></div>Loading salary transactions...</div>
         } @else {
@@ -884,7 +1187,7 @@
                 <span class="st-group-none">No group linked (Position → Job Profile → Group chain incomplete)</span>
               }
             </div>
-            <button class="btn btn-primary btn-sm" (click)="openSalaryTxnModal()">
+            <button class="btn btn-primary btn-sm" (click)="openSalaryTxnModal()" [disabled]="isPayrollLocked">
               <app-icon name="plus" [size]="14"></app-icon> Add Salary Transaction
             </button>
           </div>
@@ -905,13 +1208,8 @@
                       <tr>
                         <th>IRP5 Code</th>
                         <th>Salary Transaction</th>
-                        <th>Method</th>
-                        <th style="text-align:center">Taxable</th>
                         <th style="text-align:right">Taxable %</th>
-                        <th style="text-align:right">Amount</th>
-                        <th style="text-align:right">Percentage</th>
-                        <th style="text-align:center">In Package</th>
-                        <th>Source</th>
+                        <th>Primary SCOA Id</th>
                         <th style="width:80px">Actions</th>
                       </tr>
                     </thead>
@@ -920,46 +1218,17 @@
                         <tr>
                           <td><span class="st-irp5">{{ t.irp5_code || '-' }}</span></td>
                           <td><span class="st-txn-name">{{ t.name }}</span> <span class="st-code">({{ t.code }})</span></td>
-                          <td><span class="st-method">{{ t.calculation_method === 'PERCENTAGE_OF_BASIC' ? '% of Basic' : t.calculation_method === 'SYSTEM_CALCULATE' ? 'System' : 'Fixed' }}</span></td>
-                          <td style="text-align:center">
-                            @if (t.taxable) {
-                              <span class="st-flag st-yes">Yes</span>
-                            } @else {
-                              <span class="st-flag st-no">No</span>
-                            }
-                          </td>
                           <td style="text-align:right">{{ t.taxable ? '100.00' : '0.00' }}</td>
-                          <td style="text-align:right">
-                            @if (t.amount && +t.amount > 0) {
-                              {{ t.amount | currencyZar }}
-                            } @else {
-                              <span style="color:#94a3b8">-</span>
-                            }
-                          </td>
-                          <td style="text-align:right">
-                            @if (t.percentage && +t.percentage > 0) {
-                              {{ t.percentage }}%
-                            } @else {
-                              <span style="color:#94a3b8">-</span>
-                            }
-                          </td>
-                          <td style="text-align:center">
-                            @if (t.included_in_package === false) {
-                              <span class="st-flag st-no">No</span>
-                            } @else {
-                              <span class="st-flag st-yes">Yes</span>
-                            }
-                          </td>
                           <td>
-                            @if (t.source === 'inherited') {
-                              <span class="st-source-badge st-inherited">Inherited</span>
+                            @if (t.primary_scoa_code) {
+                              <span class="st-scoa-code" [title]="t.primary_scoa_short_desc || ''">{{ t.primary_scoa_code }}</span>
                             } @else {
-                              <span class="st-source-badge st-employee">Employee</span>
+                              <span style="color:#94a3b8">-</span>
                             }
                           </td>
                           <td>
                             @if (t.source === 'employee') {
-                              <button class="btn btn-sm" (click)="deleteSalaryTxn(t)" title="Remove"><app-icon name="trash" [size]="12"></app-icon></button>
+                              <button class="btn btn-sm" (click)="deleteSalaryTxn(t)" title="Remove" [disabled]="isPayrollLocked"><app-icon name="trash" [size]="12"></app-icon></button>
                             }
                           </td>
                         </tr>
@@ -979,11 +1248,13 @@
             <span>{{ employeeTxns.length }} employee-specific</span>
           </div>
         }
+       </div>
       </div>
     }
 
     @if (activeSubTab === 'medical-aid') {
       <div class="sub-tab-content">
+       <div class="detail-card">
         @if (medAidLoading) {
           <div class="st-loading"><div class="spinner"></div>Loading medical aid...</div>
         } @else {
@@ -1006,11 +1277,11 @@
                 </div>
                 <div style="display:flex; gap:8px">
                   @if (currentMembership) {
-                    <button class="btn btn-sm" (click)="openMedAidSchemeModal('edit', currentMembership)">
+                    <button class="btn btn-sm" (click)="openMedAidSchemeModal('edit', currentMembership)" [disabled]="isPayrollLocked">
                       <app-icon name="edit" [size]="12"></app-icon> Edit
                     </button>
                   }
-                  <button class="btn btn-sm btn-primary" (click)="openMedAidSchemeModal('create')">
+                  <button class="btn btn-sm btn-primary" (click)="openMedAidSchemeModal('create')" [disabled]="isPayrollLocked">
                     <app-icon name="plus" [size]="12"></app-icon> Add Scheme
                   </button>
                 </div>
@@ -1087,8 +1358,8 @@
                             </td>
                             <td>
                               <div style="display:flex; gap:4px">
-                                <button class="btn btn-sm" (click)="openMedAidSchemeModal('edit', m); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
-                                <button class="btn btn-sm" (click)="deleteMembership(m); $event.stopPropagation()" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                                <button class="btn btn-sm" (click)="openMedAidSchemeModal('edit', m); $event.stopPropagation()" title="Edit" [disabled]="isPayrollLocked"><app-icon name="edit" [size]="12"></app-icon></button>
+                                <button class="btn btn-sm" (click)="deleteMembership(m); $event.stopPropagation()" title="Delete" [disabled]="isPayrollLocked"><app-icon name="trash" [size]="12"></app-icon></button>
                               </div>
                             </td>
                           </tr>
@@ -1108,7 +1379,7 @@
                   <label class="st-group-label">Extra Transactions for</label>
                   <span class="st-group-name" style="font-size:13px">{{ currentMembership.scheme_name }}</span>
                 </div>
-                <button class="btn btn-sm btn-primary" (click)="openExtraTxnModal('create')">
+                <button class="btn btn-sm btn-primary" (click)="openExtraTxnModal('create')" [disabled]="isPayrollLocked">
                   <app-icon name="plus" [size]="12"></app-icon> Add Extra Transaction
                 </button>
               </div>
@@ -1141,8 +1412,8 @@
                           </td>
                           <td>
                             <div style="display:flex; gap:4px">
-                              <button class="btn btn-sm" (click)="openExtraTxnModal('edit', et)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
-                              <button class="btn btn-sm" (click)="deleteExtraTxn(et)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                              <button class="btn btn-sm" (click)="openExtraTxnModal('edit', et)" title="Edit" [disabled]="isPayrollLocked"><app-icon name="edit" [size]="12"></app-icon></button>
+                              <button class="btn btn-sm" (click)="deleteExtraTxn(et)" title="Delete" [disabled]="isPayrollLocked"><app-icon name="trash" [size]="12"></app-icon></button>
                             </div>
                           </td>
                         </tr>
@@ -1163,7 +1434,7 @@
                   <label class="st-group-label">Dependants for</label>
                   <span class="st-group-name" style="font-size:13px">{{ currentMembership.scheme_name }}</span>
                 </div>
-                <button class="btn btn-sm btn-primary" (click)="openDependantModal('create')">
+                <button class="btn btn-sm btn-primary" (click)="openDependantModal('create')" [disabled]="isPayrollLocked">
                   <app-icon name="plus" [size]="12"></app-icon> Add Dependant
                 </button>
               </div>
@@ -1220,8 +1491,8 @@
                           </td>
                           <td>
                             <div style="display:flex; gap:4px">
-                              <button class="btn btn-sm" (click)="openDependantModal('edit', dep)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
-                              <button class="btn btn-sm" (click)="deleteDependant(dep)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                              <button class="btn btn-sm" (click)="openDependantModal('edit', dep)" title="Edit" [disabled]="isPayrollLocked"><app-icon name="edit" [size]="12"></app-icon></button>
+                              <button class="btn btn-sm" (click)="deleteDependant(dep)" title="Delete" [disabled]="isPayrollLocked"><app-icon name="trash" [size]="12"></app-icon></button>
                             </div>
                           </td>
                         </tr>
@@ -1235,12 +1506,13 @@
             </div>
           }
         }
+       </div>
       </div>
     }
 
     @if (activeSubTab === 'retirement-funds') {
       <div class="sub-tab-content">
-        <div class="emp-section-group">
+        <div class="detail-card">
           <div class="ret-inner-tabs">
             <button class="ret-tab" [class.active]="retInnerTab === 'pension'" (click)="retInnerTab = 'pension'; cdr.detectChanges()">Pension</button>
             <button class="ret-tab" [class.active]="retInnerTab === 'provident'" (click)="retInnerTab = 'provident'; cdr.detectChanges()">Provident</button>
@@ -1284,7 +1556,7 @@
                 </div>
                 <div class="form-group">
                   <label>Join Date <span class="required">*</span></label>
-                  <input type="date" class="form-control" [(ngModel)]="editRetFund.join_date">
+                  <app-date-input [(ngModel)]="editRetFund.join_date"></app-date-input>
                 </div>
               </div>
               <div class="form-row">
@@ -1299,7 +1571,7 @@
                 </div>
                 <div class="form-group">
                   <label>Termination Date <span class="required">*</span></label>
-                  <input type="date" class="form-control" [(ngModel)]="editRetFund.termination_date">
+                  <app-date-input [(ngModel)]="editRetFund.termination_date"></app-date-input>
                 </div>
               </div>
               @if (retInnerTab === 'retirement') {
@@ -1315,7 +1587,7 @@
                 </div>
               }
               <div class="ret-action-row">
-                <button class="btn btn-sm" (click)="retFundMode = 'create'; saveRetFund()"><app-icon name="plus" [size]="12"></app-icon> Add</button>
+                <button class="btn btn-sm" (click)="retFundMode = 'create'; saveRetFund()" [disabled]="isPayrollLocked"><app-icon name="plus" [size]="12"></app-icon> Add</button>
                 <button class="btn btn-sm" (click)="editRetFund = { vendor_id: '', fund_type_id: '' }; retPlansForSelectedAdmin = []; cdr.detectChanges()">Cancel</button>
               </div>
             </div>
@@ -1351,8 +1623,8 @@
                       <td style="text-align:right">{{ (rf.employee_amount || 0) + (rf.employer_amount || 0) | number:'1.2-2' }}</td>
                       <td>
                         <div style="display:flex; gap:4px;">
-                          <button class="btn btn-sm" (click)="openRetFundModal('edit', rf)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
-                          <button class="btn btn-sm" (click)="deleteRetFund(rf)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                          <button class="btn btn-sm" (click)="openRetFundModal('edit', rf)" title="Edit" [disabled]="isPayrollLocked"><app-icon name="edit" [size]="12"></app-icon></button>
+                          <button class="btn btn-sm" (click)="deleteRetFund(rf)" title="Delete" [disabled]="isPayrollLocked"><app-icon name="trash" [size]="12"></app-icon></button>
                         </div>
                       </td>
                     </tr>
@@ -1367,7 +1639,7 @@
 
     @if (activeSubTab === 'unions') {
       <div class="sub-tab-content">
-        <div class="emp-section-group">
+        <div class="detail-card">
           @if (unionLoading) {
             <div class="loading" style="padding: 20px; text-align:center; color:#64748b;">Loading unions...</div>
           } @else {
@@ -1384,18 +1656,18 @@
                 </div>
                 <div class="form-group">
                   <label>Join Date <span class="required">*</span></label>
-                  <input type="date" class="form-control" [(ngModel)]="editUnion.join_date">
+                  <app-date-input [(ngModel)]="editUnion.join_date"></app-date-input>
                 </div>
               </div>
               <div class="form-row">
                 <div class="form-group">
                   <label>Termination Date</label>
-                  <input type="date" class="form-control" [(ngModel)]="editUnion.termination_date">
+                  <app-date-input [(ngModel)]="editUnion.termination_date"></app-date-input>
                 </div>
                 <div class="form-group"></div>
               </div>
               <div class="ret-action-row">
-                <button class="btn btn-sm" (click)="saveUnion()"><app-icon [name]="editingUnionId ? 'check' : 'plus'" [size]="12"></app-icon> {{ editingUnionId ? 'Update' : 'Add' }}</button>
+                <button class="btn btn-sm" (click)="saveUnion()" [disabled]="isPayrollLocked"><app-icon [name]="editingUnionId ? 'check' : 'plus'" [size]="12"></app-icon> {{ editingUnionId ? 'Update' : 'Add' }}</button>
                 <button class="btn btn-sm" (click)="cancelUnionEdit()">Cancel</button>
               </div>
             </div>
@@ -1429,8 +1701,8 @@
                       <td><span class="status-pill" [class.active]="unionStatus(um) === 'Active'" [class.terminated]="unionStatus(um) === 'Terminated'">{{ unionStatus(um) }}</span></td>
                       <td>
                         <div style="display:flex; gap:4px;">
-                          <button class="btn btn-sm" (click)="startEditUnion(um)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
-                          <button class="btn btn-sm" (click)="deleteUnion(um)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                          <button class="btn btn-sm" (click)="startEditUnion(um)" title="Edit" [disabled]="isPayrollLocked"><app-icon name="edit" [size]="12"></app-icon></button>
+                          <button class="btn btn-sm" (click)="deleteUnion(um)" title="Delete" [disabled]="isPayrollLocked"><app-icon name="trash" [size]="12"></app-icon></button>
                         </div>
                       </td>
                     </tr>
@@ -1442,6 +1714,223 @@
         </div>
       </div>
     }
+
+@if (activeSubTab === 'leave-scheme') {
+  <div class="sub-tab-content">
+    <div class="detail-card">
+
+      @if (leaveSuccess) {
+        <div class="alert-success" style="margin-bottom:12px; padding:10px 14px; background:#f0fdf4; border:1px solid #86efac; border-radius:6px; color:#166534; font-size:13px;">
+          {{ leaveSuccess }}
+        </div>
+      }
+      @if (leaveError) {
+        <div class="alert-error" style="margin-bottom:12px; padding:10px 14px; background:#fef2f2; border:1px solid #fca5a5; border-radius:6px; color:#991b1b; font-size:13px;">
+          {{ leaveError }}
+        </div>
+      }
+
+      @if (mode === 'create') {
+        <div style="padding:32px; text-align:center; color:#64748b; font-size:13px;">
+          Save this employee record first, then return to the Leave tab to assign a leave scheme.
+        </div>
+      } @else if (leaveLoading) {
+        <div style="padding:24px; text-align:center; color:#64748b; font-size:13px;">Loading leave schemes...</div>
+      } @else {
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h4 style="font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#0f2b46; margin:0;">Leave Scheme Assignment</h4>
+          @if (!leaveEditMode) {
+            <button class="btn btn-sm" (click)="startLeaveEdit()" style="font-size:12px;">Edit</button>
+          }
+        </div>
+
+        @if (!leaveEditMode) {
+          <div class="info-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px 24px; margin-bottom:20px;">
+            <div class="info-item">
+              <span class="info-label" style="font-size:11px; text-transform:uppercase; color:#64748b; letter-spacing:.4px; display:block; margin-bottom:4px;">Leave Scheme</span>
+              @if (leaveSchemeId) {
+                <span style="font-size:13px; font-weight:600; color:#0f2b46;">
+                  {{ leaveSchemeLabel() }}
+                </span>
+              } @else {
+                <span style="font-size:13px; color:#94a3b8; font-style:italic;">Not assigned</span>
+              }
+            </div>
+            <div class="info-item">
+              <span class="info-label" style="font-size:11px; text-transform:uppercase; color:#64748b; letter-spacing:.4px; display:block; margin-bottom:4px;">Leave Entitlement</span>
+              @if (noLeaveEntitlement) {
+                <span class="status-badge" style="background:#fef2f2; color:#991b1b; border-radius:20px; font-size:11px; padding:3px 10px; text-transform:uppercase;">Not Entitled</span>
+              } @else {
+                <span class="status-badge" style="background:#f0fdf4; color:#166534; border-radius:20px; font-size:11px; padding:3px 10px; text-transform:uppercase;">Entitled</span>
+              }
+            </div>
+          </div>
+
+          @if (leaveSchemeId && leaveSchemeTypes.length > 0) {
+            <div style="margin-top:8px;">
+              <span style="font-size:11px; text-transform:uppercase; color:#64748b; letter-spacing:.4px; display:block; margin-bottom:8px;">Leave Types in Scheme</span>
+              <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                @for (lt of leaveSchemeTypes; track lt.id) {
+                  <span style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:16px; font-size:12px; font-weight:500;
+                               background:{{ lt.calendar_color ? lt.calendar_color + '22' : '#f1f5f9' }};
+                               color:{{ lt.calendar_color || '#0f2b46' }};
+                               border:1px solid {{ lt.calendar_color ? lt.calendar_color + '55' : '#e2e8f0' }};">
+                    <span style="width:8px; height:8px; border-radius:50%; background:{{ lt.calendar_color || '#94a3b8' }}; flex-shrink:0;"></span>
+                    {{ lt.name }}
+                    @if (lt.calendar_abbreviation) { <span style="opacity:.7;">({{ lt.calendar_abbreviation }})</span> }
+                    @if (!lt.paid) { <span style="font-size:10px; opacity:.7;">• Unpaid</span> }
+                  </span>
+                }
+              </div>
+            </div>
+          } @else if (leaveSchemeId && leaveSchemeTypes.length === 0) {
+            <div style="font-size:13px; color:#94a3b8; font-style:italic; margin-top:4px;">No leave types assigned to this scheme.</div>
+          }
+
+        } @else {
+          <div class="ret-form-section">
+            @if (leaveHasBalances) {
+              <div style="margin-bottom:14px; padding:10px 14px; background:#fffbeb; border:1px solid #fbbf24; border-radius:6px; color:#92400e; font-size:12px; display:flex; align-items:flex-start; gap:8px;">
+                <span style="font-weight:600; flex-shrink:0;">&#9888; Balance Lock:</span>
+                <span>This employee has existing leave balances. The leave scheme cannot be changed until a balance transfer has been completed.</span>
+              </div>
+            }
+            <div class="form-row">
+              <div class="form-group">
+                <label>Leave Scheme</label>
+                <select class="form-control" [(ngModel)]="leaveSchemeIdEdit" (ngModelChange)="onLeaveSchemeEditChange()"
+                        [disabled]="noLeaveEntitlementEdit || leaveHasBalances">
+                  <option [ngValue]="null">-- None (No Leave Scheme) --</option>
+                  @for (s of leaveSchemes; track s.id) {
+                    <option [ngValue]="s.id">{{ leaveSchemeOptionLabel(s) }}</option>
+                  }
+                </select>
+                @if (noLeaveEntitlementEdit) {
+                  <span style="font-size:11px; color:#94a3b8; display:block; margin-top:4px;">Scheme cleared — employee marked as not entitled to leave.</span>
+                } @else if (leaveSchemes.length === 0) {
+                  <span style="font-size:11px; color:#94a3b8; display:block; margin-top:4px;">No eligible schemes found for this employee's type and condition of service.</span>
+                }
+              </div>
+              <div class="form-group" style="align-self:center; padding-top:18px;">
+                <label class="checkbox-label">
+                  <input type="checkbox" [(ngModel)]="noLeaveEntitlementEdit" [disabled]="leaveHasBalances">
+                  Employee has no leave entitlement
+                </label>
+              </div>
+            </div>
+
+            @if (leaveSchemeIdEdit && leaveSchemeTypes.length > 0) {
+              <div style="margin-top:12px; padding:12px; background:#f8f9fb; border-radius:6px; border:1px solid #e2e8f0;">
+                <span style="font-size:11px; text-transform:uppercase; color:#64748b; letter-spacing:.4px; display:block; margin-bottom:8px;">Leave Types in Selected Scheme</span>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                  @for (lt of leaveSchemeTypes; track lt.id) {
+                    <span style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:16px; font-size:12px; font-weight:500;
+                                 background:{{ lt.calendar_color ? lt.calendar_color + '22' : '#f1f5f9' }};
+                                 color:{{ lt.calendar_color || '#0f2b46' }};
+                                 border:1px solid {{ lt.calendar_color ? lt.calendar_color + '55' : '#e2e8f0' }};">
+                      <span style="width:8px; height:8px; border-radius:50%; background:{{ lt.calendar_color || '#94a3b8' }}; flex-shrink:0;"></span>
+                      {{ lt.name }}
+                      @if (!lt.paid) { <span style="font-size:10px; opacity:.7;">• Unpaid</span> }
+                    </span>
+                  }
+                </div>
+              </div>
+            }
+
+            <div style="display:flex; gap:8px; margin-top:16px;">
+              <button class="btn btn-primary" (click)="saveLeaveScheme()" [disabled]="leaveSaving">
+                {{ leaveSaving ? 'Saving...' : 'Save' }}
+              </button>
+              <button class="btn" (click)="cancelLeaveEdit()" [disabled]="leaveSaving">Cancel</button>
+            </div>
+          </div>
+        }
+      }
+    </div>
+  </div>
+}
+
+@if (activeSubTab === 'leave-balances') {
+  <div class="sub-tab-content">
+    <div class="detail-card">
+      <div class="card-header" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <h4 style="font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#0f2b46; margin:0;">Leave Balances</h4>
+        <button class="btn btn-sm" (click)="loadLeaveBalances()" style="font-size:12px;">
+          <app-icon name="refresh" [size]="13"></app-icon> Refresh
+        </button>
+      </div>
+
+      @if (leaveBalancesLoading) {
+        <div style="padding:24px; text-align:center; color:#64748b; font-size:13px;">Loading leave balances...</div>
+      } @else if (leaveBalances.length === 0) {
+        <div style="padding:24px; text-align:center; color:#94a3b8; font-size:13px; font-style:italic;">
+          No leave balances found. Assign a leave scheme and capture opening balances to get started.
+        </div>
+      } @else {
+        <table class="data-table" style="width:100%;">
+          <thead>
+            <tr>
+              <th>Leave Type</th>
+              <th style="text-align:right;">Opening Balance</th>
+              <th style="text-align:right;">Adjustments</th>
+              <th style="text-align:right;">Accrued</th>
+              <th style="text-align:right;">Taken</th>
+              <th style="text-align:right;">Encashed</th>
+              <th style="text-align:right;">Forfeited</th>
+              <th style="text-align:right;">Available</th>
+              <th style="text-align:right;">Max Accum.</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (b of leaveBalances; track b.leave_type_id) {
+              <tr>
+                <td>
+                  <span style="display:inline-flex; align-items:center; gap:6px;">
+                    @if (b.calendar_color) {
+                      <span style="width:8px; height:8px; border-radius:50%; background:{{ b.calendar_color }}; flex-shrink:0; display:inline-block;"></span>
+                    }
+                    <strong style="font-size:13px;">{{ b.leave_type_name }}</strong>
+                    <span style="font-size:11px; color:#94a3b8;">({{ b.leave_type_code }})</span>
+                  </span>
+                </td>
+                <td style="text-align:right; font-size:13px;">{{ (+b.opening_balance).toFixed(2) }}</td>
+                <td style="text-align:right; font-size:13px;"
+                    [style.color]="(+b.adjusted_days) > 0 ? '#16a34a' : (+b.adjusted_days) < 0 ? '#dc2626' : '#64748b'">
+                  {{ (+b.adjusted_days) > 0 ? '+' : '' }}{{ (+b.adjusted_days).toFixed(2) }}
+                </td>
+                <td style="text-align:right; font-size:13px;"
+                    [style.color]="(+b.accrued_days) > 0 ? '#0369a1' : '#94a3b8'">
+                  {{ (+b.accrued_days).toFixed(2) }}
+                </td>
+                <td style="text-align:right; font-size:13px; color:#dc2626;">
+                  {{ (+b.taken_days) > 0 ? '-' : '' }}{{ (+b.taken_days).toFixed(2) }}
+                </td>
+                <td style="text-align:right; font-size:13px; color:#64748b;">
+                  {{ (+b.encashed_days).toFixed(2) }}
+                </td>
+                <td style="text-align:right; font-size:13px;"
+                    [style.color]="(+b.forfeited_days) > 0 ? '#d97706' : '#94a3b8'">
+                  {{ (+b.forfeited_days).toFixed(2) }}
+                </td>
+                <td style="text-align:right;">
+                  <span style="font-size:13px; font-weight:700; padding:2px 8px; border-radius:12px;"
+                        [style.background]="(+b.available_days) < 0 ? '#fef2f2' : (+b.available_days) === 0 ? '#fefce8' : '#f0fdf4'"
+                        [style.color]="(+b.available_days) < 0 ? '#dc2626' : (+b.available_days) === 0 ? '#ca8a04' : '#16a34a'">
+                    {{ (+b.available_days).toFixed(2) }}
+                  </span>
+                </td>
+                <td style="text-align:right; font-size:13px; color:#94a3b8;">
+                  {{ b.max_accumulation ? (+b.max_accumulation).toFixed(2) : '—' }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  </div>
+}
   </div>
 </div>
 }
@@ -1490,11 +1979,11 @@
         <div class="form-row">
           <div class="form-group">
             <label>Join Date <span class="required">*</span></label>
-            <input type="date" class="form-control" [(ngModel)]="editRetFund.join_date">
+            <app-date-input [(ngModel)]="editRetFund.join_date"></app-date-input>
           </div>
           <div class="form-group">
             <label>Termination Date</label>
-            <input type="date" class="form-control" [(ngModel)]="editRetFund.termination_date">
+            <app-date-input [(ngModel)]="editRetFund.termination_date"></app-date-input>
           </div>
         </div>
         @if (retInnerTab === 'retirement') {
@@ -1512,7 +2001,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn" (click)="showRetFundModal = false">Cancel</button>
-        <button class="btn btn-primary" (click)="saveRetFund()">{{ retFundMode === 'edit' ? 'Update' : 'Add' }}</button>
+        <button class="btn btn-primary" (click)="saveRetFund()" [disabled]="isPayrollLocked">{{ retFundMode === 'edit' ? 'Update' : 'Add' }}</button>
       </div>
     </div>
   </div>
@@ -1533,6 +2022,7 @@
             <option value="EARNING">Earning</option>
             <option value="DEDUCTION">Deduction</option>
             <option value="COMPANY_CONTRIBUTION">Company Contribution</option>
+            <option value="FRINGE_BENEFIT">Fringe Benefit</option>
           </select>
         </div>
         <div class="form-group" style="margin-top:12px">
@@ -1540,7 +2030,7 @@
           <select class="form-control" [(ngModel)]="editSalaryTxn.salary_head_id" [disabled]="!selectedTxnType">
             <option [ngValue]="null">-- Select Head --</option>
             @for (h of filteredModalHeads; track h.id) {
-              <option [ngValue]="h.id">{{ h.code }} - {{ h.name }}</option>
+              <option [ngValue]="h.id">{{ h.name }}</option>
             }
           </select>
         </div>
@@ -1557,17 +2047,17 @@
         <div class="form-row" style="margin-top:12px">
           <div class="form-group">
             <label>Start Date</label>
-            <input type="date" class="form-control" [(ngModel)]="editSalaryTxn.start_date">
+            <app-date-input [(ngModel)]="editSalaryTxn.start_date"></app-date-input>
           </div>
           <div class="form-group">
             <label>End Date</label>
-            <input type="date" class="form-control" [(ngModel)]="editSalaryTxn.end_date">
+            <app-date-input [(ngModel)]="editSalaryTxn.end_date"></app-date-input>
           </div>
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn" (click)="showSalaryTxnModal = false">Cancel</button>
-        <button class="btn btn-primary" (click)="saveSalaryTxn()">Save</button>
+        <button class="btn btn-primary" (click)="saveSalaryTxn()" [disabled]="isPayrollLocked">Save</button>
       </div>
     </div>
   </div>
@@ -1608,17 +2098,17 @@
         <div class="form-row" style="margin-top:12px">
           <div class="form-group">
             <label>Join Date *</label>
-            <input type="date" class="form-control" [(ngModel)]="editMedAidScheme.join_date">
+            <app-date-input [(ngModel)]="editMedAidScheme.join_date"></app-date-input>
           </div>
           <div class="form-group">
             <label>Termination Date</label>
-            <input type="date" class="form-control" [(ngModel)]="editMedAidScheme.termination_date">
+            <app-date-input [(ngModel)]="editMedAidScheme.termination_date"></app-date-input>
           </div>
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn" (click)="showMedAidSchemeModal = false">Cancel</button>
-        <button class="btn btn-primary" (click)="saveMedAidScheme()">{{ medAidSchemeMode === 'edit' ? 'Update' : 'Save' }}</button>
+        <button class="btn btn-primary" (click)="saveMedAidScheme()" [disabled]="isPayrollLocked">{{ medAidSchemeMode === 'edit' ? 'Update' : 'Save' }}</button>
       </div>
     </div>
   </div>
@@ -1649,7 +2139,7 @@
           </div>
           <div class="form-group">
             <label>Date of Birth</label>
-            <input type="date" class="form-control" [(ngModel)]="editDependant.date_of_birth">
+            <app-date-input [(ngModel)]="editDependant.date_of_birth"></app-date-input>
           </div>
         </div>
         <div class="form-row" style="margin-top:12px">
@@ -1671,11 +2161,11 @@
         <div class="form-row" style="margin-top:12px">
           <div class="form-group">
             <label>Start Date</label>
-            <input type="date" class="form-control" [(ngModel)]="editDependant.start_date">
+            <app-date-input [(ngModel)]="editDependant.start_date"></app-date-input>
           </div>
           <div class="form-group">
             <label>Termination Date</label>
-            <input type="date" class="form-control" [(ngModel)]="editDependant.end_date">
+            <app-date-input [(ngModel)]="editDependant.end_date"></app-date-input>
           </div>
         </div>
         <div class="form-row" style="margin-top:12px">
@@ -1690,7 +2180,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn" (click)="showDependantModal = false">Cancel</button>
-        <button class="btn btn-primary" (click)="saveDependant()">{{ dependantMode === 'edit' ? 'Update' : 'Save' }}</button>
+        <button class="btn btn-primary" (click)="saveDependant()" [disabled]="isPayrollLocked">{{ dependantMode === 'edit' ? 'Update' : 'Save' }}</button>
       </div>
     </div>
   </div>
@@ -1721,11 +2211,11 @@
         <div class="form-row" style="margin-top:12px">
           <div class="form-group">
             <label>Start Date</label>
-            <input type="date" class="form-control" [(ngModel)]="editExtraTxn.start_date">
+            <app-date-input [(ngModel)]="editExtraTxn.start_date"></app-date-input>
           </div>
           <div class="form-group">
             <label>End Date</label>
-            <input type="date" class="form-control" [(ngModel)]="editExtraTxn.end_date">
+            <app-date-input [(ngModel)]="editExtraTxn.end_date"></app-date-input>
           </div>
         </div>
         <div class="form-row" style="margin-top:12px">
@@ -1736,7 +2226,55 @@
       </div>
       <div class="modal-footer">
         <button class="btn" (click)="showExtraTxnModal = false">Cancel</button>
-        <button class="btn btn-primary" (click)="saveExtraTxn()">{{ extraTxnMode === 'edit' ? 'Update' : 'Save' }}</button>
+        <button class="btn btn-primary" (click)="saveExtraTxn()" [disabled]="isPayrollLocked">{{ extraTxnMode === 'edit' ? 'Update' : 'Save' }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showShiftAssignModal) {
+  <div class="modal-overlay visible" (click)="closeShiftAssignModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">{{ shiftAssignMode === 'create' ? 'Assign Shift Rotation' : 'Edit Shift Assignment' }}</h3>
+        <button class="modal-close" (click)="closeShiftAssignModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group" style="margin-bottom:14px;">
+          <label>Shift Rotation <span class="required">*</span></label>
+          @if (shiftRotationsLoading) {
+            <div style="font-size:13px; color:#64748b;">Loading rotations...</div>
+          } @else {
+            <select class="form-control" [(ngModel)]="editShiftAssign.shift_rotation_id">
+              <option [ngValue]="null">-- Select Rotation --</option>
+              @for (r of shiftRotations; track r.id) {
+                <option [ngValue]="r.id">{{ r.name }}{{ r.short_description ? ' — ' + r.short_description : '' }} ({{ r.no_of_weeks }} week{{ r.no_of_weeks !== 1 ? 's' : '' }})</option>
+              }
+            </select>
+            @if (shiftRotations.length === 0) {
+              <div class="field-hint">No shift rotations configured. Create rotations under Configuration first.</div>
+            }
+          }
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Effective From <span class="required">*</span></label>
+            <app-date-input [(ngModel)]="editShiftAssign.effective_from"></app-date-input>
+          </div>
+          <div class="form-group">
+            <label>Effective To</label>
+            <app-date-input [(ngModel)]="editShiftAssign.effective_to"></app-date-input>
+            <div class="field-hint">Leave as 31/12/9999 for ongoing assignment</div>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:6px;">
+          <label>Notes</label>
+          <textarea class="form-control" [(ngModel)]="editShiftAssign.notes" rows="2" placeholder="Optional notes about this assignment"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="closeShiftAssignModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="saveShiftAssign()" [disabled]="shiftAssignSaving">{{ shiftAssignSaving ? 'Saving...' : (shiftAssignMode === 'edit' ? 'Update' : 'Assign') }}</button>
       </div>
     </div>
   </div>

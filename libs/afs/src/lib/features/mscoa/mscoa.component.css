@@ -41,7 +41,10 @@
 .stat-value { font-size: 11px; color: #64748b; }
 
 .mscoa-tabs ::ng-deep .mat-mdc-tab-header { margin-bottom: 0; }
-.tab-content { padding-top: 20px; }
+/* display:block restores the pre-leak default — the global
+   `.tab-content{display:none}` from libs/payroll/_payroll-global.css (registered
+   as a global style in apps/shell/angular.json) otherwise hides this content. */
+.tab-content { display: block; padding-top: 20px; }
 
 .filter-bar {
   display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: flex-end;

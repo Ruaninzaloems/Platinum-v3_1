@@ -5,6 +5,7 @@
       <p class="page-subtitle">Manage CIDMS municipal service classifications</p>
     </div>
     <div class="header-actions">
+      <button mat-stroked-button (click)="exportToExcel()"><mat-icon>download</mat-icon> Export to Excel</button>
       <button mat-stroked-button (click)="openImport()"><mat-icon>upload_file</mat-icon> Import from Excel</button>
       <button mat-flat-button class="btn-primary" (click)="openAdd()"><mat-icon>add</mat-icon> Add Municipal Service</button>
     </div>
@@ -17,6 +18,13 @@
         <div class="form-field">
           <label>Municipal Service Description *</label>
           <input type="text" class="form-input" [(ngModel)]="formData.assetMunicipalServicesDesc" placeholder="Enter municipal service description">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label class="checkbox-label">
+            <input type="checkbox" [checked]="formData.enabled === 1" (change)="onEnabledChange($event)"> Active
+          </label>
         </div>
       </div>
       <div class="form-actions">

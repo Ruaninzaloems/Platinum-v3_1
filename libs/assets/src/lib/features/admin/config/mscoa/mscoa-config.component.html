@@ -7,6 +7,36 @@
         <p class="page-subtitle">Configure mSCOA journal mapping per asset classification</p>
       </div>
       <div class="header-actions">
+        <button mat-stroked-button (click)="exportToExcel()"><mat-icon>download</mat-icon> Export to Excel</button>
+        <div class="dropdown-wrapper">
+          <button mat-stroked-button (click)="showTemplateDropdown.set(!showTemplateDropdown()); showImportDropdown.set(false)" [disabled]="importLoading()">
+            <mat-icon>download</mat-icon> Download Template <mat-icon style="font-size:16px;vertical-align:middle">arrow_drop_down</mat-icon>
+          </button>
+          @if (showTemplateDropdown()) {
+            <div class="dropdown-menu">
+              @for (t of txnTypeNames; track t) {
+                <div class="dropdown-item" (click)="downloadMscoaTemplate(t)">{{t}}</div>
+              }
+            </div>
+          }
+        </div>
+        <div class="dropdown-wrapper">
+          <button mat-stroked-button (click)="showImportDropdown.set(!showImportDropdown()); showTemplateDropdown.set(false)" [disabled]="importLoading()">
+            @if (importLoading()) { <mat-spinner diameter="14" style="display:inline-block;margin-right:4px"></mat-spinner> }
+            <mat-icon>upload_file</mat-icon> Import <mat-icon style="font-size:16px;vertical-align:middle">arrow_drop_down</mat-icon>
+          </button>
+          @if (showImportDropdown()) {
+            <div class="dropdown-menu">
+              @for (t of txnTypeNames; track t) {
+                <div class="dropdown-item" (click)="openImportForType(t)">{{t}}</div>
+              }
+            </div>
+          }
+        </div>
+        <input #mscoaFileInput type="file" accept=".xlsx" style="display:none" (change)="onMscoaFileSelected($event)">
+        <button mat-stroked-button (click)="goToDuplicates()">
+          <mat-icon>content_copy</mat-icon> Find Duplicates
+        </button>
         <button mat-flat-button class="btn-primary" (click)="openAdd()">
           <mat-icon>add</mat-icon> Add New
         </button>
@@ -51,24 +81,26 @@
             }
           </select>
         </div>
-        <div class="filter-field">
-          <label>Department</label>
-          <select class="form-input" [(ngModel)]="filterDepartmentId" (change)="onFilterDepartmentChange()">
-            <option value="">All Departments</option>
-            @for (d of departments(); track d.id) {
-              <option [value]="d.id">{{d.description}}</option>
-            }
-          </select>
-        </div>
-        <div class="filter-field">
-          <label>Division</label>
-          <select class="form-input" [(ngModel)]="filterDivisionId" [disabled]="filterDivisions().length === 0">
-            <option value="">All Divisions</option>
-            @for (dv of filterDivisions(); track dv.id) {
-              <option [value]="dv.id">{{dv.description}}</option>
-            }
-          </select>
-        </div>
+        @if (useDeptDivision()) {
+          <div class="filter-field">
+            <label>Department</label>
+            <select class="form-input" [(ngModel)]="filterDepartmentId" (change)="onFilterDepartmentChange()">
+              <option value="">All Departments</option>
+              @for (d of departments(); track d.id) {
+                <option [value]="d.id">{{d.description}}</option>
+              }
+            </select>
+          </div>
+          <div class="filter-field">
+            <label>Division</label>
+            <select class="form-input" [(ngModel)]="filterDivisionId" [disabled]="filterDivisions().length === 0">
+              <option value="">All Divisions</option>
+              @for (dv of filterDivisions(); track dv.id) {
+                <option [value]="dv.id">{{dv.description}}</option>
+              }
+            </select>
+          </div>
+        }
         <div class="filter-actions">
           <button mat-flat-button class="btn-primary" (click)="search()"><mat-icon>search</mat-icon> Search</button>
           <button mat-stroked-button (click)="clearFilter()">Clear</button>
@@ -89,8 +121,10 @@
               <th>Sub Category</th>
               <th>Measurement Type</th>
               <th>Status</th>
-              <th>Department</th>
-              <th>Division</th>
+              @if (useDeptDivision()) {
+                <th>Department</th>
+                <th>Division</th>
+              }
               <th class="actions-col">Actions</th>
             </tr>
           </thead>
@@ -105,8 +139,10 @@
                   <span [class]="getMtypeClass(item)">{{getMeasurementTypeDisplayName(item)}}</span>
                 </td>
                 <td><span class="status-badge status-active">{{item.statusDesc || '—'}}</span></td>
-                <td>{{getDeptName(item.departmentId)}}</td>
-                <td>{{getDivName(item.divisionId)}}</td>
+                @if (useDeptDivision()) {
+                  <td>{{getDeptName(item.departmentId)}}</td>
+                  <td>{{getDivName(item.divisionId)}}</td>
+                }
                 <td class="actions-cell">
                   <button mat-icon-button matTooltip="Edit mSCOA settings" (click)="openEdit(item)">
                     <mat-icon class="action-icon edit">edit</mat-icon>
@@ -200,29 +236,36 @@
           <label>Asset Status</label>
           <select class="form-input" [(ngModel)]="step1Form.statusId">
             <option value="">— Select —</option>
-            @for (s of statuses(); track s.assetStatus_ID) {
-              <option [value]="s.assetStatus_ID">{{s.assetStatusDesc}}</option>
+            @for (s of statuses(); track s.assetStatusId) {
+              <option [value]="s.assetStatusId">{{s.assetStatusDesc}}</option>
             }
           </select>
         </div>
         <div class="form-field">
-          <label>Department <span class="required">*</span></label>
-          <select class="form-input" [(ngModel)]="step1Form.departmentId" (change)="onStep1DepartmentChange()">
-            <option value="">— Select —</option>
-            @for (d of departments(); track d.id) {
-              <option [value]="d.id">{{d.description}}</option>
-            }
-          </select>
+          <label class="checkbox-label">
+            <input type="checkbox" [checked]="step1Form.enabled === 1" (change)="onEnabledChange($event)"> Active
+          </label>
         </div>
-        <div class="form-field">
-          <label>Division <span class="required">*</span></label>
-          <select class="form-input" [(ngModel)]="step1Form.divisionId" [disabled]="step1Divisions().length === 0">
-            <option value="">— Select —</option>
-            @for (dv of step1Divisions(); track dv.id) {
-              <option [value]="dv.id">{{dv.description}}</option>
-            }
-          </select>
-        </div>
+        @if (useDeptDivision()) {
+          <div class="form-field">
+            <label>Department <span class="required">*</span></label>
+            <select class="form-input" [(ngModel)]="step1Form.departmentId" (change)="onStep1DepartmentChange()">
+              <option value="">— Select —</option>
+              @for (d of departments(); track d.id) {
+                <option [value]="d.id">{{d.description}}</option>
+              }
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Division <span class="required">*</span></label>
+            <select class="form-input" [(ngModel)]="step1Form.divisionId" [disabled]="step1Divisions().length === 0">
+              <option value="">— Select —</option>
+              @for (dv of step1Divisions(); track dv.id) {
+                <option [value]="dv.id">{{dv.description}}</option>
+              }
+            </select>
+          </div>
+        }
       </div>
 
       <div class="wizard-actions">
@@ -282,15 +325,17 @@
               <span class="chip-label">Status</span>
               <span class="chip-value">{{currentRecord().statusDesc || '—'}}</span>
             </div>
-            <div class="info-chip">
-              <span class="chip-label">Department</span>
-              <span class="chip-value">{{getDeptName(currentRecord().departmentId)}}</span>
-            </div>
-            @if (currentRecord().divisionId) {
+            @if (useDeptDivision()) {
               <div class="info-chip">
-                <span class="chip-label">Division</span>
-                <span class="chip-value">{{getDivName(currentRecord().divisionId)}}</span>
+                <span class="chip-label">Department</span>
+                <span class="chip-value">{{getDeptName(currentRecord().departmentId)}}</span>
               </div>
+              @if (currentRecord().divisionId) {
+                <div class="info-chip">
+                  <span class="chip-label">Division</span>
+                  <span class="chip-value">{{getDivName(currentRecord().divisionId)}}</span>
+                </div>
+              }
             }
           </div>
         }
@@ -322,11 +367,16 @@
                     }
                     @for (field of tab.leftFields; track field.voteKey) {
                       <div class="mapping-row">
-                        <div class="mapping-label">{{field.label}}</div>
+                        <div class="mapping-label">
+                          {{field.label}}
+                          @if (field.requiredPrefix) {
+                            <span class="prefix-badge" [matTooltip]="'SCOA code must start with ' + field.requiredPrefix">{{field.requiredPrefix}}</span>
+                          }
+                        </div>
                         <div class="mapping-inputs">
                           <div class="mapping-input-group">
                             <label class="input-sublabel">Project</label>
-                            <select class="form-input mapping-select" [ngModel]="getTabData(i)[field.projectKey]" (focus)="ensureProjectsLoaded()" (ngModelChange)="onMscoaProjectChange(i, field.projectKey, field.voteKey, $event)">
+                            <select class="form-input mapping-select" [ngModel]="getTabData(i)[field.projectKey]" (focus)="ensureProjectsLoaded()" (ngModelChange)="onMscoaProjectChange(i, field.projectKey, field.voteKey, $event, field.requiredPrefix)">
                               <option value="">— Select Project —</option>
                               @for (p of getProjectOptions(i, field.projectKey); track p.projectId) {
                                 <option [value]="p.projectId">{{p.projectCode}}{{p.projectName ? ' | ' + p.projectName : ''}}</option>
@@ -335,12 +385,15 @@
                           </div>
                           <div class="mapping-input-group">
                             <label class="input-sublabel">SCOA Item</label>
-                            <select class="form-input mapping-select" [ngModel]="getTabData(i)[field.voteKey]" (focus)="ensureScoaItemsLoaded(i, field.projectKey, getTabData(i)[field.projectKey])" (ngModelChange)="setTabField(i, field.voteKey, $event)" [disabled]="!getTabData(i)[field.projectKey]">
+                            <select class="form-input mapping-select" [class.prefix-error]="tabFieldErrors[i + '_' + field.voteKey]" [ngModel]="getTabData(i)[field.voteKey]" (focus)="ensureScoaItemsLoaded(i, field.projectKey, getTabData(i)[field.projectKey], field.requiredPrefix, field.voteKey)" (ngModelChange)="onScoaItemChange(i, field.voteKey, $event)" [disabled]="!getTabData(i)[field.projectKey]">
                               <option value="">{{getTabData(i)[field.projectKey] ? '— Select SCOA Item —' : '— Select Project First —'}}</option>
                               @for (s of getScoaOptions(i, field.projectKey, field.voteKey); track s.planProjectItemId) {
                                 <option [value]="s.planProjectItemId">{{s.scoaDesc}}</option>
                               }
                             </select>
+                            @if (tabFieldErrors[i + '_' + field.voteKey]) {
+                              <div class="prefix-error-msg">{{tabFieldErrors[i + '_' + field.voteKey]}}</div>
+                            }
                           </div>
                         </div>
                       </div>
@@ -355,11 +408,16 @@
                       }
                       @for (field of tab.rightFields; track field.voteKey) {
                         <div class="mapping-row">
-                          <div class="mapping-label">{{field.label}}</div>
+                          <div class="mapping-label">
+                            {{field.label}}
+                            @if (field.requiredPrefix) {
+                              <span class="prefix-badge" [matTooltip]="'SCOA code must start with ' + field.requiredPrefix">{{field.requiredPrefix}}</span>
+                            }
+                          </div>
                           <div class="mapping-inputs">
                             <div class="mapping-input-group">
                               <label class="input-sublabel">Project</label>
-                              <select class="form-input mapping-select" [ngModel]="getTabData(i)[field.projectKey]" (focus)="ensureProjectsLoaded()" (ngModelChange)="onMscoaProjectChange(i, field.projectKey, field.voteKey, $event)">
+                              <select class="form-input mapping-select" [ngModel]="getTabData(i)[field.projectKey]" (focus)="ensureProjectsLoaded()" (ngModelChange)="onMscoaProjectChange(i, field.projectKey, field.voteKey, $event, field.requiredPrefix)">
                                 <option value="">— Select Project —</option>
                                 @for (p of getProjectOptions(i, field.projectKey); track p.projectId) {
                                   <option [value]="p.projectId">{{p.projectCode}}{{p.projectName ? ' | ' + p.projectName : ''}}</option>
@@ -368,12 +426,15 @@
                             </div>
                             <div class="mapping-input-group">
                               <label class="input-sublabel">SCOA Item</label>
-                              <select class="form-input mapping-select" [ngModel]="getTabData(i)[field.voteKey]" (focus)="ensureScoaItemsLoaded(i, field.projectKey, getTabData(i)[field.projectKey])" (ngModelChange)="setTabField(i, field.voteKey, $event)" [disabled]="!getTabData(i)[field.projectKey]">
+                              <select class="form-input mapping-select" [class.prefix-error]="tabFieldErrors[i + '_' + field.voteKey]" [ngModel]="getTabData(i)[field.voteKey]" (focus)="ensureScoaItemsLoaded(i, field.projectKey, getTabData(i)[field.projectKey], field.requiredPrefix, field.voteKey)" (ngModelChange)="onScoaItemChange(i, field.voteKey, $event)" [disabled]="!getTabData(i)[field.projectKey]">
                                 <option value="">{{getTabData(i)[field.projectKey] ? '— Select SCOA Item —' : '— Select Project First —'}}</option>
                                 @for (s of getScoaOptions(i, field.projectKey, field.voteKey); track s.planProjectItemId) {
                                   <option [value]="s.planProjectItemId">{{s.scoaDesc}}</option>
                                 }
                               </select>
+                              @if (tabFieldErrors[i + '_' + field.voteKey]) {
+                                <div class="prefix-error-msg">{{tabFieldErrors[i + '_' + field.voteKey]}}</div>
+                              }
                             </div>
                           </div>
                         </div>
@@ -383,7 +444,7 @@
                 </div>
 
                 <div class="tab-actions">
-                  <button mat-flat-button class="btn-primary" (click)="saveCurrentTab()" [disabled]="saving()">
+                  <button mat-flat-button class="btn-primary" (click)="saveCurrentTab()" [disabled]="saving() || hasPrefixErrorsForTab(i)">
                     @if (saving()) { <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner> }
                     <mat-icon>save</mat-icon> Save {{tab.name}} Mapping
                   </button>
@@ -401,3 +462,67 @@
   }
 
 </div>
+
+@if (showDuplicateConfirmModal()) {
+<div class="import-error-overlay" (click)="cancelDuplicateConfirm()">
+  <div class="import-error-modal" (click)="$event.stopPropagation()">
+    <div class="import-error-header">
+      <span>Duplicate Records Found</span>
+      <button class="import-error-close" (click)="cancelDuplicateConfirm()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div class="import-error-body">
+      <p class="import-error-summary">
+        {{importDuplicateCount()}} row(s) already have a configuration in the database.
+      </p>
+      <p style="font-size:0.85rem;color:var(--color-text-secondary);margin-top:8px">
+        Would you like to update them with the new PPID values from the file?
+        New rows (if any) will be inserted as usual. Only PPID mapping columns will be updated for existing rows.
+      </p>
+    </div>
+    <div class="import-error-footer" style="gap:8px;display:flex;justify-content:flex-end">
+      <button mat-stroked-button (click)="cancelDuplicateConfirm()">No, Cancel</button>
+      <button mat-flat-button class="btn-primary" (click)="confirmOverwriteDuplicates()">Yes, Update</button>
+    </div>
+  </div>
+</div>
+}
+@if (showImportErrorModal()) {
+  <div class="import-error-overlay" (click)="closeImportErrorModal()">
+    <div class="import-error-modal" (click)="$event.stopPropagation()">
+      <div class="import-error-header">
+        <span>Import Errors</span>
+        <button class="import-error-close" (click)="closeImportErrorModal()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <div class="import-error-body">
+        <p class="import-error-summary">{{importErrors().length}} error(s) found. No records were imported.</p>
+        <table class="import-error-table">
+          <thead>
+            <tr>
+              <th>Row</th>
+              <th>Column</th>
+              <th>Value</th>
+              <th>Message</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (e of importErrors(); track $index) {
+              <tr>
+                <td>{{e.row}}</td>
+                <td>{{e.column}}</td>
+                <td class="error-val-cell">{{e.value ?? ''}}</td>
+                <td>{{e.message}}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="import-error-footer">
+        <button mat-flat-button class="btn-primary" (click)="closeImportErrorModal()">Close</button>
+      </div>
+    </div>
+  </div>
+}

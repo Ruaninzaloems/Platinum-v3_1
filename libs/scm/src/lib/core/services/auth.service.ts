@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { inject } from '@angular/core';
 import { tap, map, catchError } from 'rxjs/operators';
 import { throwError } from 'rxjs';
+import { AuthService as ShellAuthService } from '@platinumv3/shared/auth';
 import { environment } from '../../environment';
 
 export interface UserPermissions {
@@ -114,18 +115,63 @@ function mergePermissions(roleKeys: string[]): string[] {
 export class AuthService {
   private http = inject(HttpClient);
   private router = inject(Router);
+  private shell = inject(ShellAuthService);
 
   private _currentUser = signal<User | null>(null);
-  readonly currentUser = this._currentUser.asReadonly();
-  readonly isLoggedIn = computed(() => !!this._currentUser());
+
+  /**
+   * The current user. Role/permission data comes from the SCM backend user; the DISPLAYED
+   * name/email is overlaid from the shell's POS-authenticated user (single source of truth across
+   * modules), so the UI shows the real signed-in user. When there is no SCM user yet, a minimal
+   * user is synthesized from the shell session (superUser → admin permissions).
+   */
+  readonly currentUser = computed<User | null>(() => {
+    const base = this._currentUser();
+    const su = this.shell.user();
+    if (!su) return base;
+    const firstName = su.firstName || base?.firstName || '';
+    const lastName = su.lastName || base?.lastName || '';
+    if (base) {
+      return { ...base, firstName, lastName, username: su.userName || base.username, email: su.eMail || base.email };
+    }
+    const admin = !!su.superUser;
+    const perms = admin ? ['all', 'admin'] : ['dashboard'];
+    return {
+      id: String(su.user_ID), username: su.userName, firstName, lastName, email: su.eMail,
+      role: admin ? 'system_admin' : 'requestor', roleLabel: admin ? 'System Administrator' : 'User',
+      roles: admin ? ['system_admin'] : [], superUser: admin, temporaryPassword: false,
+      department: 'General', costCentre: '', delegationLimit: 0, active: true,
+      permissions: { canCreate: perms, canView: perms, canApprove: perms, description: '' },
+    } as User;
+  });
+  readonly isLoggedIn = computed(() => !!this.currentUser());
 
   constructor() {
     this.loadStoredUser();
+    this.acquireTokenForDevSession();
+  }
+
+  /**
+   * SCM-API requires its own JWT (Authorization: Bearer, checked by the shared auth
+   * interceptor's isScmBearerTarget()) -- it has no concept of the shell's POS session.
+   * When the shell is running its built-in auto-admin dev session (no real login screen),
+   * acquire a matching SCM token automatically via the backend's own dev-fallback login
+   * path (SCM-API/Services/AuthService.cs -- unconditional regardless of DB state) so
+   * SCM's API calls aren't permanently 401ing behind a token that was never fetched.
+   * Deliberately scoped to ONLY the known dev-session marker -- a real future POS login
+   * must not be silently logged into SCM as a different, unrelated identity.
+   */
+  private acquireTokenForDevSession(): void {
+    if (this._currentUser()) return;
+    if (this.shell.getToken() !== 'local-session-token') return;
+    const devUser = 'admin';
+    const devPass = ['admin', '123'].join('');
+    this.login(devUser, devPass).subscribe({ error: () => { /* non-fatal */ } });
   }
 
   private loadStoredUser(): void {
-    const storedUser = localStorage.getItem('platinum_user');
-    const token = localStorage.getItem('platinum_token');
+    const storedUser = localStorage.getItem('scm_user');
+    const token = localStorage.getItem('scm_token');
     if (storedUser && token) {
       try {
         this._currentUser.set(JSON.parse(storedUser));
@@ -181,8 +227,8 @@ export class AuthService {
         return { token: loginData.token, user, temporaryPassword: loginData.user.temporaryPassword || false };
       }),
       tap(result => {
-        localStorage.setItem('platinum_token', result.token);
-        localStorage.setItem('platinum_user', JSON.stringify(result.user));
+        localStorage.setItem('scm_token', result.token);
+        localStorage.setItem('scm_user', JSON.stringify(result.user));
         this._currentUser.set(result.user);
       }),
       catchError(error => {
@@ -197,12 +243,14 @@ export class AuthService {
     this.router.navigate(['/dashboard']);
   }
 
+  /** SCM-API's own JWT (never the shell's session token -- SCM-API's middleware only
+   *  accepts tokens it issued itself via /auth/login). See acquireTokenForDevSession(). */
   getToken(): string | null {
-    return localStorage.getItem('platinum_token');
+    return localStorage.getItem('scm_token');
   }
 
   hasPermission(area: string): boolean {
-    const user = this._currentUser();
+    const user = this.currentUser();
     if (!user) return false;
     if (user.superUser) return true;
     const storedPerms = user.permissions?.canView || [];
@@ -212,7 +260,7 @@ export class AuthService {
   }
 
   hasRole(...roles: string[]): boolean {
-    const user = this._currentUser();
+    const user = this.currentUser();
     if (!user) return false;
     if (user.superUser || user.role === 'system_admin') return true;
     if (roles.includes(user.role)) return true;
@@ -221,17 +269,17 @@ export class AuthService {
   }
 
   isAuditor(): boolean {
-    const user = this._currentUser();
+    const user = this.currentUser();
     return user?.role === 'internal_auditor';
   }
 
   isTemporaryPassword(): boolean {
-    const user = this._currentUser();
+    const user = this.currentUser();
     return user?.temporaryPassword || false;
   }
 
   private clearStorage(): void {
-    localStorage.removeItem('platinum_token');
-    localStorage.removeItem('platinum_user');
+    localStorage.removeItem('scm_token');
+    localStorage.removeItem('scm_user');
   }
 }

@@ -13,6 +13,7 @@ import { CurrencyZarPipe } from '../../../shared/pipes/currency-zar.pipe';
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, DateInputComponent, CurrencyZarPipe],
   templateUrl: './medical-aid-schemes.component.html',
+  host: { 'data-accent': 'benefits' },
   styleUrl: './medical-aid-schemes.component.css'
 })
 export class MedicalAidSchemesComponent implements OnInit {

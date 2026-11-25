@@ -1,9 +1,12 @@
+import "./load-profile"; // MUST be first: applies the EMS_PROFILE config before other modules read process.env
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import compression from "compression";
 import pgSessionStore from "connect-pg-simple";
+import createMemoryStore from "memorystore";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
+import { setupSwagger } from "./swagger";
 import { createServer } from "http";
 import path from "path";
 import { existsSync } from "fs";
@@ -55,16 +58,30 @@ app.use(compression({
   },
 }));
 
-const PgStore = pgSessionStore(session);
+// Session store: Postgres whenever a connection string is present (always the
+// case in production / Replit). The in-memory store is ONLY a local-testing
+// fallback for when no Postgres is configured — it never overrides an existing
+// Postgres DB.
+const pgConnString = process.env.AZURE_DATABASE_URL || process.env.DATABASE_URL;
+
+let sessionStore: session.Store;
+if (pgConnString) {
+  const PgStore = pgSessionStore(session);
+  sessionStore = new PgStore({
+    conString: pgConnString,
+    tableName: 'user_sessions',
+    createTableIfMissing: true,
+    pruneSessionInterval: 300,
+  });
+} else {
+  const MemoryStore = createMemoryStore(session);
+  sessionStore = new MemoryStore({ checkPeriod: 24 * 60 * 60 * 1000 });
+  console.warn('[Session] No DATABASE_URL — using in-memory session store (local testing only).');
+}
 
 app.use(
   session({
-    store: new PgStore({
-      conString: process.env.DATABASE_URL,
-      tableName: 'user_sessions',
-      createTableIfMissing: true,
-      pruneSessionInterval: 300,
-    }),
+    store: sessionStore,
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
@@ -141,6 +158,10 @@ app.use((req, res, next) => {
 
   await registerRoutes(httpServer, app);
 
+  // Swagger UI — mounted after routes (so the spec sees them) and before
+  // serveStatic (so /swagger isn't swallowed by the SPA/dev-proxy catch-all).
+  setupSwagger(app);
+
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
@@ -157,10 +178,11 @@ app.use((req, res, next) => {
   serveStatic(app);
 
   const port = parseInt(process.env.PORT || '5000', 10);
+  const spawnSiblings = process.env.SPAWN_SIBLING_SERVICES === 'true';
   httpServer.listen(port, "0.0.0.0", () => {
     log(`serving on port ${port}`);
 
-    if (port !== 5000) {
+    if (port !== 5000 && spawnSiblings) {
       // NOTE: We deliberately do NOT spawn an Angular dev server here.
       // The new Nx shell at apps/shell is owned by the dedicated
       // "Platinum Shell" workflow on port 5000. Spawning the legacy
@@ -208,10 +230,10 @@ app.use((req, res, next) => {
 
       const perfHubDir = path.resolve(process.cwd(), '..', 'Insight-Performance-Hub');
       if (existsSync(perfHubDir)) {
-        log(`Starting Performance Hub API on port 6800...`);
+        log(`Starting Performance Hub API on port 8080...`);
         const perfApi = spawn('pnpm', ['--filter', '@workspace/api-server', 'run', 'dev'], {
           cwd: perfHubDir,
-          env: { ...process.env, PORT: '6800', NODE_ENV: 'development' },
+          env: { ...process.env, PORT: '8080', NODE_ENV: 'development' },
           stdio: ['ignore', 'pipe', 'pipe']
         });
         perfApi.stdout?.on('data', (d: Buffer) => {

@@ -45,6 +45,7 @@ import type {
   CreateKpiGroupInput,
   CreateModerationInput,
   CreateMonthActivityInput,
+  CreateNationalKpaInput,
   CreateNkpaWeightingInput,
   CreateNotificationConfigInput,
   CreateProgressStatusInput,
@@ -71,6 +72,7 @@ import type {
   EmployeeKpi,
   EvidenceComplianceData,
   ExecutiveDashboardData,
+  ExportScorecardParams,
   FinancialSnapshotData,
   GenerateReportInput,
   GenerateSdbipFromKpisBody,
@@ -85,8 +87,10 @@ import type {
   GetFinancialSnapshotParams,
   GetIndividualDashboardParams,
   GetKpiStatusSummaryParams,
+  GetMunicipalHealthParams,
   GetNarrativeSummaryParams,
   GetNkpaPerformanceParams,
+  GetOrgScorecardParams,
   GetOverviewDashboardParams,
   GetTopUnderperformingParams,
   GetTrendlineParams,
@@ -104,6 +108,7 @@ import type {
   KpiMonthActivity,
   KpiQuarterActual,
   KpiQuarterTarget,
+  KpiRatingThreshold,
   KpiReviewSubmission,
   KpiStatusSummaryData,
   ListAgreementsParams,
@@ -116,6 +121,7 @@ import type {
   ListIndividualAssessmentsParams,
   ListIndividualModerationsParams,
   ListIntegrationSyncLogParams,
+  ListKpiActualsParams,
   ListKpiEvidenceParams,
   ListKpiGroupsParams,
   ListModerationsParams,
@@ -133,16 +139,20 @@ import type {
   ListReviewerAssignmentsParams,
   ListReviewsParams,
   ListScorecardsParams,
+  ListSdbipFieldConfigsParams,
   ListSdbipItemsParams,
   ListSubmissionDeadlinesParams,
   ListUnitsOfMeasureParams,
   ListWorkflowConfigsParams,
   LockPeriodInput,
   ModerationRecordIndividual,
+  MunicipalHealthData,
+  NationalKpa,
   NkpaPerformanceData,
   NkpaWeighting,
   Notification,
   NotificationConfig,
+  OrgScorecardData,
   OverviewDashboardData,
   PerformanceCycle,
   PeriodLock,
@@ -150,13 +160,18 @@ import type {
   RemedialActionPlan,
   ReportField,
   ReportRun,
+  RequestEvidenceUploadUrl200,
   ReviewerAssignment,
   ReviseSdbipInput,
   Role,
+  SaveKpiRatingThresholdsInput,
+  SaveSdbipFieldConfigsInput,
   ScoreCompetencyInput,
   Scorecard,
   ScorecardKpi,
   ScorecardType,
+  SdbipFieldConfig,
+  SdbipFieldUsage,
   SdbipItem,
   SdbipRevision,
   SdbipRevisionLog,
@@ -176,6 +191,7 @@ import type {
   UpdateKpiActualInput,
   UpdateKpiGroupInput,
   UpdateMonthActivityInput,
+  UpdateNationalKpaInput,
   UpdateNkpaWeightingInput,
   UpdateNotificationConfigInput,
   UpdateProgressStatusInput,
@@ -2213,6 +2229,338 @@ export const useUpdateScorecardType = <
 };
 
 /**
+ * @summary List national key performance areas
+ */
+export const getListNationalKpasUrl = () => {
+  return `/api/national-kpas`;
+};
+
+export const listNationalKpas = async (
+  options?: RequestInit,
+): Promise<NationalKpa[]> => {
+  return customFetch<NationalKpa[]>(getListNationalKpasUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListNationalKpasQueryKey = () => {
+  return [`/api/national-kpas`] as const;
+};
+
+export const getListNationalKpasQueryOptions = <
+  TData = Awaited<ReturnType<typeof listNationalKpas>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listNationalKpas>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListNationalKpasQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listNationalKpas>>
+  > = ({ signal }) => listNationalKpas({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listNationalKpas>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListNationalKpasQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listNationalKpas>>
+>;
+export type ListNationalKpasQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List national key performance areas
+ */
+
+export function useListNationalKpas<
+  TData = Awaited<ReturnType<typeof listNationalKpas>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listNationalKpas>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListNationalKpasQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a national KPA
+ */
+export const getCreateNationalKpaUrl = () => {
+  return `/api/national-kpas`;
+};
+
+export const createNationalKpa = async (
+  createNationalKpaInput: CreateNationalKpaInput,
+  options?: RequestInit,
+): Promise<NationalKpa> => {
+  return customFetch<NationalKpa>(getCreateNationalKpaUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createNationalKpaInput),
+  });
+};
+
+export const getCreateNationalKpaMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createNationalKpa>>,
+    TError,
+    { data: BodyType<CreateNationalKpaInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createNationalKpa>>,
+  TError,
+  { data: BodyType<CreateNationalKpaInput> },
+  TContext
+> => {
+  const mutationKey = ["createNationalKpa"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createNationalKpa>>,
+    { data: BodyType<CreateNationalKpaInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createNationalKpa(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateNationalKpaMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createNationalKpa>>
+>;
+export type CreateNationalKpaMutationBody = BodyType<CreateNationalKpaInput>;
+export type CreateNationalKpaMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a national KPA
+ */
+export const useCreateNationalKpa = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createNationalKpa>>,
+    TError,
+    { data: BodyType<CreateNationalKpaInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createNationalKpa>>,
+  TError,
+  { data: BodyType<CreateNationalKpaInput> },
+  TContext
+> => {
+  return useMutation(getCreateNationalKpaMutationOptions(options));
+};
+
+/**
+ * @summary Delete a national KPA
+ */
+export const getDeleteNationalKpaUrl = (id: number) => {
+  return `/api/national-kpas/${id}`;
+};
+
+export const deleteNationalKpa = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteNationalKpaUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteNationalKpaMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteNationalKpa>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteNationalKpa>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteNationalKpa"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteNationalKpa>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteNationalKpa(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteNationalKpaMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteNationalKpa>>
+>;
+
+export type DeleteNationalKpaMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a national KPA
+ */
+export const useDeleteNationalKpa = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteNationalKpa>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteNationalKpa>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteNationalKpaMutationOptions(options));
+};
+
+/**
+ * @summary Update a national KPA
+ */
+export const getUpdateNationalKpaUrl = (id: number) => {
+  return `/api/national-kpas/${id}`;
+};
+
+export const updateNationalKpa = async (
+  id: number,
+  updateNationalKpaInput: UpdateNationalKpaInput,
+  options?: RequestInit,
+): Promise<NationalKpa> => {
+  return customFetch<NationalKpa>(getUpdateNationalKpaUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateNationalKpaInput),
+  });
+};
+
+export const getUpdateNationalKpaMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateNationalKpa>>,
+    TError,
+    { id: number; data: BodyType<UpdateNationalKpaInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateNationalKpa>>,
+  TError,
+  { id: number; data: BodyType<UpdateNationalKpaInput> },
+  TContext
+> => {
+  const mutationKey = ["updateNationalKpa"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateNationalKpa>>,
+    { id: number; data: BodyType<UpdateNationalKpaInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateNationalKpa(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateNationalKpaMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateNationalKpa>>
+>;
+export type UpdateNationalKpaMutationBody = BodyType<UpdateNationalKpaInput>;
+export type UpdateNationalKpaMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a national KPA
+ */
+export const useUpdateNationalKpa = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateNationalKpa>>,
+    TError,
+    { id: number; data: BodyType<UpdateNationalKpaInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateNationalKpa>>,
+  TError,
+  { id: number; data: BodyType<UpdateNationalKpaInput> },
+  TContext
+> => {
+  return useMutation(getUpdateNationalKpaMutationOptions(options));
+};
+
+/**
  * @summary List NKPA weightings
  */
 export const getListNkpaWeightingsUrl = (params?: ListNkpaWeightingsParams) => {
@@ -3198,6 +3546,593 @@ export const useDeleteReportField = <
   TContext
 > => {
   return useMutation(getDeleteReportFieldMutationOptions(options));
+};
+
+/**
+ * @summary List SDBIP field configurations
+ */
+export const getListSdbipFieldConfigsUrl = (
+  params?: ListSdbipFieldConfigsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/sdbip-field-configs?${stringifiedParams}`
+    : `/api/sdbip-field-configs`;
+};
+
+export const listSdbipFieldConfigs = async (
+  params?: ListSdbipFieldConfigsParams,
+  options?: RequestInit,
+): Promise<SdbipFieldConfig[]> => {
+  return customFetch<SdbipFieldConfig[]>(getListSdbipFieldConfigsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListSdbipFieldConfigsQueryKey = (
+  params?: ListSdbipFieldConfigsParams,
+) => {
+  return [`/api/sdbip-field-configs`, ...(params ? [params] : [])] as const;
+};
+
+export const getListSdbipFieldConfigsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listSdbipFieldConfigs>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListSdbipFieldConfigsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listSdbipFieldConfigs>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListSdbipFieldConfigsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listSdbipFieldConfigs>>
+  > = ({ signal }) =>
+    listSdbipFieldConfigs(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listSdbipFieldConfigs>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListSdbipFieldConfigsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listSdbipFieldConfigs>>
+>;
+export type ListSdbipFieldConfigsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List SDBIP field configurations
+ */
+
+export function useListSdbipFieldConfigs<
+  TData = Awaited<ReturnType<typeof listSdbipFieldConfigs>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListSdbipFieldConfigsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listSdbipFieldConfigs>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListSdbipFieldConfigsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Replace field configuration for an SDBIP type
+ */
+export const getSaveSdbipFieldConfigsUrl = (
+  sdbipType:
+    | "original"
+    | "revised"
+    | "departmental"
+    | "quarterly"
+    | "midyear"
+    | "annual",
+) => {
+  return `/api/sdbip-field-configs/${sdbipType}`;
+};
+
+export const saveSdbipFieldConfigs = async (
+  sdbipType:
+    | "original"
+    | "revised"
+    | "departmental"
+    | "quarterly"
+    | "midyear"
+    | "annual",
+  saveSdbipFieldConfigsInput: SaveSdbipFieldConfigsInput,
+  options?: RequestInit,
+): Promise<SdbipFieldConfig[]> => {
+  return customFetch<SdbipFieldConfig[]>(
+    getSaveSdbipFieldConfigsUrl(sdbipType),
+    {
+      ...options,
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(saveSdbipFieldConfigsInput),
+    },
+  );
+};
+
+export const getSaveSdbipFieldConfigsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveSdbipFieldConfigs>>,
+    TError,
+    {
+      sdbipType:
+        | "original"
+        | "revised"
+        | "departmental"
+        | "quarterly"
+        | "midyear"
+        | "annual";
+      data: BodyType<SaveSdbipFieldConfigsInput>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof saveSdbipFieldConfigs>>,
+  TError,
+  {
+    sdbipType:
+      | "original"
+      | "revised"
+      | "departmental"
+      | "quarterly"
+      | "midyear"
+      | "annual";
+    data: BodyType<SaveSdbipFieldConfigsInput>;
+  },
+  TContext
+> => {
+  const mutationKey = ["saveSdbipFieldConfigs"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof saveSdbipFieldConfigs>>,
+    {
+      sdbipType:
+        | "original"
+        | "revised"
+        | "departmental"
+        | "quarterly"
+        | "midyear"
+        | "annual";
+      data: BodyType<SaveSdbipFieldConfigsInput>;
+    }
+  > = (props) => {
+    const { sdbipType, data } = props ?? {};
+
+    return saveSdbipFieldConfigs(sdbipType, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SaveSdbipFieldConfigsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof saveSdbipFieldConfigs>>
+>;
+export type SaveSdbipFieldConfigsMutationBody =
+  BodyType<SaveSdbipFieldConfigsInput>;
+export type SaveSdbipFieldConfigsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Replace field configuration for an SDBIP type
+ */
+export const useSaveSdbipFieldConfigs = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveSdbipFieldConfigs>>,
+    TError,
+    {
+      sdbipType:
+        | "original"
+        | "revised"
+        | "departmental"
+        | "quarterly"
+        | "midyear"
+        | "annual";
+      data: BodyType<SaveSdbipFieldConfigsInput>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof saveSdbipFieldConfigs>>,
+  TError,
+  {
+    sdbipType:
+      | "original"
+      | "revised"
+      | "departmental"
+      | "quarterly"
+      | "midyear"
+      | "annual";
+    data: BodyType<SaveSdbipFieldConfigsInput>;
+  },
+  TContext
+> => {
+  return useMutation(getSaveSdbipFieldConfigsMutationOptions(options));
+};
+
+/**
+ * @summary Count KPIs holding data for each configured field
+ */
+export const getGetSdbipFieldUsageUrl = (
+  sdbipType: "original" | "revised" | "departmental",
+) => {
+  return `/api/sdbip-field-configs/${sdbipType}/usage`;
+};
+
+export const getSdbipFieldUsage = async (
+  sdbipType: "original" | "revised" | "departmental",
+  options?: RequestInit,
+): Promise<SdbipFieldUsage> => {
+  return customFetch<SdbipFieldUsage>(getGetSdbipFieldUsageUrl(sdbipType), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetSdbipFieldUsageQueryKey = (
+  sdbipType: "original" | "revised" | "departmental",
+) => {
+  return [`/api/sdbip-field-configs/${sdbipType}/usage`] as const;
+};
+
+export const getGetSdbipFieldUsageQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSdbipFieldUsage>>,
+  TError = ErrorType<unknown>,
+>(
+  sdbipType: "original" | "revised" | "departmental",
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSdbipFieldUsage>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetSdbipFieldUsageQueryKey(sdbipType);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getSdbipFieldUsage>>
+  > = ({ signal }) =>
+    getSdbipFieldUsage(sdbipType, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!sdbipType,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSdbipFieldUsage>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSdbipFieldUsageQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSdbipFieldUsage>>
+>;
+export type GetSdbipFieldUsageQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Count KPIs holding data for each configured field
+ */
+
+export function useGetSdbipFieldUsage<
+  TData = Awaited<ReturnType<typeof getSdbipFieldUsage>>,
+  TError = ErrorType<unknown>,
+>(
+  sdbipType: "original" | "revised" | "departmental",
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSdbipFieldUsage>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSdbipFieldUsageQueryOptions(sdbipType, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List KPI rating thresholds (seeded with National Treasury defaults)
+ */
+export const getListKpiRatingThresholdsUrl = () => {
+  return `/api/kpi-rating-thresholds`;
+};
+
+export const listKpiRatingThresholds = async (
+  options?: RequestInit,
+): Promise<KpiRatingThreshold[]> => {
+  return customFetch<KpiRatingThreshold[]>(getListKpiRatingThresholdsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListKpiRatingThresholdsQueryKey = () => {
+  return [`/api/kpi-rating-thresholds`] as const;
+};
+
+export const getListKpiRatingThresholdsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listKpiRatingThresholds>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listKpiRatingThresholds>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListKpiRatingThresholdsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listKpiRatingThresholds>>
+  > = ({ signal }) => listKpiRatingThresholds({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listKpiRatingThresholds>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListKpiRatingThresholdsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listKpiRatingThresholds>>
+>;
+export type ListKpiRatingThresholdsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List KPI rating thresholds (seeded with National Treasury defaults)
+ */
+
+export function useListKpiRatingThresholds<
+  TData = Awaited<ReturnType<typeof listKpiRatingThresholds>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listKpiRatingThresholds>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListKpiRatingThresholdsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Replace the KPI rating threshold bands
+ */
+export const getSaveKpiRatingThresholdsUrl = () => {
+  return `/api/kpi-rating-thresholds`;
+};
+
+export const saveKpiRatingThresholds = async (
+  saveKpiRatingThresholdsInput: SaveKpiRatingThresholdsInput,
+  options?: RequestInit,
+): Promise<KpiRatingThreshold[]> => {
+  return customFetch<KpiRatingThreshold[]>(getSaveKpiRatingThresholdsUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(saveKpiRatingThresholdsInput),
+  });
+};
+
+export const getSaveKpiRatingThresholdsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveKpiRatingThresholds>>,
+    TError,
+    { data: BodyType<SaveKpiRatingThresholdsInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof saveKpiRatingThresholds>>,
+  TError,
+  { data: BodyType<SaveKpiRatingThresholdsInput> },
+  TContext
+> => {
+  const mutationKey = ["saveKpiRatingThresholds"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof saveKpiRatingThresholds>>,
+    { data: BodyType<SaveKpiRatingThresholdsInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return saveKpiRatingThresholds(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SaveKpiRatingThresholdsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof saveKpiRatingThresholds>>
+>;
+export type SaveKpiRatingThresholdsMutationBody =
+  BodyType<SaveKpiRatingThresholdsInput>;
+export type SaveKpiRatingThresholdsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Replace the KPI rating threshold bands
+ */
+export const useSaveKpiRatingThresholds = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveKpiRatingThresholds>>,
+    TError,
+    { data: BodyType<SaveKpiRatingThresholdsInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof saveKpiRatingThresholds>>,
+  TError,
+  { data: BodyType<SaveKpiRatingThresholdsInput> },
+  TContext
+> => {
+  return useMutation(getSaveKpiRatingThresholdsMutationOptions(options));
+};
+
+/**
+ * @summary Reset rating thresholds to National Treasury defaults
+ */
+export const getResetKpiRatingThresholdsUrl = () => {
+  return `/api/kpi-rating-thresholds/reset`;
+};
+
+export const resetKpiRatingThresholds = async (
+  options?: RequestInit,
+): Promise<KpiRatingThreshold[]> => {
+  return customFetch<KpiRatingThreshold[]>(getResetKpiRatingThresholdsUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getResetKpiRatingThresholdsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resetKpiRatingThresholds>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof resetKpiRatingThresholds>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["resetKpiRatingThresholds"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof resetKpiRatingThresholds>>,
+    void
+  > = () => {
+    return resetKpiRatingThresholds(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ResetKpiRatingThresholdsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof resetKpiRatingThresholds>>
+>;
+
+export type ResetKpiRatingThresholdsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Reset rating thresholds to National Treasury defaults
+ */
+export const useResetKpiRatingThresholds = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resetKpiRatingThresholds>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof resetKpiRatingThresholds>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getResetKpiRatingThresholdsMutationOptions(options));
 };
 
 /**
@@ -4480,6 +5415,211 @@ export const useTransitionScorecard = <
 > => {
   return useMutation(getTransitionScorecardMutationOptions(options));
 };
+
+/**
+ * @summary List quarter targets for all KPIs in a scorecard
+ */
+export const getListScorecardQuarterTargetsUrl = (scorecardId: number) => {
+  return `/api/scorecards/${scorecardId}/quarter-targets`;
+};
+
+export const listScorecardQuarterTargets = async (
+  scorecardId: number,
+  options?: RequestInit,
+): Promise<KpiQuarterTarget[]> => {
+  return customFetch<KpiQuarterTarget[]>(
+    getListScorecardQuarterTargetsUrl(scorecardId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListScorecardQuarterTargetsQueryKey = (scorecardId: number) => {
+  return [`/api/scorecards/${scorecardId}/quarter-targets`] as const;
+};
+
+export const getListScorecardQuarterTargetsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listScorecardQuarterTargets>>,
+  TError = ErrorType<unknown>,
+>(
+  scorecardId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listScorecardQuarterTargets>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getListScorecardQuarterTargetsQueryKey(scorecardId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listScorecardQuarterTargets>>
+  > = ({ signal }) =>
+    listScorecardQuarterTargets(scorecardId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!scorecardId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listScorecardQuarterTargets>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListScorecardQuarterTargetsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listScorecardQuarterTargets>>
+>;
+export type ListScorecardQuarterTargetsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List quarter targets for all KPIs in a scorecard
+ */
+
+export function useListScorecardQuarterTargets<
+  TData = Awaited<ReturnType<typeof listScorecardQuarterTargets>>,
+  TError = ErrorType<unknown>,
+>(
+  scorecardId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listScorecardQuarterTargets>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListScorecardQuarterTargetsQueryOptions(
+    scorecardId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Export a scorecard's KPI table as xlsx, pdf or docx
+ */
+export const getExportScorecardUrl = (
+  id: number,
+  params?: ExportScorecardParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/scorecards/${id}/export?${stringifiedParams}`
+    : `/api/scorecards/${id}/export`;
+};
+
+export const exportScorecard = async (
+  id: number,
+  params?: ExportScorecardParams,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getExportScorecardUrl(id, params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getExportScorecardQueryKey = (
+  id: number,
+  params?: ExportScorecardParams,
+) => {
+  return [`/api/scorecards/${id}/export`, ...(params ? [params] : [])] as const;
+};
+
+export const getExportScorecardQueryOptions = <
+  TData = Awaited<ReturnType<typeof exportScorecard>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: ExportScorecardParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportScorecard>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getExportScorecardQueryKey(id, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof exportScorecard>>> = ({
+    signal,
+  }) => exportScorecard(id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof exportScorecard>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ExportScorecardQueryResult = NonNullable<
+  Awaited<ReturnType<typeof exportScorecard>>
+>;
+export type ExportScorecardQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Export a scorecard's KPI table as xlsx, pdf or docx
+ */
+
+export function useExportScorecard<
+  TData = Awaited<ReturnType<typeof exportScorecard>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: ExportScorecardParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportScorecard>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getExportScorecardQueryOptions(id, params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List KPIs for a scorecard
@@ -6537,22 +7677,44 @@ export function useListAllActuals<
 /**
  * @summary List actuals for a KPI
  */
-export const getListKpiActualsUrl = (kpiId: number) => {
-  return `/api/scorecard-kpis/${kpiId}/actuals`;
+export const getListKpiActualsUrl = (
+  kpiId: number,
+  params?: ListKpiActualsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/scorecard-kpis/${kpiId}/actuals?${stringifiedParams}`
+    : `/api/scorecard-kpis/${kpiId}/actuals`;
 };
 
 export const listKpiActuals = async (
   kpiId: number,
+  params?: ListKpiActualsParams,
   options?: RequestInit,
 ): Promise<KpiQuarterActual[]> => {
-  return customFetch<KpiQuarterActual[]>(getListKpiActualsUrl(kpiId), {
+  return customFetch<KpiQuarterActual[]>(getListKpiActualsUrl(kpiId, params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getListKpiActualsQueryKey = (kpiId: number) => {
-  return [`/api/scorecard-kpis/${kpiId}/actuals`] as const;
+export const getListKpiActualsQueryKey = (
+  kpiId: number,
+  params?: ListKpiActualsParams,
+) => {
+  return [
+    `/api/scorecard-kpis/${kpiId}/actuals`,
+    ...(params ? [params] : []),
+  ] as const;
 };
 
 export const getListKpiActualsQueryOptions = <
@@ -6560,6 +7722,7 @@ export const getListKpiActualsQueryOptions = <
   TError = ErrorType<unknown>,
 >(
   kpiId: number,
+  params?: ListKpiActualsParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof listKpiActuals>>,
@@ -6571,11 +7734,12 @@ export const getListKpiActualsQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListKpiActualsQueryKey(kpiId);
+  const queryKey =
+    queryOptions?.queryKey ?? getListKpiActualsQueryKey(kpiId, params);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof listKpiActuals>>> = ({
     signal,
-  }) => listKpiActuals(kpiId, { signal, ...requestOptions });
+  }) => listKpiActuals(kpiId, params, { signal, ...requestOptions });
 
   return {
     queryKey,
@@ -6603,6 +7767,7 @@ export function useListKpiActuals<
   TError = ErrorType<unknown>,
 >(
   kpiId: number,
+  params?: ListKpiActualsParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof listKpiActuals>>,
@@ -6612,7 +7777,7 @@ export function useListKpiActuals<
     request?: SecondParameter<typeof customFetch>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListKpiActualsQueryOptions(kpiId, options);
+  const queryOptions = getListKpiActualsQueryOptions(kpiId, params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -7082,6 +8247,261 @@ export const useUploadKpiEvidence = <
   TContext
 > => {
   return useMutation(getUploadKpiEvidenceMutationOptions(options));
+};
+
+/**
+ * @summary Request a presigned URL for uploading an evidence file
+ */
+export const getRequestEvidenceUploadUrlUrl = () => {
+  return `/api/evidence/upload-url`;
+};
+
+export const requestEvidenceUploadUrl = async (
+  options?: RequestInit,
+): Promise<RequestEvidenceUploadUrl200> => {
+  return customFetch<RequestEvidenceUploadUrl200>(
+    getRequestEvidenceUploadUrlUrl(),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getRequestEvidenceUploadUrlMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestEvidenceUploadUrl>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof requestEvidenceUploadUrl>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["requestEvidenceUploadUrl"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof requestEvidenceUploadUrl>>,
+    void
+  > = () => {
+    return requestEvidenceUploadUrl(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RequestEvidenceUploadUrlMutationResult = NonNullable<
+  Awaited<ReturnType<typeof requestEvidenceUploadUrl>>
+>;
+
+export type RequestEvidenceUploadUrlMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Request a presigned URL for uploading an evidence file
+ */
+export const useRequestEvidenceUploadUrl = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestEvidenceUploadUrl>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof requestEvidenceUploadUrl>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getRequestEvidenceUploadUrlMutationOptions(options));
+};
+
+/**
+ * @summary Download an evidence file
+ */
+export const getDownloadEvidenceUrl = (id: number) => {
+  return `/api/evidence/${id}/download`;
+};
+
+export const downloadEvidence = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getDownloadEvidenceUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getDownloadEvidenceQueryKey = (id: number) => {
+  return [`/api/evidence/${id}/download`] as const;
+};
+
+export const getDownloadEvidenceQueryOptions = <
+  TData = Awaited<ReturnType<typeof downloadEvidence>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof downloadEvidence>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getDownloadEvidenceQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof downloadEvidence>>
+  > = ({ signal }) => downloadEvidence(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof downloadEvidence>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type DownloadEvidenceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof downloadEvidence>>
+>;
+export type DownloadEvidenceQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Download an evidence file
+ */
+
+export function useDownloadEvidence<
+  TData = Awaited<ReturnType<typeof downloadEvidence>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof downloadEvidence>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getDownloadEvidenceQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Delete an evidence document
+ */
+export const getDeleteEvidenceUrl = (id: number) => {
+  return `/api/evidence/${id}`;
+};
+
+export const deleteEvidence = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteEvidenceUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteEvidenceMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteEvidence>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteEvidence>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteEvidence"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteEvidence>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteEvidence(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteEvidenceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteEvidence>>
+>;
+
+export type DeleteEvidenceMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete an evidence document
+ */
+export const useDeleteEvidence = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteEvidence>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteEvidence>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteEvidenceMutationOptions(options));
 };
 
 /**
@@ -9604,6 +11024,103 @@ export function useGetTrendline<
 }
 
 /**
+ * @summary Get organisational scorecard status breakdown per NKPA and department
+ */
+export const getGetOrgScorecardUrl = (params: GetOrgScorecardParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/dashboards/org-scorecard?${stringifiedParams}`
+    : `/api/dashboards/org-scorecard`;
+};
+
+export const getOrgScorecard = async (
+  params: GetOrgScorecardParams,
+  options?: RequestInit,
+): Promise<OrgScorecardData> => {
+  return customFetch<OrgScorecardData>(getGetOrgScorecardUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetOrgScorecardQueryKey = (params?: GetOrgScorecardParams) => {
+  return [
+    `/api/dashboards/org-scorecard`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetOrgScorecardQueryOptions = <
+  TData = Awaited<ReturnType<typeof getOrgScorecard>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetOrgScorecardParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOrgScorecard>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetOrgScorecardQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getOrgScorecard>>> = ({
+    signal,
+  }) => getOrgScorecard(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getOrgScorecard>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetOrgScorecardQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getOrgScorecard>>
+>;
+export type GetOrgScorecardQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get organisational scorecard status breakdown per NKPA and department
+ */
+
+export function useGetOrgScorecard<
+  TData = Awaited<ReturnType<typeof getOrgScorecard>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetOrgScorecardParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOrgScorecard>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetOrgScorecardQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary Get top 5 underperforming KPIs
  */
 export const getGetTopUnderperformingUrl = (
@@ -9901,6 +11418,106 @@ export function useGetEvidenceCompliance<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetEvidenceComplianceQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get municipal health composite score
+ */
+export const getGetMunicipalHealthUrl = (params: GetMunicipalHealthParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/dashboards/municipal-health?${stringifiedParams}`
+    : `/api/dashboards/municipal-health`;
+};
+
+export const getMunicipalHealth = async (
+  params: GetMunicipalHealthParams,
+  options?: RequestInit,
+): Promise<MunicipalHealthData> => {
+  return customFetch<MunicipalHealthData>(getGetMunicipalHealthUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMunicipalHealthQueryKey = (
+  params?: GetMunicipalHealthParams,
+) => {
+  return [
+    `/api/dashboards/municipal-health`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetMunicipalHealthQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMunicipalHealth>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetMunicipalHealthParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMunicipalHealth>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetMunicipalHealthQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMunicipalHealth>>
+  > = ({ signal }) => getMunicipalHealth(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMunicipalHealth>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMunicipalHealthQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMunicipalHealth>>
+>;
+export type GetMunicipalHealthQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get municipal health composite score
+ */
+
+export function useGetMunicipalHealth<
+  TData = Awaited<ReturnType<typeof getMunicipalHealth>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetMunicipalHealthParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMunicipalHealth>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMunicipalHealthQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

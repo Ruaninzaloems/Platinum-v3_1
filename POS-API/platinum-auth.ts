@@ -16,8 +16,10 @@ export const SITE_CONFIGS: SiteConfig[] = [
   {
     id: 'george',
     name: 'George Municipality',
-    apiUrl: 'https://georgeplatinumuatapi.azurewebsites.net',
-    dbName: 'George',
+    // Overridable via the PLATINUM_API_URL / PLATINUM_API_DBNAME env vars (App Settings on the
+    // web app) so the George Platinum API endpoint can be changed without a code change.
+    apiUrl: PLATINUM_API_URL,
+    dbName: PLATINUM_DBNAME,
     logo: '/images/platinum-logo.png',
     themeClass: '',
   },
@@ -213,7 +215,9 @@ async function fetchTokenForUser(username: string, password: string, dbName: str
         const res = await fetch(`${baseUrl}/auth/createToken`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userName: username, password, dbName }),
+          // dbName intentionally NOT sent — confirmed via Postman that the George/Site02
+          // token APIs ignore it and authenticate on userName/password alone.
+          body: JSON.stringify({ userName: username, password }),
           signal: AbortSignal.timeout(45000),
         });
 
@@ -271,11 +275,11 @@ async function fetchTokenForUser(username: string, password: string, dbName: str
   const res = await fetch(`${baseUrl}/auth/createTokenAzure`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    // dbName intentionally NOT sent — same as createToken above.
     body: JSON.stringify({
       azureUid: "00000000-0000-0000-0000-000000000000",
       email: username,
       username: username,
-      dbName,
     }),
     signal: AbortSignal.timeout(45000),
   });

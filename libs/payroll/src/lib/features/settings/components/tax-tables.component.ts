@@ -13,6 +13,7 @@ import { DateInputComponent } from '../../../shared/components/date-input/date-i
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent, CurrencyZarPipe, DateSaPipe, DateInputComponent],
   templateUrl: './tax-tables.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './tax-tables.component.css'
 })
 export class TaxTablesComponent implements OnInit {
@@ -35,9 +36,12 @@ export class TaxTablesComponent implements OnInit {
   sarsCopyTo: number | null = null;
   hasSarsChanges = false;
 
+  availableDefaultYears: number[] = [];
+  loadingDefaults = false;
+
   constructor(private api: ApiService, private ui: UiService, private cdr: ChangeDetectorRef) {}
 
-  ngOnInit(): void { this.loadYears(); this.loadSarsRates(); }
+  ngOnInit(): void { this.loadYears(); this.loadSarsRates(); this.loadAvailableDefaults(); }
 
   loadYears(): void {
     this.loading = true;
@@ -363,6 +367,41 @@ export class TaxTablesComponent implements OnInit {
         this.loadSarsRates();
       },
       error: (err: any) => this.ui.toast('error', 'Error', err?.error?.error?.message || 'Failed to copy SARS rates')
+    });
+  }
+
+  loadAvailableDefaults(): void {
+    this.api.get<number[]>('/settings/tax-tables/available-defaults').subscribe({
+      next: (data) => { this.availableDefaultYears = data || []; this.cdr.detectChanges(); },
+      error: () => { this.availableDefaultYears = []; }
+    });
+  }
+
+  get canLoadDefaults(): boolean {
+    return this.selectedYear != null && this.availableDefaultYears.includes(this.selectedYear);
+  }
+
+  async loadSarsDefaults(): Promise<void> {
+    if (!this.selectedYear) return;
+    const confirmed = await this.ui.confirm({
+      title: 'Load SARS Defaults',
+      message: `This will overwrite all tax table data for tax year ${this.selectedYear} with the official SARS-published values. Are you sure you want to continue?`,
+      danger: true,
+      confirmText: 'Load Defaults'
+    });
+    if (!confirmed) return;
+    this.loadingDefaults = true;
+    this.api.post('/settings/tax-tables/load-defaults', { tax_year: this.selectedYear }).subscribe({
+      next: () => {
+        this.ui.toast('success', 'SARS Defaults Loaded', `Official SARS tax values loaded for tax year ${this.selectedYear}.`);
+        this.loadingDefaults = false;
+        this.loadYears();
+      },
+      error: (err: any) => {
+        this.ui.toast('error', 'Error', err?.error?.error?.message || 'Failed to load SARS defaults');
+        this.loadingDefaults = false;
+        this.cdr.detectChanges();
+      }
     });
   }
 }

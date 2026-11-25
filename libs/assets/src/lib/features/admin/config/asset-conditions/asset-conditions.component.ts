@@ -42,21 +42,24 @@ import { Component, OnInit, signal } from '@angular/core';
     }
 
     openAdd(): void {
-      this.formData = { assetConditionDesc: '', rating: null as number | null };
+      this.formData = { assetConditionDesc: '', rating: null as number | null, enabled: 1 };
       this.editingId.set(null);
       this.showForm.set(true);
     }
 
     openEdit(item: any): void {
-      this.formData = { assetConditionDesc: item.assetConditionDesc, rating: item.rating };
-      this.editingId.set(item.assetCondition_ID);
+      this.formData = { assetConditionDesc: item.assetConditionDesc, rating: item.rating, enabled: item.enabled ?? 1 };
+      this.editingId.set(item.assetConditionId);
       this.showForm.set(true);
     }
 
     cancelForm(): void {
+
       this.showForm.set(false);
       this.editingId.set(null);
     }
+
+  onEnabledChange(event: Event): void { this.formData.enabled = (event.target as HTMLInputElement).checked ? 1 : 0; }
 
     save(): void {
       const id = this.editingId();
@@ -75,7 +78,7 @@ import { Component, OnInit, signal } from '@angular/core';
 
     confirmDelete(item: any): void {
       if (confirm('Are you sure you want to delete "' + item.assetConditionDesc + '"?')) {
-        this.api.deleteAssetCondition(item.assetCondition_ID).subscribe({
+        this.api.deleteAssetCondition(item.assetConditionId).subscribe({
           next: function(this: AssetConditionsComponent) { this.loadData(); this.snackBar.open('Asset Condition deleted', 'OK', { duration: 3000 }); }.bind(this),
           error: function(this: AssetConditionsComponent, err: any) { this.snackBar.open(err.error?.error || 'Delete failed', 'OK', { duration: 4000 }); }.bind(this)
         });
@@ -132,6 +135,19 @@ import { Component, OnInit, signal } from '@angular/core';
           const a = document.createElement('a');
           a.href = url;
           a.download = 'asset_conditions_template.xlsx';
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+      });
+    }
+
+    exportToExcel(): void {
+      this.api.exportAssetConditions().subscribe({
+        next: function(blob: Blob) {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'asset_conditions_export.xlsx';
           a.click();
           URL.revokeObjectURL(url);
         }

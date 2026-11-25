@@ -27,6 +27,8 @@ import { CommonModule } from '@angular/common';
     .status-filled { background: #e0f2f1; color: #00695c; }
     .status-processed { background: #f5f5f5; color: #757575; }
     .status-current { background: #e8f5e9; color: #2e7d32; }
+    .status-returned { background: #fff8e1; color: #e65100; }
+    .status-paid { background: #f3e5f5; color: #6a1b9a; }
   `]
 })
 export class StatusBadgeComponent {

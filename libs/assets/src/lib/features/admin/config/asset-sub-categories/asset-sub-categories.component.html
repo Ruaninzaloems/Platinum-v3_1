@@ -5,6 +5,7 @@
       <p class="page-subtitle">Manage asset sub category classifications</p>
     </div>
     <div class="header-actions">
+      <button mat-stroked-button (click)="exportToExcel()"><mat-icon>download</mat-icon> Export to Excel</button>
       <button mat-stroked-button (click)="openImport()"><mat-icon>upload_file</mat-icon> Import from Excel</button>
       <button mat-flat-button class="btn-primary" (click)="openAdd()"><mat-icon>add</mat-icon> Add Sub Category</button>
     </div>
@@ -15,8 +16,8 @@
       <label>Asset Type</label>
       <select class="form-input" (change)="onFilterTypeChange($any($event.target).value)">
         <option value="">All Types</option>
-        @for (t of assetTypes(); track t.assetType_ID) {
-          <option [value]="t.assetType_ID">{{t.assetTypeDesc}}</option>
+        @for (t of assetTypes(); track t.assetTypeId) {
+          <option [value]="t.assetTypeId">{{t.assetTypeDesc}}</option>
         }
       </select>
     </div>
@@ -24,8 +25,8 @@
       <label>Category</label>
       <select class="form-input" (change)="onFilterCategoryChange($any($event.target).value)" [disabled]="!filterTypeId()">
         <option value="">All Categories</option>
-        @for (c of filterCategories(); track c.assetCategoryID) {
-          <option [value]="c.assetCategoryID">{{c.assetCategoryDesc}}</option>
+        @for (c of filterCategories(); track c.assetCategoryId) {
+          <option [value]="c.assetCategoryId">{{c.assetCategoryDesc}}</option>
         }
       </select>
     </div>
@@ -39,8 +40,8 @@
           <label>Asset Type</label>
           <select class="form-input" [ngModel]="formData.typeID" (ngModelChange)="onFormTypeChange($event)">
             <option [ngValue]="null" disabled>Select asset type</option>
-            @for (t of assetTypes(); track t.assetType_ID) {
-              <option [ngValue]="t.assetType_ID">{{t.assetTypeDesc}}</option>
+            @for (t of assetTypes(); track t.assetTypeId) {
+              <option [ngValue]="t.assetTypeId">{{t.assetTypeDesc}}</option>
             }
           </select>
         </div>
@@ -48,14 +49,21 @@
           <label>Category</label>
           <select class="form-input" [(ngModel)]="formData.assetCategoryID" [disabled]="!formData.typeID">
             <option [ngValue]="null" disabled>Select category</option>
-            @for (c of formCategories(); track c.assetCategoryID) {
-              <option [ngValue]="c.assetCategoryID">{{c.assetCategoryDesc}}</option>
+            @for (c of formCategories(); track c.assetCategoryId) {
+              <option [ngValue]="c.assetCategoryId">{{c.assetCategoryDesc}}</option>
             }
           </select>
         </div>
         <div class="form-field">
           <label>Sub Category Description</label>
           <input type="text" class="form-input" [(ngModel)]="formData.asset_SubCategoryDescription" placeholder="Enter sub category description">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label class="checkbox-label">
+            <input type="checkbox" [checked]="formData.enabled === 1" (change)="onEnabledChange($event)"> Active
+          </label>
         </div>
       </div>
       <div class="form-actions">
@@ -72,11 +80,11 @@
       <table class="data-table">
         <thead><tr><th>ID</th><th>Asset Type</th><th>Sub Category Description</th><th>Status</th><th>Date Captured</th><th class="actions-col">Actions</th></tr></thead>
         <tbody>
-          @for (item of items(); track item.asset_SubCategory_ID) {
+          @for (item of items(); track item.assetSubCategoryId) {
             <tr>
-              <td class="id-cell">{{item.asset_SubCategory_ID}}</td>
+              <td class="id-cell">{{item.assetSubCategoryId}}</td>
               <td><span class="type-badge">{{getTypeName(item.typeID)}}</span></td>
-              <td class="desc-cell">{{item.asset_SubCategoryDescription}}</td>
+              <td class="desc-cell">{{item.assetSubCategoryDesc}}</td>
               <td><span class="status-badge" [class.active]="item.enabled === 1">{{item.enabled === 1 ? 'Active' : 'Inactive'}}</span></td>
               <td class="date-cell">{{item.dateCaptured | date:'mediumDate'}}</td>
               <td class="actions-cell">

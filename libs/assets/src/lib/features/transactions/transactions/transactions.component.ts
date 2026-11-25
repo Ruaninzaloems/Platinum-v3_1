@@ -7,13 +7,15 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ApiService } from '../../../core/api.service';
+import * as XLSX from 'xlsx';
 import { PriorYearAdjustmentsComponent } from '../../prior-year-adjustments/prior-year-adjustments.component';
 import { PriorPeriodAdjustmentsComponent } from '../../prior-period-adjustments/prior-period-adjustments.component';
+import { AssetDocumentPanelComponent } from '../../../shared/asset-document-panel/asset-document-panel.component';
 
 @Component({
   selector: 'app-transactions',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, MatIconModule, MatButtonModule, MatTabsModule, MatProgressSpinnerModule, PriorYearAdjustmentsComponent, PriorPeriodAdjustmentsComponent],
+  imports: [CommonModule, FormsModule, RouterModule, MatIconModule, MatButtonModule, MatTabsModule, MatProgressSpinnerModule, PriorYearAdjustmentsComponent, PriorPeriodAdjustmentsComponent, AssetDocumentPanelComponent],
   templateUrl: './transactions.component.html',
   styleUrl: './transactions.component.scss'
 })
@@ -53,13 +55,23 @@ export class TransactionsComponent implements OnInit {
 
   submittingReval = signal(false);
   revalSuccess = signal(false);
+  revalLastAssetId = signal<number>(0);
+  revalLastEntityId = signal<number|null>(null);
   submittingImpair = signal(false);
   impairSuccess = signal(false);
+  impairLastAssetId = signal<number>(0);
+  impairLastEntityId = signal<number|null>(null);
   submittingTransfer = signal(false);
   transferSuccess = signal(false);
   submittingDisposal = signal(false);
   disposalSuccess = signal(false);
+  disposalLastAssetId = signal<number>(0);
+  disposalLastEntityId = signal<number|null>(null);
   disposalError = signal('');
+  reversalLastAssetId = signal<number>(0);
+  reversalLastEntityId = signal<number|null>(null);
+  refurbLastAssetId = signal<number>(0);
+  refurbLastEntityId = signal<number|null>(null);
 
   glValidating = signal(false);
   glValidationErrors = signal<any[]>([]);
@@ -125,6 +137,20 @@ export class TransactionsComponent implements OnInit {
   refurbCtProjectId: string = '';
   refurbCtScoaItemId: string = '';
 
+  depDocCount = signal(0);
+  revalDocCount = signal(0);
+  impairDocCount = signal(0);
+  reversalDocCount = signal(0);
+  disposalDocCount = signal(0);
+  refurbDocCount = signal(0);
+
+  onDepDocumentsChanged(docs: any[]) { this.depDocCount.set((docs || []).length); }
+  onRevalDocumentsChanged(docs: any[]) { this.revalDocCount.set((docs || []).length); }
+  onImpairDocumentsChanged(docs: any[]) { this.impairDocCount.set((docs || []).length); }
+  onReversalDocumentsChanged(docs: any[]) { this.reversalDocCount.set((docs || []).length); }
+  onDisposalDocumentsChanged(docs: any[]) { this.disposalDocCount.set((docs || []).length); }
+  onRefurbDocumentsChanged(docs: any[]) { this.refurbDocCount.set((docs || []).length); }
+
   revalForm: any = { revaluation_date: '', market_value: null, valuation_module: -1, dep_adjustment: null };
   revalError = signal<string>('');
   pendingRevaluations = signal<any[]>([]);
@@ -144,6 +170,7 @@ export class TransactionsComponent implements OnInit {
   transferDateError = signal<string>('');
   disposalDateError = signal<string>('');
   depRunDateError = signal<string>('');
+  depPeriodApprovedNote = signal<string>('');
   nextRunCutoff = signal<string>('');
 
   pendingImpairments = signal<any[]>([]);
@@ -334,7 +361,7 @@ export class TransactionsComponent implements OnInit {
       next: function(this: TransactionsComponent, items: any[]) {
         var pending: any[] = [];
         for (var i = 0; i < items.length; i++) {
-          var s = (items[i].status || '').toLowerCase();
+          var s = (items[i].status || items[i].Status || '').toLowerCase();
           if (s === 'pending' || s === 'submitted') pending.push(items[i]);
         }
         this.pendingDisposals.set(pending);
@@ -609,8 +636,6 @@ export class TransactionsComponent implements OnInit {
     const txDate = new Date(dateStr);
     const today = new Date(this.todayDate);
     if (txDate > today) return 'Transaction date cannot be in the future';
-    var globalMin = this.globalMinTransactionDate();
-    if (globalMin && dateStr < globalMin) return 'This period is closed. The earliest allowed transaction date is ' + globalMin + '.';
     var assetLastDep = this.disposalAssetLastDepDate();
     if (assetLastDep) {
       var lastDep = new Date(assetLastDep);
@@ -789,8 +814,8 @@ export class TransactionsComponent implements OnInit {
     var finYear = this.monthEndFilters.finYear;
     var period = this.monthEndFilters.period;
     this.api.createMonthlyApproval({
-      financialYear: finYear,
-      financialPeriod: period,
+      finYear: finYear,
+      period: period,
       userId: 1,
       verifiedRevaluation: true,
       verifiedImpairment: true,
@@ -1232,7 +1257,14 @@ export class TransactionsComponent implements OnInit {
 
   onDepFinYearChange(finYear: string) {
     this.depCompletedPeriods.set([]);
+    this.depPeriodApprovedNote.set('');
+    this.depRunDateError.set('');
     this.loadCompletedPeriods(finYear);
+  }
+
+  onDepPeriodChange() {
+    this.depPeriodApprovedNote.set('');
+    this.depRunDateError.set('');
   }
 
   runDepreciation() {
@@ -1246,6 +1278,7 @@ export class TransactionsComponent implements OnInit {
       return;
     }
     this.depRunDateError.set('');
+    this.depPeriodApprovedNote.set('');
     this.depRunning.set(true);
     this.depRunStep.set(1);
     this.depRunModalVisible.set(true);
@@ -1298,7 +1331,11 @@ export class TransactionsComponent implements OnInit {
             this.depRunning.set(false);
             this.depRunModalVisible.set(false);
             this.depRunStep.set(0);
-            this.depRunDateError.set('Run failed: ' + (err?.error?.error || err?.error?.details || err?.message || 'Unknown error'));
+            if (err?.status === 409) {
+              this.depPeriodApprovedNote.set('This period has already been approved and cannot be re-run.');
+            } else {
+              this.depRunDateError.set('Run failed: ' + (err?.error?.error || err?.error?.details || err?.message || 'Unknown error'));
+            }
           }.bind(this)
         });
       }.bind(this),
@@ -1423,8 +1460,46 @@ export class TransactionsComponent implements OnInit {
   }
 
   exportScheduleDetail(scheduleId: number, itemId?: number) {
-    var url = this.api.exportDepreciationScheduleDetails(scheduleId, itemId);
-    window.open(url, '_blank');
+    this.api.exportDepreciationScheduleDetails(scheduleId, itemId).subscribe({
+      next: (data: any[]) => {
+        if (!data || data.length === 0) return;
+        var cols = [
+          'AssetRegisterItemId', 'Description', 'InServiceDate', 'UsefulLifeMonths',
+          'RemainingUsefulLifeMonths', 'DaysFromLastRun', 'CostPurchaseAmount', 'ResidualValue',
+          'DepreciationForPeriod', 'AccumulatedDepreciation', 'CarryingAmount',
+          'AccumulatedRevaluationReserveClosingBalance', 'DepreciationOffsetOpeningBalance',
+          'DepreciationOffset', 'DepreciationOffsetClosingBalance'
+        ];
+        var headers = [
+          'Asset ID', 'Description', 'In Service Date', 'UL (Mths)', 'RUL (Mths)', 'Days',
+          'Cost', 'Residual', 'Dep. Period', 'Accum. Dep.', 'Carrying Amt',
+          'Reval Reserve', 'Dep Offset Open', 'Dep Offset', 'Dep Offset Close'
+        ];
+        var wsData: any[][] = [headers];
+        for (var i = 0; i < data.length; i++) {
+          var row = data[i];
+          var r: any[] = [];
+          for (var j = 0; j < cols.length; j++) {
+            var val = row[cols[j]] !== undefined ? row[cols[j]] : (row[cols[j].charAt(0).toLowerCase() + cols[j].slice(1)] !== undefined ? row[cols[j].charAt(0).toLowerCase() + cols[j].slice(1)] : '');
+            val = val !== null && val !== undefined ? val : '';
+            if (j >= 3 && val !== '') {
+              var n = parseFloat(val);
+              if (!isNaN(n)) val = n;
+            }
+            r.push(val);
+          }
+          wsData.push(r);
+        }
+        var ws = XLSX.utils.aoa_to_sheet(wsData);
+        var colWidths: any[] = [];
+        for (var wi = 0; wi < headers.length; wi++) { colWidths.push({ wch: 20 }); }
+        ws['!cols'] = colWidths;
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Schedule Detail');
+        XLSX.writeFile(wb, 'depreciation_schedule_' + scheduleId + '_' + new Date().toISOString().split('T')[0] + '.xlsx');
+      },
+      error: () => {}
+    });
   }
 
   submitRevaluation() {
@@ -1466,7 +1541,10 @@ export class TransactionsComponent implements OnInit {
       surplusAmount: surplusAmount,
       depreciationAdjustment: depAdjustment
     }).subscribe({
-      next: function(this: TransactionsComponent) {
+      next: function(this: TransactionsComponent, result: any) {
+        var revalId = (result?.assetRevaluation_ID || result?.revaluationId || result?.id) ?? null;
+        this.revalLastAssetId.set(Number(assetId) || 0);
+        this.revalLastEntityId.set(revalId ? Number(revalId) : null);
         this.submittingReval.set(false);
         this.revalSuccess.set(true);
         this.revalForm = { revaluation_date: '', market_value: null, valuation_module: -1, dep_adjustment: null };
@@ -1522,8 +1600,12 @@ export class TransactionsComponent implements OnInit {
       next: function(this: TransactionsComponent, result: any) {
         var impairmentId = result.assetImpairment_ID || result.assetImpairmentId;
         this.api.createImpairmentPosting({
+          impairmentId: impairmentId,
           assetImpairment_ID: impairmentId,
           impairment_ID: impairmentId,
+          postingDate: isoDate,
+          finYear: fy,
+          postingAmount: totalImpairment,
           fairValueAmt: basis,
           impairmentLostAmt: impairmentLoss,
           carryingValue: adjustedCarrying,
@@ -1548,6 +1630,8 @@ export class TransactionsComponent implements OnInit {
               mssql_reference_id: String(impairmentId)
             }).subscribe({
               next: function(this: TransactionsComponent) {
+                this.impairLastAssetId.set(Number(assetId) || 0);
+                this.impairLastEntityId.set(impairmentId ? Number(impairmentId) : null);
                 this.submittingImpair.set(false);
                 this.impairSuccess.set(true);
                 this.impairForm = { impairment_type: 'non_cash_generating', recoverable_amount: null, value_in_use: null, reason: '', transaction_date: '' };
@@ -1641,8 +1725,12 @@ export class TransactionsComponent implements OnInit {
       next: function(this: TransactionsComponent, result: any) {
         var impairmentId = result.assetImpairment_ID || result.assetImpairmentId;
         this.api.createImpairmentPosting({
+          impairmentId: impairmentId,
           assetImpairment_ID: impairmentId,
           impairment_ID: impairmentId,
+          postingDate: isoDate,
+          finYear: fy,
+          postingAmount: totalReversal,
           fairValueAmt: basis,
           impairmentLostAmt: reversalToIncome,
           carryingValue: currentCarrying,
@@ -1668,6 +1756,8 @@ export class TransactionsComponent implements OnInit {
               mssql_reference_id: String(impairmentId)
             }).subscribe({
               next: function(this: TransactionsComponent) {
+                this.reversalLastAssetId.set(Number(assetId) || 0);
+                this.reversalLastEntityId.set(impairmentId ? Number(impairmentId) : null);
                 this.submittingReversal.set(false);
                 this.reversalSuccess.set(true);
                 this.reversalForm = { recoverable_amount: null, value_in_use: null, reason: '', transaction_date: '' };
@@ -1774,6 +1864,8 @@ export class TransactionsComponent implements OnInit {
           mssql_reference_id: String(disposalId)
         }).subscribe({
           next: function(this: TransactionsComponent) {
+            this.disposalLastAssetId.set(Number(disposalAssetId) || 0);
+            this.disposalLastEntityId.set(disposalId ? Number(disposalId) : null);
             this.submittingDisposal.set(false);
             this.disposalSuccess.set(true);
             this.disposalForm = { method: '', value: null, disposal_date: '', reason: '' };
@@ -1983,7 +2075,7 @@ export class TransactionsComponent implements OnInit {
     var schedFy = '';
     var scheds = this.pendingSchedules();
     for (var si = 0; si < scheds.length; si++) {
-      if (scheds[si].depreciationSchedule_ID === scheduleId) {
+      if (scheds[si].depreciationScheduleId === scheduleId) {
         schedFy = scheds[si].finYear || '';
         break;
       }
@@ -2052,7 +2144,7 @@ export class TransactionsComponent implements OnInit {
   }
 
   approveImpairment(item: any) {
-    var id = item.assetImpairment_ID || item.AssetImpairment_ID || item.id;
+    var id = item.impairmentId || item.id;
     this.approvingId.set(id);
     this.approveError.set('');
     this.api.approveImpairment(id, 1).subscribe({
@@ -2069,7 +2161,7 @@ export class TransactionsComponent implements OnInit {
   }
 
   rejectImpairment(item: any) {
-    var id = item.assetImpairment_ID || item.AssetImpairment_ID || item.id;
+    var id = item.impairmentId || item.id;
     this.approvingId.set(id);
     this.api.rejectImpairment(id).subscribe({
       next: function(this: TransactionsComponent) {
@@ -2114,7 +2206,7 @@ export class TransactionsComponent implements OnInit {
   }
 
   approveImpairmentReversal(item: any) {
-    var id = item.assetImpairment_ID || item.AssetImpairment_ID || item.id;
+    var id = item.impairmentId || item.id;
     this.approvingId.set(id);
     this.approveError.set('');
     this.api.approveImpairmentReversal(id, 1).subscribe({
@@ -2131,7 +2223,7 @@ export class TransactionsComponent implements OnInit {
   }
 
   rejectImpairmentReversal(item: any) {
-    var id = item.assetImpairment_ID || item.AssetImpairment_ID || item.id;
+    var id = item.impairmentId || item.id;
     this.approvingId.set(id);
     this.api.rejectImpairmentReversal(id).subscribe({
       next: function(this: TransactionsComponent) {
@@ -2169,6 +2261,7 @@ export class TransactionsComponent implements OnInit {
     this.api.createRefurbishment({
       assetRegisterID: Number(assetId),
       refurbDate: isoDate,
+      refurbishmentCost: refurbDT - refurbCT,
       refurb_DT: refurbDT,
       refurb_CT: refurbCT,
       refurb_Depreciation: refurbDepreciation,
@@ -2196,6 +2289,8 @@ export class TransactionsComponent implements OnInit {
           mssql_reference_id: String(refurbId)
         }).subscribe({
           next: function(this: TransactionsComponent) {
+            this.refurbLastAssetId.set(Number(assetId) || 0);
+            this.refurbLastEntityId.set(refurbId ? Number(refurbId) : null);
             this.submittingRefurb.set(false);
             this.refurbSuccess.set(true);
             this.refurbForm = { refurb_date: '', refurb_dt: null, refurb_ct: null, refurb_depreciation: null, refurb_revaluation: null, refurb_impairment: null, debitPlanProjectItemId: null, creditPlanProjectItemId: null };
@@ -2263,5 +2358,9 @@ export class TransactionsComponent implements OnInit {
     } else if (txnType === 'Disposal') {
       this.submitDisposal();
     }
+  }
+
+  getAssetNumericId(asset: any): number {
+    return Number(asset?.assetRegisterItem_ID || asset?.assetRegisterItemId || asset?.assetId) || 0;
   }
 }

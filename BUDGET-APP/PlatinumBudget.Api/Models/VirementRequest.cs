@@ -53,5 +53,4 @@ public class VirementRequest
     public string? RejectionReason { get; set; }
 
     public BudgetVersion BudgetVersion { get; set; } = null!;
-    public ICollection<BudgetApproval> Approvals { get; set; } = new List<BudgetApproval>();
 }

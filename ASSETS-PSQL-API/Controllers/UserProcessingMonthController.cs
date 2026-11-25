@@ -11,12 +11,20 @@ public class UserProcessingMonthController : ControllerBase
     private readonly DbConnectionFactory _db;
     public UserProcessingMonthController(DbConnectionFactory db) => _db = db;
 
+    private const string SelectColumns = @"
+        SELECT ""UserProcessingMonth_ID""  AS ""userProcessingMonthId"",
+               ""UserID""                  AS ""userId"",
+               ""ProcessingMonth""         AS ""processingMonth"",
+               ""DateCaptured""            AS ""dateCaptured"",
+               ""DateModified""            AS ""dateModified""
+        FROM ""User_UserProcessingMonth""";
+
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] int? userId)
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
-        var sql = @"SELECT * FROM ""User_UserProcessingMonth"" WHERE 1=1";
+        var sql = SelectColumns + @" WHERE 1=1";
         var p = new DynamicParameters();
         if (userId.HasValue)
         {
@@ -34,7 +42,7 @@ public class UserProcessingMonthController : ControllerBase
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
         var item = await conn.QueryFirstOrDefaultAsync<dynamic>(
-            @"SELECT * FROM ""User_UserProcessingMonth"" WHERE ""UserID"" = @userId ORDER BY ""UserProcessingMonth_ID"" DESC LIMIT 1",
+            SelectColumns + @" WHERE ""UserID"" = @userId ORDER BY ""UserProcessingMonth_ID"" DESC LIMIT 1",
             new { userId });
         return item is null ? NotFound() : Ok(item);
     }
@@ -45,7 +53,7 @@ public class UserProcessingMonthController : ControllerBase
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
         var item = await conn.QueryFirstOrDefaultAsync<dynamic>(
-            @"SELECT * FROM ""User_UserProcessingMonth"" WHERE ""UserProcessingMonth_ID"" = @id", new { id });
+            SelectColumns + @" WHERE ""UserProcessingMonth_ID"" = @id", new { id });
         return item is null ? NotFound() : Ok(item);
     }
 

@@ -13,6 +13,7 @@ import { forkJoin } from 'rxjs';
 @Component({
   selector: 'app-job-profiles',
   standalone: true,
+  host: { 'data-accent': 'talent' },
   imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, PaginationComponent, DateInputComponent, DateSaPipe],
   templateUrl: './job-profiles.component.html',
   styleUrl: './job-profiles.component.css'
@@ -436,7 +437,6 @@ export class JobProfilesComponent implements OnInit {
     if (!this.isPostRetirement) {
       if (!this.profile.job_family_id) return 'Occupation Level / Job Family is required';
       if (!this.profile.employment_category_id) return 'Employment Category is required';
-      if (!this.profile.employment_code_id) return 'Employment Code is required';
     }
 
     const dup = this.profiles.find(p =>

@@ -10,3 +10,5 @@ export * from "./sdbip";
 export * from "./actuals";
 export * from "./departmental";
 export * from "./individual";
+export * from "./scorecard-wizard";
+export * from "./departments";

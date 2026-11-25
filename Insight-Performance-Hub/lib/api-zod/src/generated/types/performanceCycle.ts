@@ -10,9 +10,9 @@ import type { PerformanceCycleStatus } from "./performanceCycleStatus";
 export interface PerformanceCycle {
   id: number;
   financialYearLabel: string;
-  startDate: Date;
-  endDate: Date;
+  startDate: string;
+  endDate: string;
   status: PerformanceCycleStatus;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }

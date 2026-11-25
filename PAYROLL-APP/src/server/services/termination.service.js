@@ -45,7 +45,7 @@ async function calculateLeavePayout(employeeId) {
 
   const balances = await dbQuery(
     `SELECT COALESCE(SUM(balance_days), 0) AS total_balance
-     FROM employee_leave_balances
+     FROM employee_leave_balances_legacy
      WHERE employee_id = $1 AND balance_days > 0`,
     [employeeId]
   );

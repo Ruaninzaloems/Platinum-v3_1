@@ -10,6 +10,7 @@ import { DateInputComponent } from '../../../shared/components/date-input/date-i
 @Component({
   selector: 'app-disciplinary',
   standalone: true,
+  host: { 'data-accent': 'talent' },
   imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, DateInputComponent],
   templateUrl: './disciplinary.component.html',
   styleUrl: './disciplinary.component.css'
@@ -114,7 +115,7 @@ export class DisciplinaryComponent implements OnInit {
   }
 
   downloadDocument(caseId: number, type: string): void {
-    window.open(`/api/v1/disciplinary/${caseId}/${type}`, '_blank');
+    window.open(`/payroll-app/api/disciplinary/${caseId}/${type}`, '_blank');
   }
 
   openNewGrievance(): void {

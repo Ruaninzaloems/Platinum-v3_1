@@ -5,12 +5,16 @@
  * Organisational Performance Management API
  * OpenAPI spec version: 0.1.0
  */
+import type { UploadEvidenceInputPeriodType } from "./uploadEvidenceInputPeriodType";
 
 export interface UploadEvidenceInput {
+  periodType?: UploadEvidenceInputPeriodType;
   quarter: number;
   fileName: string;
   fileSize: number;
   mimeType: string;
   documentType?: string;
   description?: string;
+  /** Object storage path returned by the upload-url flow */
+  filePath?: string;
 }

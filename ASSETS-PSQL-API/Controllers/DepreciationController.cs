@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Dapper;
 using AssetManagement.Data;
+using AssetManagement.Filters;
 using AssetManagement.Models;
 using AssetManagement.Services;
 
@@ -13,13 +14,16 @@ public class DepreciationController : ControllerBase
     private readonly DbConnectionFactory _db;
     private readonly TransactionService _txnService;
     private readonly LookupService _lookupService;
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (int Done, int Total)> _rebuildProgress = new();
+    private readonly EmailService _emailService;
+    private record RebuildProgressEntry(int Done, int Total, bool Complete, List<int> FailedAssets, int Mismatched, int AutoCorrected);
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, RebuildProgressEntry> _rebuildProgress = new();
 
-    public DepreciationController(DbConnectionFactory db, TransactionService txnService, LookupService lookupService)
+    public DepreciationController(DbConnectionFactory db, TransactionService txnService, LookupService lookupService, EmailService emailService)
     {
         _db = db;
         _txnService = txnService;
         _lookupService = lookupService;
+        _emailService = emailService;
     }
 
     [HttpGet]
@@ -73,9 +77,12 @@ public class DepreciationController : ControllerBase
         var sql = @"SELECT s.*, s.""Asset_DepreciationSchedule_ID"" AS ""DepreciationSchedule_ID"",
                        (SELECT MAX(si.""FinancialPeriod"") FROM ""Asset_DepreciationSchedule_Item"" si
                         WHERE si.""Asset_DepreciationSchedule_ID"" = s.""Asset_DepreciationSchedule_ID"") AS ""FinancialPeriod""
-                   FROM ""Asset_DepreciationSchedule"" s";
+                   FROM ""Asset_DepreciationSchedule"" s
+                   WHERE (s.""RunType_ID"" IS NULL OR s.""RunType_ID"" NOT IN (
+                       SELECT ""RunType_ID"" FROM ""Const_Asset_Run_Type""
+                       WHERE ""RunTypeDesc"" ILIKE '%Catch%'))";
         if (!string.IsNullOrEmpty(finYear))
-            sql += @" WHERE s.""FinYear"" = @finYear";
+            sql += @" AND s.""FinYear"" = @finYear";
         sql += @" ORDER BY s.""Asset_DepreciationSchedule_ID"" DESC";
         var items = await conn.QueryAsync<AssetDepreciationSchedule>(sql, new { finYear });
         return Ok(items);
@@ -395,13 +402,15 @@ public class DepreciationController : ControllerBase
         decimal depreciableAmount = currentValue - residual;
         if (depreciableAmount < 0) depreciableAmount = 0;
 
-        int maxDepDays = (int)(remainingUsefulLifeMonths * 30.44m);
-        int days = (int)(depToDate - depFromDate).TotalDays;
-        if (days < 0) days = 0;
-        if (days > maxDepDays) days = maxDepDays;
+        decimal rulDaysCalc = remainingUsefulLifeMonths / 12m * 365m;
+        int periodDays = (int)(depToDate - depFromDate).TotalDays;
+        if (periodDays < 0) periodDays = 0;
+        bool calcExceedsRul = (decimal)periodDays >= rulDaysCalc;
+        int days = calcExceedsRul ? (int)Math.Ceiling(rulDaysCalc) : periodDays;
 
-        decimal depreciationAmount = depreciableAmount * 12m / remainingUsefulLifeMonths / 365m * days;
-        depreciationAmount = Math.Round(depreciationAmount, 2);
+        decimal depreciationAmount = calcExceedsRul
+            ? depreciableAmount
+            : Math.Round(depreciableAmount / rulDaysCalc * days, 2);
 
         if (depreciationAmount > depreciableAmount) depreciationAmount = depreciableAmount;
 
@@ -554,8 +563,8 @@ public class DepreciationController : ControllerBase
             INSERT INTO ""Asset_Depreciation"" (""AssetRegisterItem_ID"", ""DepreciationDate"",
                 ""DepreciationAmount"", ""AccumulatedDepreciation"", ""CarryingAmount"",
                 ""RunType_ID"", ""RunStatus_ID"", ""FinYear"", ""MonthID"", ""DateCaptured"", ""CapturerID"")
-            VALUES (@assetId, GETDATE(), @monthlyDepreciation, @newAccumulated, @newCarryingAmount,
-                @RunTypeId, 1, @FinYear, @MonthId, GETDATE(), 1)
+            VALUES (@assetId, NOW(), @monthlyDepreciation, @newAccumulated, @newCarryingAmount,
+                @RunTypeId, 1, @FinYear, @MonthId, NOW(), 1)
             RETURNING ""Asset_Depreciation_ID""",
             new { assetId, monthlyDepreciation, newAccumulated, newCarryingAmount,
                   request.RunTypeId, request.FinYear, request.MonthId }, txn);
@@ -564,10 +573,9 @@ public class DepreciationController : ControllerBase
             UPDATE ""Asset_Register_Items""
             SET ""AccumulatedDepreciationClosingBalance"" = @newAccumulated,
                 ""CarryingAmountClosingBalance"" = @newCarryingAmount,
-                ""DepreciationPerMonth"" = @monthlyDepreciation,
-                ""DateModified"" = GETDATE()
+                ""DateModified"" = NOW()
             WHERE ""AssetRegisterItem_ID"" = @assetId",
-            new { newAccumulated, newCarryingAmount, monthlyDepreciation, assetId }, txn);
+            new { newAccumulated, newCarryingAmount, assetId }, txn);
 
         await txn.CommitAsync();
 
@@ -610,13 +618,33 @@ public class DepreciationController : ControllerBase
             var (fyYear, fyPeriod) = _txnService.GetFinancialPeriodForDate(scheduledDate);
             int monthId = fyPeriod;
 
-            var scheduleId = await conn.QuerySingleAsync<int>(@"
+            bool alreadyApproved = await conn.ExecuteScalarAsync<bool>(@"
+                SELECT COUNT(1) > 0
+                FROM ""Asset_DepreciationSchedule"" s
+                INNER JOIN ""Asset_DepreciationSchedule_Item"" si
+                    ON si.""Asset_DepreciationSchedule_ID"" = s.""Asset_DepreciationSchedule_ID""
+                WHERE s.""FinYear"" = @finYear
+                  AND si.""Month_ID"" = @monthId
+                  AND COALESCE(s.""IsApproved"", 0) = 1
+                  AND (s.""RunType_ID"" IS NULL OR s.""RunType_ID"" NOT IN (
+                      SELECT ""RunType_ID"" FROM ""Const_Asset_Run_Type""
+                      WHERE ""RunTypeDesc"" ILIKE '%Catch%'))",
+                new { finYear, monthId }, txn);
+
+            if (alreadyApproved)
+                return Conflict(new { error = $"Period {monthId} for financial year {finYear} has already been approved and cannot be re-run." });
+
+            // Look up the first available run type — do NOT hardcode 1 (IDs vary per database)
+            int? runTypeId = await conn.ExecuteScalarAsync<int?>(
+                @"SELECT ""RunType_ID"" FROM ""Const_Asset_Run_Type"" ORDER BY ""RunType_ID"" LIMIT 1", transaction: txn);
+            if (runTypeId is null)
+                return BadRequest(new { success = 0, message = "No depreciation run types are configured. Please add at least one run type before running depreciation." });
+
+            int scheduleId = await conn.QuerySingleAsync<int>(@"
                 INSERT INTO ""Asset_DepreciationSchedule"" (""FinYear"", ""RunDate"", ""RunType_ID"", ""RunStatus_ID"", ""DateCaptured"", ""CapturerID"", ""ScheduledDate"", ""StatusID"", ""PendingApproval"")
-                VALUES (@finYear, GETDATE(), 1, 1, GETDATE(), 1, @scheduledDate, 1, 1)
-                ON CONFLICT (""FinYear"") DO UPDATE
-                SET ""RunDate"" = GETDATE(), ""ScheduledDate"" = EXCLUDED.""ScheduledDate"", ""RunStatus_ID"" = 1, ""StatusID"" = 1, ""PendingApproval"" = 1
+                VALUES (@finYear, NOW(), @runTypeId, 1, NOW(), 1, @scheduledDate, 1, 1)
                 RETURNING ""Asset_DepreciationSchedule_ID""",
-                new { finYear, scheduledDate }, txn);
+                new { finYear, scheduledDate, runTypeId }, txn);
 
             var groupings = await conn.QueryAsync<dynamic>(@"
                 SELECT DISTINCT COALESCE(""AssetType_ID"", 0) AS ""AssetType_ID"",
@@ -628,8 +656,15 @@ public class DepreciationController : ControllerBase
                        COALESCE(""DivisionID"", 0) AS ""DivisionID""
                 FROM ""Asset_Register_Items""
                 WHERE COALESCE(""RemainingUsefulLife"", ""UsefulLifeMonthComponent"", 0) > 0
-                AND COALESCE(""DateOfDisposal"", '9999-12-31') > GETDATE()
-                AND COALESCE(""CarryingAmountClosingBalance"", 0) > COALESCE(""ResidualValue"", 0)", transaction: txn);
+                AND NOT EXISTS (
+                    SELECT 1 FROM ""Asset_Disposal"" ad
+                    WHERE ad.""AssetItemID"" = ""Asset_Register_Items"".""AssetRegisterItem_ID""
+                      AND COALESCE(ad.""Approved"", 0) = 1)
+                AND COALESCE(
+                    (SELECT ""CurrentValue"" FROM ""Asset_Transaction_Summary""
+                     WHERE ""AssetRegisterItemID"" = ""Asset_Register_Items"".""AssetRegisterItem_ID""
+                     ORDER BY ""ID"" DESC LIMIT 1),
+                    ""CarryingAmountClosingBalance"", ""CurrentAmount"", ""PurchaseAmount"", 0) > COALESCE(""ResidualValue"", 0)", transaction: txn);
 
             var scheduleItemIds = new List<int>();
             int totalAssetsProcessed = 0;
@@ -659,14 +694,14 @@ public class DepreciationController : ControllerBase
                             @assetTypeId, @assetCategoryId, @assetSubCategoryId,
                             @measurementTypeId, @assetStatusId,
                             @groupDeptId, @groupDivId,
-                            @monthId, 1, GETDATE(), 1)
+                            @monthId, @runTypeId, NOW(), 1)
                     RETURNING ""Asset_DepreciationSchedule_Item_ID""",
                     new
                     {
                         scheduleId, scheduledDate,
                         assetTypeId, assetCategoryId, assetSubCategoryId,
                         measurementTypeId, assetStatusId, monthId, finYear,
-                        groupDeptId, groupDivId
+                        groupDeptId, groupDivId, runTypeId
                     }, txn);
                 scheduleItemIds.Add(itemId);
 
@@ -675,6 +710,9 @@ public class DepreciationController : ControllerBase
                            ari.""RemainingUsefulLife"", ari.""UsefulLifeMonthComponent"", ari.""UsefulLifeYearComponent"",
                            ari.""AccumulatedDepreciationClosingBalance"", ari.""CarryingAmountClosingBalance"",
                            ari.""CurrentAmount"", ari.""InserviceDate"",
+                           ats.""CurrentValue""                          AS ""AtsCurrentValue"",
+                           ats.""RemainingUsefulLife""                   AS ""AtsRemainingUsefulLife"",
+                           ats.""AccumulatedDepreciationClosingBalance""  AS ""AtsAccDep"",
                            (SELECT MAX(sub.latest) FROM (
                                SELECT MAX(d2.""DepreciationDate"") AS latest FROM ""Asset_Depreciation"" d2 WHERE d2.""AssetRegisterItem_ID"" = ari.""AssetRegisterItem_ID""
                                UNION ALL
@@ -685,6 +723,12 @@ public class DepreciationController : ControllerBase
                                  )
                            ) sub) AS ""LastTransactionDate""
                     FROM ""Asset_Register_Items"" ari
+                    LEFT JOIN LATERAL (
+                        SELECT ""CurrentValue"", ""RemainingUsefulLife"", ""AccumulatedDepreciationClosingBalance""
+                        FROM ""Asset_Transaction_Summary""
+                        WHERE ""AssetRegisterItemID"" = ari.""AssetRegisterItem_ID""
+                        ORDER BY ""ID"" DESC
+                        LIMIT 1) ats ON true
                     WHERE COALESCE(ari.""AssetType_ID"", 0) = @assetTypeId
                     AND COALESCE(ari.""AssetCategory_ID"", 0) = @assetCategoryId
                     AND COALESCE(ari.""Asset_SubCategory_ID"", 0) = @assetSubCategoryId
@@ -693,8 +737,11 @@ public class DepreciationController : ControllerBase
                     AND COALESCE(CAST(NULLIF(ari.""MunicipalDepartment_ID"", '') AS INTEGER), 0) = @groupDeptId
                     AND COALESCE(ari.""DivisionID"", 0) = @groupDivId
                     AND COALESCE(ari.""RemainingUsefulLife"", ari.""UsefulLifeMonthComponent"", 0) > 0
-                    AND COALESCE(ari.""DateOfDisposal"", '9999-12-31') > GETDATE()
-                    AND COALESCE(ari.""CarryingAmountClosingBalance"", 0) > COALESCE(ari.""ResidualValue"", 0)",
+                    AND NOT EXISTS (
+                        SELECT 1 FROM ""Asset_Disposal"" ad
+                        WHERE ad.""AssetItemID"" = ari.""AssetRegisterItem_ID""
+                          AND COALESCE(ad.""Approved"", 0) = 1)
+                    AND COALESCE(ats.""CurrentValue"", ari.""CarryingAmountClosingBalance"", ari.""CurrentAmount"", ari.""PurchaseAmount"", 0) > COALESCE(ari.""ResidualValue"", 0)",
                     new { assetTypeId, assetCategoryId, assetSubCategoryId, measurementTypeId, assetStatusId, groupDeptId, groupDivId }, txn);
 
                 int itemAssetCount = 0;
@@ -712,16 +759,27 @@ public class DepreciationController : ControllerBase
                     DateTime fromDate = lastTxnDate ?? readyForUse;
                     if (fromDate >= scheduledDate) continue;
 
-                    decimal remainingUsefulLifeMonths = (decimal)(asset.RemainingUsefulLife ?? asset.UsefulLifeMonthComponent ?? 0m);
+                    decimal remainingUsefulLifeMonths = (decimal)(asset.AtsRemainingUsefulLife
+                                                           ?? asset.RemainingUsefulLife
+                                                           ?? asset.UsefulLifeMonthComponent
+                                                           ?? (asset.UsefulLifeYearComponent != null ? asset.UsefulLifeYearComponent * 12m : null)
+                                                           ?? 0m);
                     if (remainingUsefulLifeMonths <= 0) continue;
 
                     int daysFromLastRun = (int)(scheduledDate - fromDate).TotalDays;
                     if (daysFromLastRun <= 0) continue;
 
-                    int maxDays = (int)(remainingUsefulLifeMonths / 12m * 365m);
-                    int daysForDepreciation = daysFromLastRun > maxDays ? maxDays : daysFromLastRun;
+                    decimal rulDays = remainingUsefulLifeMonths / 12m * 365m;
+                    bool periodExceedsRul = (decimal)daysFromLastRun >= rulDays;
+                    int daysForDepreciation = periodExceedsRul
+                        ? (int)Math.Ceiling(rulDays)
+                        : daysFromLastRun;
 
-                    decimal currentValue = (decimal)(asset.CurrentAmount ?? asset.CarryingAmountClosingBalance ?? asset.PurchaseAmount ?? 0m);
+                    decimal currentValue = (decimal)(asset.AtsCurrentValue
+                                             ?? asset.CarryingAmountClosingBalance
+                                             ?? asset.CurrentAmount
+                                             ?? asset.PurchaseAmount
+                                             ?? 0m);
                     decimal residual = (decimal)(asset.ResidualValue ?? 0m);
                     decimal depreciableAmount = currentValue - residual;
 
@@ -730,9 +788,13 @@ public class DepreciationController : ControllerBase
                     {
                         depreciationValue = 0;
                     }
+                    else if (periodExceedsRul)
+                    {
+                        depreciationValue = depreciableAmount;
+                    }
                     else
                     {
-                        decimal dailyRate = depreciableAmount / (remainingUsefulLifeMonths / 12m * 365m);
+                        decimal dailyRate = depreciableAmount / rulDays;
                         depreciationValue = dailyRate * daysForDepreciation;
                         if (depreciableAmount - depreciationValue <= 0)
                             depreciationValue = depreciableAmount;
@@ -743,7 +805,9 @@ public class DepreciationController : ControllerBase
                     if (newUsefulLifeMonths < 0) newUsefulLifeMonths = 0;
                     newUsefulLifeMonths = Math.Round(newUsefulLifeMonths, 4);
 
-                    decimal accDep = (decimal)(asset.AccumulatedDepreciationClosingBalance ?? 0m);
+                    decimal accDep = (decimal)(asset.AtsAccDep
+                                       ?? asset.AccumulatedDepreciationClosingBalance
+                                       ?? 0m);
                     decimal newAccDep = accDep + depreciationValue;
                     decimal newCarrying = currentValue - depreciationValue;
 
@@ -764,7 +828,7 @@ public class DepreciationController : ControllerBase
                             ""Depreciation_ScheduleID"", ""Depreciation_MonthID"", ""Depreciation_RunType"",
                             ""CarryingAmountClosingBalance"")
                         VALUES (@assetId, @scheduledDate, @depreciationValue, @newAccDep, @newCarrying,
-                            1, 1, @finYear, @monthId, @itemId, @daysForDepreciation, GETDATE(), 1,
+                            1, 1, @finYear, @monthId, @itemId, @daysForDepreciation, NOW(), 1,
                             @residual, @readyForUse, @newUsefulLifeMonths, @depreciationValue,
                             @scheduleId, @monthId, 'Distinctive', @newCarrying)",
                         new
@@ -1137,7 +1201,7 @@ public class DepreciationController : ControllerBase
                 {
                     await _txnService.InsertGeneralLedgerEntry(conn, txn,
                         depDate, processingMonth, mscoaConfig.DebitVoteId, finYear,
-                        journalTransactionTypeId, "Asset Depreciation", documentNumber,
+                        documentTypeId, "Asset Depreciation", documentNumber,
                         debit: siTotal, credit: null, matchTranGuid: transactionId,
                         journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                         scoaFundsId: mscoaConfig.DebitScoaFundId, scoaRegionId: mscoaConfig.DebitScoaRegionId,
@@ -1153,7 +1217,7 @@ public class DepreciationController : ControllerBase
                 {
                     await _txnService.InsertGeneralLedgerEntry(conn, txn,
                         depDate, processingMonth, mscoaConfig.CreditVoteId, finYear,
-                        journalTransactionTypeId, "Asset Depreciation - Accumulated", documentNumber,
+                        documentTypeId, "Asset Depreciation - Accumulated", documentNumber,
                         debit: null, credit: siTotal, matchTranGuid: transactionId,
                         journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                         scoaFundsId: mscoaConfig.CreditScoaFundId, scoaRegionId: mscoaConfig.CreditScoaRegionId,
@@ -1170,7 +1234,7 @@ public class DepreciationController : ControllerBase
                 {
                     await _txnService.InsertGeneralLedgerEntry(conn, txn,
                         depDate, processingMonth, mscoaConfig.ReserveVoteId, finYear,
-                        journalTransactionTypeId, "Asset Depreciation Offset", documentNumber,
+                        documentTypeId, "Asset Depreciation Offset", documentNumber,
                         debit: siOffset, credit: null, matchTranGuid: transactionId,
                         journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                         scoaFundsId: mscoaConfig.ReserveScoaFundId, scoaRegionId: mscoaConfig.ReserveScoaRegionId,
@@ -1183,7 +1247,7 @@ public class DepreciationController : ControllerBase
 
                     await _txnService.InsertGeneralLedgerEntry(conn, txn,
                         depDate, processingMonth, mscoaConfig.OffsetVoteId, finYear,
-                        journalTransactionTypeId, "Asset Depreciation Offset", documentNumber,
+                        documentTypeId, "Asset Depreciation Offset", documentNumber,
                         debit: null, credit: siOffset, matchTranGuid: transactionId,
                         journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                         scoaFundsId: mscoaConfig.OffsetScoaFundId, scoaRegionId: mscoaConfig.OffsetScoaRegionId,
@@ -1223,7 +1287,14 @@ public class DepreciationController : ControllerBase
                 WHERE ""entity_type"" = 'depreciation' AND ""mssql_reference_id"" = @refId AND ""status"" IN ('pending', 'in_progress')",
                 new { refId = scheduleId.ToString() });
 
-            return Ok(new { success = 1, scheduleId, totalDepreciation, assetsProcessed = processedAssets.Count, assetIdsToRebuild = distinctAssets, finYear, rebuildPeriod, progressKey = scheduleId.ToString(), failedAssets = failedAssets.Count > 0 ? failedAssets : null });
+            _ = _emailService.SendTransactionEmailsAsync("Depreciation", new Dictionary<string, string>
+            {
+                ["FinancialYear"]    = finYear ?? "",
+                ["TotalDepreciation"] = totalDepreciation.ToString("N2"),
+                ["ProcessedAssets"]  = processedAssets.Count.ToString(),
+                ["ApprovalDate"]     = DateTime.Now.ToString("dd MMM yyyy")
+            });
+            return Ok(new { success = 1, scheduleId, totalDepreciation, assetsProcessed = processedAssets.Count, assetIdsToRebuild = distinctAssets, finYear, rebuildPeriod, approvedPeriod = processingMonth, progressKey = scheduleId.ToString(), failedAssets = failedAssets.Count > 0 ? failedAssets : null });
         }
         catch (Exception ex)
         {
@@ -1238,29 +1309,84 @@ public class DepreciationController : ControllerBase
         var assetIds = request.AssetIds ?? new List<int>();
         var finYear = request.FinYear ?? _txnService.GetCurrentFinancialPeriod().year;
         var rebuildPeriod = request.RebuildPeriod > 0 ? request.RebuildPeriod : 1;
+        var approvedPeriod = request.Period > 0 ? request.Period : rebuildPeriod;
         var key = request.ProgressKey ?? "rebuild";
 
-        _rebuildProgress[key] = (0, assetIds.Count);
+        _rebuildProgress[key] = new RebuildProgressEntry(0, assetIds.Count, false, new List<int>(), 0, 0);
 
+        var db = _db;
+        var txnSvc = _txnService;
         _ = Task.Run(async () =>
         {
             int done = 0;
+            var failedAssets = new List<int>();
             const int chunkSize = 2000;
             for (int i = 0; i < assetIds.Count; i += chunkSize)
             {
                 var chunk = assetIds.GetRange(i, Math.Min(chunkSize, assetIds.Count - i));
                 try
                 {
-                    await _txnService.PopulateTransactionSummaryBulkRebuild(chunk, finYear, rebuildPeriod);
+                    await txnSvc.PopulateTransactionSummaryBulkRebuild(chunk, finYear, rebuildPeriod);
                     var d = System.Threading.Interlocked.Add(ref done, chunk.Count);
-                    _rebuildProgress[key] = (d, assetIds.Count);
+                    _rebuildProgress[key] = new RebuildProgressEntry(d, assetIds.Count, false, failedAssets, 0, 0);
                 }
                 catch (Exception atsEx)
                 {
                     Console.WriteLine($"ATS bulk rebuild failed for chunk starting at {i}: {atsEx.Message}");
+                    failedAssets.AddRange(chunk);
+                    var d = System.Threading.Interlocked.Add(ref done, chunk.Count);
+                    _rebuildProgress[key] = new RebuildProgressEntry(d, assetIds.Count, false, failedAssets, 0, 0);
                 }
             }
-            _rebuildProgress.TryRemove(key, out _);
+
+            int mismatched = 0;
+            int autoCorrected = 0;
+            if (assetIds.Count > 0)
+            {
+                try
+                {
+                    await using var conn = db.CreateConnection();
+                    await conn.OpenAsync();
+                    var mismatchedIds = (await conn.QueryAsync<int>(@"
+                        SELECT rt.""AssetRegisterItem_ID""
+                        FROM ""Asset_Register_Transactions"" rt
+                        LEFT JOIN ""Asset_Transaction_Summary"" ats
+                            ON  ats.""AssetRegisterItemID"" = rt.""AssetRegisterItem_ID""
+                            AND ats.""FinancialYear""        = rt.""FinancialYear""
+                            AND ats.""FinancialPeriod""      = rt.""FinancialPeriod""
+                        WHERE rt.""AssetRegisterItem_ID"" = ANY(@assetIds)
+                          AND rt.""FinancialYear""        = @finYear
+                          AND rt.""FinancialPeriod""      = @period
+                        GROUP BY rt.""AssetRegisterItem_ID"", ats.""DepreciationValue""
+                        HAVING ABS( COALESCE(SUM(COALESCE(rt.""DepreciationValue"",0)),0)
+                                  - COALESCE(ats.""DepreciationValue"",0) ) > 0.01
+                            OR ats.""DepreciationValue"" IS NULL",
+                        new { assetIds = assetIds.ToArray(), finYear, period = approvedPeriod })).ToList();
+                    mismatched = mismatchedIds.Count;
+                    if (mismatched > 0)
+                    {
+                        for (int i = 0; i < mismatchedIds.Count; i += chunkSize)
+                        {
+                            var corrChunk = mismatchedIds.GetRange(i, Math.Min(chunkSize, mismatchedIds.Count - i));
+                            try
+                            {
+                                await txnSvc.PopulateTransactionSummaryBulkRebuild(corrChunk, finYear, rebuildPeriod);
+                                autoCorrected += corrChunk.Count;
+                            }
+                            catch (Exception corrEx)
+                            {
+                                Console.WriteLine($"ATS reconciliation auto-correct failed: {corrEx.Message}");
+                            }
+                        }
+                    }
+                }
+                catch (Exception recEx)
+                {
+                    Console.WriteLine($"ATS reconciliation query failed: {recEx.Message}");
+                }
+            }
+
+            _rebuildProgress[key] = new RebuildProgressEntry(assetIds.Count, assetIds.Count, true, failedAssets, mismatched, autoCorrected);
         });
 
         return Accepted(new { queued = true, total = assetIds.Count });
@@ -1270,8 +1396,153 @@ public class DepreciationController : ControllerBase
     public IActionResult GetRebuildProgress(string key)
     {
         if (_rebuildProgress.TryGetValue(key, out var progress))
-            return Ok(new { done = progress.Done, total = progress.Total, complete = false });
+        {
+            if (progress.Complete)
+            {
+                _rebuildProgress.TryRemove(key, out _);
+                return Ok(new
+                {
+                    done = progress.Total, total = progress.Total, complete = true,
+                    failedChunkAssets = progress.FailedAssets,
+                    reconciliation = new { @checked = progress.Total, mismatched = progress.Mismatched, autoCorrected = progress.AutoCorrected }
+                });
+            }
+            return Ok(new { done = progress.Done, total = progress.Total, complete = false, failedChunkAssets = new List<int>(), reconciliation = (object?)null });
+        }
         return Ok(new { done = 0, total = 0, complete = true });
+    }
+
+    [AdminAuthorize]
+    [HttpGet("orphaned-gl")]
+    public async Task<IActionResult> GetOrphanedGl()
+    {
+        await using var conn = _db.CreateConnection();
+        await conn.OpenAsync();
+        var rows = await conn.QueryAsync<dynamic>(@"
+            SELECT gl.""GenLedger_ID"" AS ""GlId"", gl.""AssetLinkID"",
+                   NULL::integer AS ""AssetId"",
+                   'Asset_GeneralLedger' AS ""SourceTable"",
+                   'Journal entry not found in Led_Journal_Asset' AS ""Reason""
+            FROM ""Asset_GeneralLedger"" gl
+            WHERE gl.""AssetLinkID"" IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM ""Led_Journal_Asset"" ja
+                  WHERE ja.""AssetJournal_ID"" = gl.""AssetLinkID""
+              )
+            UNION ALL
+            SELECT gl.""GenLedger_ID"" AS ""GlId"", gl.""AssetLinkID"",
+                   ja.""AssetRegisterItem_ID"" AS ""AssetId"",
+                   'Asset_GeneralLedger' AS ""SourceTable"",
+                   'No approved depreciation for journal' AS ""Reason""
+            FROM ""Asset_GeneralLedger"" gl
+            INNER JOIN ""Led_Journal_Asset"" ja ON ja.""AssetJournal_ID"" = gl.""AssetLinkID""
+            WHERE gl.""AssetLinkID"" IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM ""Asset_Depreciation"" ad
+                  WHERE ad.""Depreciation_ScheduleID"" = ja.""Deprecation_ScheduleID""
+                    AND COALESCE(ad.""IsApproved"", 0) = 1
+              )
+            UNION ALL
+            SELECT lgl.""GenLedger_ID"" AS ""GlId"", lgl.""AssetLinkID"",
+                   NULL::integer AS ""AssetId"",
+                   'Led_GeneralLedger' AS ""SourceTable"",
+                   'Journal entry not found in Led_Journal_Asset' AS ""Reason""
+            FROM ""Led_GeneralLedger"" lgl
+            WHERE lgl.""AssetLinkID"" IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM ""Led_Journal_Asset"" ja
+                  WHERE ja.""AssetJournal_ID"" = lgl.""AssetLinkID""
+              )
+            UNION ALL
+            SELECT lgl.""GenLedger_ID"" AS ""GlId"", lgl.""AssetLinkID"",
+                   ja.""AssetRegisterItem_ID"" AS ""AssetId"",
+                   'Led_GeneralLedger' AS ""SourceTable"",
+                   'No approved depreciation for journal' AS ""Reason""
+            FROM ""Led_GeneralLedger"" lgl
+            INNER JOIN ""Led_Journal_Asset"" ja ON ja.""AssetJournal_ID"" = lgl.""AssetLinkID""
+            WHERE lgl.""AssetLinkID"" IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM ""Asset_Depreciation"" ad
+                  WHERE ad.""Depreciation_ScheduleID"" = ja.""Deprecation_ScheduleID""
+                    AND COALESCE(ad.""IsApproved"", 0) = 1
+              )");
+        return Ok(rows);
+    }
+
+    [AdminAuthorize]
+    [HttpDelete("orphaned-gl")]
+    public async Task<IActionResult> DeleteOrphanedGl()
+    {
+        await using var conn = _db.CreateConnection();
+        await conn.OpenAsync();
+        await using var txn = await conn.BeginTransactionAsync();
+        try
+        {
+            var deletedAssetGl = await conn.ExecuteAsync(@"
+                DELETE FROM ""Asset_GeneralLedger""
+                WHERE ""GenLedger_ID"" IN (
+                    SELECT gl.""GenLedger_ID""
+                    FROM ""Asset_GeneralLedger"" gl
+                    WHERE gl.""AssetLinkID"" IS NOT NULL
+                      AND NOT EXISTS (
+                          SELECT 1 FROM ""Led_Journal_Asset"" ja
+                          WHERE ja.""AssetJournal_ID"" = gl.""AssetLinkID""
+                      )
+                    UNION
+                    SELECT gl.""GenLedger_ID""
+                    FROM ""Asset_GeneralLedger"" gl
+                    INNER JOIN ""Led_Journal_Asset"" ja ON ja.""AssetJournal_ID"" = gl.""AssetLinkID""
+                    WHERE gl.""AssetLinkID"" IS NOT NULL
+                      AND NOT EXISTS (
+                          SELECT 1 FROM ""Asset_Depreciation"" ad
+                          WHERE ad.""Depreciation_ScheduleID"" = ja.""Deprecation_ScheduleID""
+                            AND COALESCE(ad.""IsApproved"", 0) = 1
+                      )
+                )", txn);
+            var deletedLedGl = await conn.ExecuteAsync(@"
+                DELETE FROM ""Led_GeneralLedger""
+                WHERE ""GenLedger_ID"" IN (
+                    SELECT lgl.""GenLedger_ID""
+                    FROM ""Led_GeneralLedger"" lgl
+                    WHERE lgl.""AssetLinkID"" IS NOT NULL
+                      AND NOT EXISTS (
+                          SELECT 1 FROM ""Led_Journal_Asset"" ja
+                          WHERE ja.""AssetJournal_ID"" = lgl.""AssetLinkID""
+                      )
+                    UNION
+                    SELECT lgl.""GenLedger_ID""
+                    FROM ""Led_GeneralLedger"" lgl
+                    INNER JOIN ""Led_Journal_Asset"" ja ON ja.""AssetJournal_ID"" = lgl.""AssetLinkID""
+                    WHERE lgl.""AssetLinkID"" IS NOT NULL
+                      AND NOT EXISTS (
+                          SELECT 1 FROM ""Asset_Depreciation"" ad
+                          WHERE ad.""Depreciation_ScheduleID"" = ja.""Deprecation_ScheduleID""
+                            AND COALESCE(ad.""IsApproved"", 0) = 1
+                      )
+                )", txn);
+            await txn.CommitAsync();
+            return Ok(new { deletedAssetGl, deletedLedGl });
+        }
+        catch
+        {
+            await txn.RollbackAsync();
+            throw;
+        }
+    }
+
+    [HttpPost("complete-workflow/{scheduleId:int}")]
+    public async Task<IActionResult> CompleteWorkflow(int scheduleId)
+    {
+        await using var conn = _db.CreateConnection();
+        await conn.OpenAsync();
+        await conn.ExecuteAsync(@"
+            UPDATE ""Asset_WorkflowInstances""
+            SET ""status"" = 'approved', ""completed_at"" = NOW()
+            WHERE ""entity_type"" = 'depreciation'
+              AND ""mssql_reference_id"" = @refId
+              AND ""status"" IN ('pending', 'in_progress')",
+            new { refId = scheduleId.ToString() });
+        return Ok(new { success = 1 });
     }
 }
 
@@ -1280,6 +1551,7 @@ public class RebuildSummariesRequest
     public List<int>? AssetIds { get; set; }
     public string? FinYear { get; set; }
     public int RebuildPeriod { get; set; }
+    public int Period { get; set; }
     public string? ProgressKey { get; set; }
 }
 

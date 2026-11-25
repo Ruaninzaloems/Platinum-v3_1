@@ -22,15 +22,20 @@ export class DashboardComponent implements OnInit {
   clearingData = signal(false);
   clearSuccess = signal(false);
   clearError = signal('');
+  clearingBalance = signal<any>(null);
+
   kpis = computed(() => {
     const d = this.data();
     if (!d) return [];
     const k = d.kpis || d;
+    const cb = this.clearingBalance();
+    const clearingValue = cb && cb.balance != null ? Number(cb.balance) : 0;
     return [
+      { label: 'Clearing Account', value: 'R ' + clearingValue.toFixed(2), icon: 'account_balance_wallet', color: 'teal', sub: 'Debit \u2212 Credit (GL)' },
       { label: 'Carrying Amount', value: 'R ' + this.formatNumber(k.totalAssetValue || 0), icon: 'account_balance', color: 'blue', sub: 'Cost R' + this.formatNumber(k.totalCostClosing || 0) },
       { label: 'Total Assets', value: (k.totalAssetCount || 0).toLocaleString(), icon: 'inventory_2', color: 'green', sub: (k.conditionGood || 0) + '% good condition' },
       { label: 'Reval Reserve', value: 'R ' + this.formatNumber(k.totalRevaluationReserve || 0), icon: 'auto_graph', color: 'purple', sub: (k.revaluationModelCount || 0).toLocaleString() + ' revalued assets' },
-      { label: 'Nearing End of Life', value: (k.assetsNearingEol || 0).toString(), icon: 'hourglass_bottom', color: 'red', sub: 'RUL ≤ 12 months' },
+      { label: 'Nearing End of Life', value: (k.assetsNearingEol || 0).toString(), icon: 'hourglass_bottom', color: 'red', sub: 'RUL \u2264 12 months' },
       { label: 'Depreciation', value: 'R ' + this.formatNumber(k.totalDepreciationCharge || 0), icon: 'trending_down', color: 'amber', sub: (k.openFinYear || '') + ' P' + (k.openPeriod || '') }
     ];
   });
@@ -68,6 +73,10 @@ export class DashboardComponent implements OnInit {
     this.api.getInsights().subscribe({
       next: function(this: DashboardComponent, i: any[]) { this.insights.set(i || []); }.bind(this),
       error: function(this: DashboardComponent) { this.insights.set([]); }.bind(this)
+    });
+    this.api.getClearingBalance().subscribe({
+      next: function(this: DashboardComponent, cb: any) { this.clearingBalance.set(cb); }.bind(this),
+      error: function() {}
     });
   }
 

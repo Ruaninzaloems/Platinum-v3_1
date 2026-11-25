@@ -15,6 +15,67 @@ public class AcquisitionsController : ControllerBase
         _db = db;
     }
 
+    [HttpGet("grn-documents/{grnId:int}")]
+    public async Task<IActionResult> GetGrnDocuments(int grnId)
+    {
+        await using var conn = _db.CreateConnection();
+        await conn.OpenAsync();
+        var rows = await conn.QueryAsync(@"
+            SELECT
+                ""Document_ID""   AS ""documentId"",
+                ""DocumentName""  AS ""documentName"",
+                ""DocumentPath""  AS ""documentPath"",
+                ""FileType""      AS ""fileType"",
+                ""DateCaptured""  AS ""dateCaptured""
+            FROM ""SCM_GRNDocuments""
+            WHERE ""GRN_ID"" = @grnId
+            ORDER BY ""Document_ID""", new { grnId });
+        return Ok(rows);
+    }
+
+    [HttpGet("grn-documents/{grnId:int}/file/{documentId:int}")]
+    public async Task<IActionResult> StreamGrnDocument(int grnId, int documentId)
+    {
+        await using var conn = _db.CreateConnection();
+        await conn.OpenAsync();
+        var doc = await conn.QueryFirstOrDefaultAsync(@"
+            SELECT ""DocumentPath"", ""DocumentName"", ""FileType""
+            FROM ""SCM_GRNDocuments""
+            WHERE ""Document_ID"" = @documentId AND ""GRN_ID"" = @grnId",
+            new { documentId, grnId });
+
+        if (doc == null) return NotFound(new { error = "Document not found." });
+
+        string? rawPath = doc.DocumentPath;
+        if (string.IsNullOrWhiteSpace(rawPath)) return BadRequest(new { error = "Document has no file path." });
+
+        var filePath = rawPath.Replace('/', System.IO.Path.DirectorySeparatorChar);
+        if (!System.IO.File.Exists(filePath))
+            return NotFound(new { error = "File not found on server." });
+
+        var ext = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
+        var contentType = ext switch
+        {
+            ".pdf"  => "application/pdf",
+            ".jpg"  => "image/jpeg",
+            ".jpeg" => "image/jpeg",
+            ".png"  => "image/png",
+            ".gif"  => "image/gif",
+            ".bmp"  => "image/bmp",
+            ".tiff" => "image/tiff",
+            ".tif"  => "image/tiff",
+            _       => "application/octet-stream"
+        };
+
+        var fileName = string.IsNullOrWhiteSpace((string?)doc.DocumentName)
+            ? System.IO.Path.GetFileName(filePath)
+            : (string)doc.DocumentName;
+
+        Response.Headers["Content-Disposition"] = $"inline; filename=\"{fileName}\"";
+        var stream = System.IO.File.OpenRead(filePath);
+        return File(stream, contentType);
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetAcquisitionsList()
     {

@@ -1,0 +1,85 @@
+<section class="plat-page">
+  <app-page-header title="Targets &amp; Activities" subtitle="Set quarterly targets and plan monthly activities for each KPI." icon="event_note" tone="cyan"></app-page-header>
+
+  <div class="plat-card filters">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Cycle</mat-label>
+      <mat-select [ngModel]="effectiveCycleId()" (ngModelChange)="selectCycle($event)">
+        <mat-option *ngFor="let c of cycles(); trackBy: trackById" [value]="c.id">{{ c.financialYearLabel }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field *ngIf="scorecards().length > 0" appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Scorecard</mat-label>
+      <mat-select [ngModel]="selectedScorecardId()" (ngModelChange)="selectScorecard($event)">
+        <mat-option *ngFor="let s of scorecards(); trackBy: trackById" [value]="s.id">{{ s.name }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field *ngIf="kpis().length > 0" appearance="outline" subscriptSizing="dynamic">
+      <mat-label>KPI</mat-label>
+      <mat-select [ngModel]="selectedKpiId()" (ngModelChange)="selectKpi($event)">
+        <mat-option *ngFor="let k of kpis(); trackBy: trackById" [value]="k.id">{{ k.kpiNumber }} – {{ (k.description || '').substring(0, 40) }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <app-loading-spinner *ngIf="loading()"></app-loading-spinner>
+
+  <ng-container *ngIf="!loading() && selectedKpi() as kpi">
+    <div class="plat-card kpi-summary">
+      <div class="left">
+        <div class="meta-top">
+          <span class="kpi-num">{{ kpi.kpiNumber }}</span>
+          <app-status-badge [status]="kpi.status"></app-status-badge>
+        </div>
+        <div class="kpi-desc">{{ kpi.description }}</div>
+        <div class="kpi-meta">Annual Target: {{ kpi.annualTarget }}</div>
+      </div>
+      <button mat-stroked-button color="primary" (click)="openTargetDialog()">
+        <mat-icon>flag</mat-icon> Set Quarterly Targets
+      </button>
+    </div>
+
+    <div *ngIf="targets().length > 0" class="targets-grid">
+      <div *ngFor="let q of [1,2,3,4]" class="plat-card qcard" [class.active]="selectedQuarter() === q" (click)="selectQuarter(q)">
+        <div class="qlbl">Q{{ q }}</div>
+        <div class="qval">{{ targetForQuarter(q)?.targetValue || '—' }}</div>
+        <span *ngIf="targetForQuarter(q)?.isApprovedBaseline" class="baseline-badge">Baseline Locked</span>
+      </div>
+    </div>
+
+    <div class="activities-section">
+      <div class="section-head">
+        <h3><mat-icon>event_note</mat-icon> Q{{ selectedQuarter() }} Monthly Activities</h3>
+        <button mat-flat-button color="primary" (click)="openNewActivityDialog()">
+          <mat-icon>add</mat-icon> Add Activity
+        </button>
+      </div>
+
+      <div class="activity-list" *ngIf="activities().length > 0; else noActs">
+        <div *ngFor="let a of activities(); trackBy: trackById" class="plat-card act-row">
+          <div class="left">
+            <mat-checkbox [checked]="a.status === 'Completed'" (change)="toggleComplete(a)"></mat-checkbox>
+            <div class="act-body">
+              <p class="act-desc" [class.done]="a.status === 'Completed'">{{ a.description }}</p>
+              <div class="act-meta">
+                <span>{{ monthName(a.month) }}</span>
+                <span *ngIf="a.dueDate">Due: {{ a.dueDate }}</span>
+              </div>
+            </div>
+          </div>
+          <button mat-icon-button color="warn" (click)="deleteActivity(a)" title="Delete activity">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </div>
+      </div>
+      <ng-template #noActs>
+        <div class="plat-card empty-acts">No activities planned for Q{{ selectedQuarter() }}</div>
+      </ng-template>
+    </div>
+  </ng-container>
+
+  <div *ngIf="!loading() && !selectedKpi()" class="plat-card">
+    <app-empty-state icon="event_note" title="Pick a KPI to begin"
+      message="Choose a cycle, scorecard, and KPI to capture quarterly targets and plan monthly activities."></app-empty-state>
+  </div>
+</section>

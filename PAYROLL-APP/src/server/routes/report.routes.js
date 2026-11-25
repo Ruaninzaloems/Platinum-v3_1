@@ -9,6 +9,75 @@ const { generateIRP5, generateEMP201, generateEMP501, generateEasyFileCSV,
 } = require('../services/statutory-reports.service');
 const { generateACBFile } = require('../services/eft.service');
 const { exportToExcel, exportToCSV } = require('../services/report-export.service');
+const payrollTotalsSvc = require('../services/payroll-totals.service');
+
+router.get('/payroll-totals', authenticate, async (req, res, next) => {
+  try {
+    const period_id = req.query.period_id ? parseInt(req.query.period_id, 10) : null;
+    const cycle_id = req.query.cycle_id ? parseInt(req.query.cycle_id, 10) : null;
+    const employee_id = req.query.employee_id ? parseInt(req.query.employee_id, 10) : null;
+    const department_id = req.query.department_id ? parseInt(req.query.department_id, 10) : null;
+    const include_trial = req.query.include_trial === 'true' || req.query.include_trial === '1';
+    const format = (req.query.format || 'json').toLowerCase();
+
+    if (!period_id || !cycle_id) {
+      return res.status(400).json({ success: false, message: 'period_id and cycle_id are required' });
+    }
+
+    const parseId = (v, name, required) => {
+      if (v === undefined || v === null || v === '' || v === 'null') {
+        if (required) throw Object.assign(new Error(`${name} is required`), { status: 400 });
+        return null;
+      }
+      const n = Number(v);
+      if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) {
+        throw Object.assign(new Error(`${name} must be a positive integer`), { status: 400 });
+      }
+      return n;
+    };
+
+    let parsedIds;
+    try {
+      parsedIds = {
+        period_id: parseId(period_id, 'period_id', true),
+        cycle_id: parseId(cycle_id, 'cycle_id', true),
+        employee_id: parseId(employee_id, 'employee_id', false),
+        department_id: parseId(department_id, 'department_id', false),
+      };
+    } catch (e) {
+      return res.status(e.status || 400).json({ success: false, message: e.message });
+    }
+
+    const generated_by = req.user?.username || req.user?.email || req.user?.full_name || 'System';
+    const report = await payrollTotalsSvc.getPayrollTotals({
+      ...parsedIds,
+      include_trial,
+      generated_by,
+    });
+
+    const baseName = `payroll_totals_${cycle_id}_${period_id}${employee_id ? `_e${employee_id}` : ''}`;
+
+    if (format === 'pdf') {
+      const pdf = await payrollTotalsSvc.buildPdf(report);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=${baseName}.pdf`);
+      return res.send(pdf);
+    }
+    if (format === 'xlsx' || format === 'excel') {
+      const buf = await payrollTotalsSvc.buildExcel(report);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=${baseName}.xlsx`);
+      return res.send(Buffer.from(buf));
+    }
+    if (format === 'csv') {
+      const csv = payrollTotalsSvc.buildCsv(report);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=${baseName}.csv`);
+      return res.send(csv);
+    }
+    res.json({ success: true, data: report });
+  } catch (err) { next(err); }
+});
 
 router.get('/payslip/:runId/:employeeId', authenticate, async (req, res, next) => {
   try {

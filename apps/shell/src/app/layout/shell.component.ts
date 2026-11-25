@@ -1,4 +1,4 @@
-import { Component, signal, computed, OnInit, OnDestroy } from '@angular/core';
+import { Component, signal, computed, Injector, OnInit, OnDestroy, isDevMode } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterOutlet, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -7,12 +7,16 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthService } from '@platinumv3/shared/auth';
+import { DatabaseToggleService, OrgSettingsService } from '@platinumv3/assets';
+import { UserContextService, type MeDto } from '@platinumv3/overtime';
 import { filter, Subscription } from 'rxjs';
 
 interface NavItem {
   label: string;
   icon: string;
   route: string;
+  /** When set, the item is hidden unless the Overtime MeDto flag with this key is true. */
+  flag?: keyof MeDto;
 }
 
 interface NavGroup {
@@ -20,6 +24,10 @@ interface NavGroup {
   icon: string;
   items: { label: string; icon: string; route: string }[];
 }
+
+type InsightsNavEntry =
+  | { kind: 'link'; label: string; icon: string; route: string }
+  | { kind: 'group'; title: string; icon: string; items: { label: string; icon: string; route: string }[] };
 
 interface BudgetSubGroup {
   label: string;
@@ -34,7 +42,7 @@ interface BudgetNavGroup {
   items?: { label: string; icon: string; route: string }[];
 }
 
-type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'budget' | 'afs';
+type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'budget' | 'afs' | 'overtime' | 'sharepoint' | 'admin' | 'settings';
 
 @Component({
   selector: 'app-shell',
@@ -65,6 +73,14 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
                     <span class="brand-module">AFS</span>
                   } @else if (activeModule() === 'assets') {
                     <span class="brand-module">Assets</span>
+                  } @else if (activeModule() === 'overtime') {
+                    <span class="brand-module">Overtime</span>
+                  } @else if (activeModule() === 'sharepoint') {
+                    <span class="brand-module">SharePoint</span>
+                  } @else if (activeModule() === 'admin') {
+                    <span class="brand-module">Admin</span>
+                  } @else if (activeModule() === 'settings') {
+                    <span class="brand-module">Settings</span>
                   }
                 </div>
               </div>
@@ -72,30 +88,66 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
           </a>
           @if (!sidenavCollapsed() || activeModule() !== 'assets') {
             <div class="module-grid">
-              <button class="module-chip" [class.active]="activeModule() === 'assets'" (click)="setModule('assets')">
-                <mat-icon class="chip-icon">inventory_2</mat-icon><span>Assets</span>
-              </button>
-              <button class="module-chip" [class.active]="activeModule() === 'scm'" (click)="setModule('scm')">
-                <mat-icon class="chip-icon">local_shipping</mat-icon><span>SCM</span>
-              </button>
-              <button class="module-chip" [class.active]="activeModule() === 'pos'" (click)="setModule('pos')">
-                <mat-icon class="chip-icon">point_of_sale</mat-icon><span>POS</span>
-              </button>
-              <button class="module-chip" [class.active]="activeModule() === 'payroll'" (click)="setModule('payroll')">
-                <mat-icon class="chip-icon">payments</mat-icon><span>Payroll</span>
-              </button>
-              <button class="module-chip" [class.active]="activeModule() === 'idp'" (click)="setModule('idp')">
-                <mat-icon class="chip-icon">assignment</mat-icon><span>IDP</span>
-              </button>
-              <button class="module-chip" [class.active]="activeModule() === 'insights'" (click)="setModule('insights')">
-                <mat-icon class="chip-icon">insights</mat-icon><span>Performance</span>
-              </button>
-              <button class="module-chip" [class.active]="activeModule() === 'budget'" (click)="setModule('budget')">
-                <mat-icon class="chip-icon">account_balance</mat-icon><span>Budget</span>
-              </button>
-              <button class="module-chip" [class.active]="activeModule() === 'afs'" (click)="setModule('afs')">
-                <mat-icon class="chip-icon">description</mat-icon><span>AFS</span>
-              </button>
+              @if (canShowModule('assets')) {
+                <button class="module-chip" [class.active]="activeModule() === 'assets'" (click)="setModule('assets')">
+                  <mat-icon class="chip-icon">inventory_2</mat-icon><span>Assets</span>
+                </button>
+              }
+              @if (canShowModule('scm')) {
+                <button class="module-chip" [class.active]="activeModule() === 'scm'" (click)="setModule('scm')">
+                  <mat-icon class="chip-icon">local_shipping</mat-icon><span>SCM</span>
+                </button>
+              }
+              @if (canShowModule('pos')) {
+                <button class="module-chip" [class.active]="activeModule() === 'pos'" (click)="setModule('pos')">
+                  <mat-icon class="chip-icon">point_of_sale</mat-icon><span>POS</span>
+                </button>
+              }
+              @if (canShowModule('payroll')) {
+                <button class="module-chip" [class.active]="activeModule() === 'payroll'" (click)="setModule('payroll')">
+                  <mat-icon class="chip-icon">payments</mat-icon><span>Payroll</span>
+                </button>
+              }
+              @if (canShowModule('idp')) {
+                <button class="module-chip" [class.active]="activeModule() === 'idp'" (click)="setModule('idp')">
+                  <mat-icon class="chip-icon">assignment</mat-icon><span>IDP</span>
+                </button>
+              }
+              @if (canShowModule('insights')) {
+                <button class="module-chip" [class.active]="activeModule() === 'insights'" (click)="setModule('insights')">
+                  <span>Performance</span>
+                </button>
+              }
+              @if (canShowModule('budget')) {
+                <button class="module-chip" [class.active]="activeModule() === 'budget'" (click)="setModule('budget')">
+                  <mat-icon class="chip-icon">account_balance</mat-icon><span>Budget</span>
+                </button>
+              }
+              @if (canShowModule('afs')) {
+                <button class="module-chip" [class.active]="activeModule() === 'afs'" (click)="setModule('afs')">
+                  <mat-icon class="chip-icon">description</mat-icon><span>AFS</span>
+                </button>
+              }
+              @if (canShowModule('overtime')) {
+                <button class="module-chip" [class.active]="activeModule() === 'overtime'" (click)="setModule('overtime')">
+                  <mat-icon class="chip-icon">more_time</mat-icon><span>Overtime</span>
+                </button>
+              }
+              @if (canShowModule('sharepoint')) {
+                <button class="module-chip" [class.active]="activeModule() === 'sharepoint'" (click)="setModule('sharepoint')">
+                  <mat-icon class="chip-icon">folder_open</mat-icon><span>SharePoint</span>
+                </button>
+              }
+              @if (canShowModule('admin')) {
+                <button class="module-chip" [class.active]="activeModule() === 'admin'" (click)="setModule('admin')">
+                  <mat-icon class="chip-icon">admin_panel_settings</mat-icon><span>Admin</span>
+                </button>
+              }
+              @if (canShowModule('settings')) {
+                <button class="module-chip" [class.active]="activeModule() === 'settings'" (click)="setModule('settings')">
+                  <mat-icon class="chip-icon">settings</mat-icon><span>Settings</span>
+                </button>
+              }
             </div>
           }
         </div>
@@ -161,6 +213,14 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
               <mat-icon class="nav-icon">dashboard</mat-icon>
               <span>Dashboard</span>
             </a>
+            <a class="nav-link" routerLink="/payroll/ess" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">badge</mat-icon>
+              <span>Employee Self-Service</span>
+            </a>
+            <a class="nav-link" routerLink="/payroll/approvals" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">fact_check</mat-icon>
+              <span>My Approvals</span>
+            </a>
             @for (group of payrollNavGroups; track group.title) {
               <div class="nav-group">
                 <button class="nav-group-header" (click)="toggleGroup(group.title)">
@@ -170,11 +230,33 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
                 </button>
                 @if (isGroupExpanded(group.title)) {
                   <div class="nav-group-items">
-                    @for (item of group.items; track item.label) {
-                      <a class="nav-link sub-item" [routerLink]="'/payroll' + item.route" routerLinkActive="active-link">
-                        <mat-icon class="nav-icon">{{item.icon}}</mat-icon>
-                        <span>{{item.label}}</span>
-                      </a>
+                    @if (group.subGroups) {
+                      @for (sub of group.subGroups; track sub.label) {
+                        <div class="nav-sub-group">
+                          <button class="nav-sub-group-header" (click)="toggleGroup(group.title + '/' + sub.label)">
+                            <mat-icon class="nav-icon">{{sub.icon}}</mat-icon>
+                            <span class="nav-sub-group-title">{{sub.label}}</span>
+                            <mat-icon class="nav-chevron" [class.expanded]="isGroupExpanded(group.title + '/' + sub.label)">chevron_right</mat-icon>
+                          </button>
+                          @if (isGroupExpanded(group.title + '/' + sub.label)) {
+                            <div class="nav-sub-group-items">
+                              @for (child of sub.children; track child.label) {
+                                <a class="nav-link sub-sub-item" [routerLink]="'/payroll' + child.route" routerLinkActive="active-link">
+                                  <span>{{child.label}}</span>
+                                </a>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                    }
+                    @if (group.items) {
+                      @for (item of group.items; track item.label) {
+                        <a class="nav-link sub-item" [routerLink]="'/payroll' + item.route" routerLinkActive="active-link">
+                          <mat-icon class="nav-icon">{{item.icon}}</mat-icon>
+                          <span>{{item.label}}</span>
+                        </a>
+                      }
                     }
                   </div>
                 }
@@ -209,41 +291,32 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
               </div>
             }
           } @else if (activeModule() === 'insights') {
-            <a class="nav-link" routerLink="/ins/dashboard" routerLinkActive="active-link">
-              <mat-icon class="nav-icon">dashboard</mat-icon>
-              <span>Dashboard</span>
-            </a>
-            @for (group of insightsNavGroups; track group.title) {
-              <div class="nav-group">
-                <button class="nav-group-header" (click)="toggleGroup(group.title)">
-                  <mat-icon class="nav-icon">{{group.icon}}</mat-icon>
-                  <span class="nav-group-title">{{group.title}}</span>
-                  <mat-icon class="nav-chevron" [class.expanded]="isGroupExpanded(group.title)">chevron_right</mat-icon>
-                </button>
-                @if (isGroupExpanded(group.title)) {
-                  <div class="nav-group-items">
-                    @for (item of group.items; track item.label) {
-                      <a class="nav-link sub-item" [routerLink]="'/ins' + item.route" routerLinkActive="active-link">
-                        <mat-icon class="nav-icon">{{item.icon}}</mat-icon>
-                        <span>{{item.label}}</span>
-                      </a>
-                    }
-                  </div>
-                }
-              </div>
+            @for (entry of insightsNav; track $index) {
+              @if (entry.kind === 'link') {
+                <a class="nav-link" [routerLink]="'/ins' + entry.route" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">{{entry.icon}}</mat-icon>
+                  <span>{{entry.label}}</span>
+                </a>
+              } @else {
+                <div class="nav-group">
+                  <button class="nav-group-header" (click)="toggleGroup(entry.title)">
+                    <mat-icon class="nav-icon">{{entry.icon}}</mat-icon>
+                    <span class="nav-group-title">{{entry.title}}</span>
+                    <mat-icon class="nav-chevron" [class.expanded]="isGroupExpanded(entry.title)">chevron_right</mat-icon>
+                  </button>
+                  @if (isGroupExpanded(entry.title)) {
+                    <div class="nav-group-items">
+                      @for (item of entry.items; track item.label) {
+                        <a class="nav-link sub-item" [routerLink]="'/ins' + item.route" routerLinkActive="active-link">
+                          <mat-icon class="nav-icon">{{item.icon}}</mat-icon>
+                          <span>{{item.label}}</span>
+                        </a>
+                      }
+                    </div>
+                  }
+                </div>
+              }
             }
-            <a class="nav-link" routerLink="/ins/ai-insights" routerLinkActive="active-link">
-              <mat-icon class="nav-icon">psychology</mat-icon>
-              <span>AI Insights</span>
-            </a>
-            <a class="nav-link" routerLink="/ins/integrations" routerLinkActive="active-link">
-              <mat-icon class="nav-icon">hub</mat-icon>
-              <span>Integrations</span>
-            </a>
-            <a class="nav-link" routerLink="/ins/audit-trail" routerLinkActive="active-link">
-              <mat-icon class="nav-icon">security</mat-icon>
-              <span>Audit Trail</span>
-            </a>
           } @else if (activeModule() === 'budget') {
             <a class="nav-link" routerLink="/budget/dashboard" routerLinkActive="active-link">
               <mat-icon class="nav-icon">dashboard</mat-icon>
@@ -270,6 +343,7 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
                             <div class="nav-sub-group-items">
                               @for (child of sub.children; track child.label) {
                                 <a class="nav-link sub-sub-item" [routerLink]="'/budget' + child.route" routerLinkActive="active-link">
+                                  <mat-icon class="nav-icon">{{child.icon}}</mat-icon>
                                   <span>{{child.label}}</span>
                                 </a>
                               }
@@ -314,6 +388,94 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
                 }
               </div>
             }
+          } @else if (activeModule() === 'overtime') {
+            @for (item of visibleOvertimeNavItems(); track item.label) {
+              <a class="nav-link" [routerLink]="item.route" routerLinkActive="active-link">
+                <mat-icon class="nav-icon">{{item.icon}}</mat-icon>
+                <span>{{item.label}}</span>
+              </a>
+            }
+          } @else if (activeModule() === 'sharepoint') {
+            <a class="nav-link" routerLink="/sharepoint" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: true}">
+              <mat-icon class="nav-icon">home</mat-icon>
+              <span>Document Browser</span>
+            </a>
+            <div style="padding:6px 16px 4px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase">
+              Pinned Libraries
+            </div>
+            <a class="nav-link sub-item" routerLink="/sharepoint/uat-assets" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">folder_open</mat-icon>
+              <span>UatAssets</span>
+            </a>
+            <div style="padding:2px 16px 0 44px;font-size:11px;color:#94a3b8">Sebata2</div>
+            <a class="nav-link sub-item" routerLink="/sharepoint/uat-overtime" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">folder_open</mat-icon>
+              <span>UatOvertime</span>
+            </a>
+            <div style="padding:2px 16px 0 44px;font-size:11px;color:#94a3b8">Sebata2</div>
+          } @else if (activeModule() === 'admin') {
+            <!-- API Config (collapsible) -->
+            <button class="nav-group-header" (click)="toggleGroup('API Config')">
+              <mat-icon class="nav-icon">api</mat-icon>
+              <span class="nav-group-title">API Config</span>
+              <mat-icon class="nav-chevron" [class.expanded]="isGroupExpanded('API Config')">chevron_right</mat-icon>
+            </button>
+            @if (isGroupExpanded('API Config')) {
+              <div class="nav-group-items">
+                <a class="nav-link sub-item" routerLink="/admin-settings/assets" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">inventory_2</mat-icon><span>Assets</span>
+                </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/scm" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">local_shipping</mat-icon><span>SCM</span>
+                </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/pos" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">point_of_sale</mat-icon><span>POS</span>
+                </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/payroll" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">payments</mat-icon><span>Payroll</span>
+                </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/idp" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">assignment</mat-icon><span>IDP</span>
+                </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/budget" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">account_balance</mat-icon><span>Budget</span>
+                </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/afs" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">summarize</mat-icon><span>AFS</span>
+                </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/insights" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">trending_up</mat-icon><span>Performance</span>
+                </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/overtime" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">more_time</mat-icon><span>Overtime</span>
+                </a>
+              </div>
+            }
+            <!-- Settings (collapsible) -->
+            <button class="nav-group-header" (click)="toggleGroup('Admin Settings')">
+              <mat-icon class="nav-icon">settings</mat-icon>
+              <span class="nav-group-title">Settings</span>
+              <mat-icon class="nav-chevron" [class.expanded]="isGroupExpanded('Admin Settings')">chevron_right</mat-icon>
+            </button>
+            @if (isGroupExpanded('Admin Settings')) {
+              <div class="nav-group-items">
+                <a class="nav-link sub-item" routerLink="/admin-settings/access-management" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">admin_panel_settings</mat-icon><span>Access Management</span>
+                </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/user-roles" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">group</mat-icon><span>User & Roles</span>
+                </a>
+              </div>
+            }
+          } @else if (activeModule() === 'settings') {
+            <a class="nav-link" routerLink="/settings/access-management" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">admin_panel_settings</mat-icon>
+              @if (!sidenavCollapsed()) { <span>Access Management</span> }
+            </a>
+            <a class="nav-link" routerLink="/settings/user-roles" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">group</mat-icon>
+              @if (!sidenavCollapsed()) { <span>User & Roles</span> }
+            </a>
           }
         </nav>
         <div style="padding:12px 16px;border-top:1px solid #e8ecf1;font-size:11px;color:#94a3b8">
@@ -325,6 +487,10 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
             @else if (activeModule() === 'insights') { v1.0 · Performance Mgmt }
             @else if (activeModule() === 'budget') { v1.0 · MFMA Budget }
             @else if (activeModule() === 'afs') { v4.0 · GRAP/MFMA AFS }
+            @else if (activeModule() === 'overtime') { v1.0 · Overtime Mgmt }
+            @else if (activeModule() === 'sharepoint') { Microsoft 365 · SharePoint }
+            @else if (activeModule() === 'admin') { System Administration }
+            @else if (activeModule() === 'settings') { System Settings }
             @else { v1.0 · GRAP Compliant }
           }
         </div>
@@ -336,10 +502,22 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
             <mat-icon>menu</mat-icon>
           </button>
           <div style="display:flex;align-items:center;gap:12px;margin-left:12px">
-            <span class="municipality-name">Mnquma Local Municipality</span>
+            <span class="municipality-name">{{ municipalityName() }}</span>
             <span class="period-badge">FY {{activeFinYear()}} · P{{activePeriod()}}</span>
           </div>
           <div style="flex:1"></div>
+          @if (activeModule() === 'assets') {
+            <button class="db-toggle"
+              [class.sqlserver]="dbToggle.activeBackend() === 'sqlserver'"
+              [class.hybrid]="dbToggle.activeBackend() === 'hybrid'"
+              (click)="dbToggle.cycleBackend()"
+              [matTooltip]="dbToggle.activeBackend() === 'postgresql' ? 'Mode: PostgreSQL — click to switch to SQL Server' : dbToggle.activeBackend() === 'sqlserver' ? 'Mode: SQL Server — click to switch to Hybrid' : 'Mode: Hybrid — click to switch to PostgreSQL'">
+              <mat-icon style="font-size:16px">storage</mat-icon>
+              @if (dbToggle.activeBackend() === 'postgresql') { <span>PostgreSQL</span> }
+              @else if (dbToggle.activeBackend() === 'sqlserver') { <span>SQL Server</span> }
+              @else { <span>Hybrid</span> }
+            </button>
+          }
           <span class="audit-badge"><mat-icon style="font-size:14px">verified</mat-icon> Clean Audit</span>
           <button mat-icon-button [matMenuTriggerFor]="userMenu" style="margin-left:8px">
             <div class="user-avatar">{{ userInitials() }}</div>
@@ -437,6 +615,16 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
       display: inline-flex; align-items: center; background: #e8f5e9; color: #2e7d32;
       font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 16px;
     }
+    .db-toggle {
+      display: inline-flex; align-items: center; gap: 6px; background: #e8f5e9; color: #2e7d32;
+      font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 16px; border: none;
+      cursor: pointer; margin-right: 8px; transition: all 0.2s;
+    }
+    .db-toggle:hover { background: #c8e6c9; }
+    .db-toggle.sqlserver { background: #e3f2fd; color: #1565c0; }
+    .db-toggle.sqlserver:hover { background: #bbdefb; }
+    .db-toggle.hybrid { background: #f3e5f5; color: #6a1b9a; }
+    .db-toggle.hybrid:hover { background: #e1bee7; }
     .audit-badge {
       display: inline-flex; align-items: center; gap: 4px; background: #fef3c7; color: #92400e;
       font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 12px;
@@ -455,10 +643,16 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
 export class ShellComponent implements OnInit, OnDestroy {
   sidenavCollapsed = signal(false);
   activeModule = signal<AppModule>('home');
-  private expandedGroups = signal<Set<string>>(new Set());
+  private expandedGroups = signal<Set<string>>(new Set(['API Config']));
   private routeSub!: Subscription;
 
-  constructor(public authService: AuthService, private router: Router) {}
+  constructor(
+    public authService: AuthService,
+    private router: Router,
+    public dbToggle: DatabaseToggleService,
+    public orgSettings: OrgSettingsService,
+    private injector: Injector,
+  ) {}
 
   ngOnInit() {
     this.syncModuleFromUrl(this.router.url);
@@ -477,7 +671,42 @@ export class ShellComponent implements OnInit, OnDestroy {
     return ((u.firstName?.[0] || '') + (u.lastName?.[0] || '')).toUpperCase() || 'U';
   });
 
+  // POS and SharePoint chips are still in active development, so show them only
+  // when running locally (ng serve → isDevMode() === true) and hide them on the
+  // deployed production build (ng build → isDevMode() === false). Performance
+  // (insights) came off this list on 2026-08-27 - Pass 4 verified it renders real
+  // production data end-to-end (dashboard, FIN YEAR, nav matching the live site),
+  // so it's no longer dev-only.
+  private readonly _isDev = isDevMode();
+  showDevModules(): boolean { return this._isDev; }
+
+  // POS is still in active development — hidden on production builds regardless
+  // of access grants. (SharePoint was removed from this list so users with the
+  // SharePoint grant see it on prod; keep the dashboard's list in sync.)
+  private readonly _devOnlyModules = new Set<string>(['pos']);
+
+  /**
+   * Whether a module chip should render: the user must have access to the
+   * module AND (for in-development modules) be running a dev build. superUsers
+   * pass the access check for everything (see AuthService.canAccessModule).
+   */
+  canShowModule(code: string): boolean {
+    if (this._devOnlyModules.has(code) && !this._isDev) return false;
+    return this.authService.canAccessModule(code);
+  }
+
+  // Municipality name from the Assets settings API (GET /api/settings →
+  // municipality_name). OrgSettingsService is root-provided and auto-loads on
+  // construction, so the header reflects the configured municipality instead of a
+  // hardcoded value. Falls back while settings are still loading / unavailable.
+  municipalityName = computed(() => {
+    const s = this.orgSettings.settings();
+    return (s && s.municipality_name) ? s.municipality_name : 'Loading…';
+  });
+
   activeFinYear = computed(() => {
+    const s = this.orgSettings.settings();
+    if (s && s.financial_year) return s.financial_year;
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth() + 1;
@@ -486,6 +715,9 @@ export class ShellComponent implements OnInit, OnDestroy {
   });
 
   activePeriod = computed(() => {
+    const s = this.orgSettings.settings();
+    if (s && s.current_period_month) return s.current_period_month;
+    if (s && s.current_period) return s.current_period;
     const month = new Date().getMonth() + 1;
     return month >= 7 ? month - 6 : month + 6;
   });
@@ -500,11 +732,14 @@ export class ShellComponent implements OnInit, OnDestroy {
     else if (url.startsWith('/ins')) mod = 'insights';
     else if (url.startsWith('/budget')) mod = 'budget';
     else if (url.startsWith('/afs')) mod = 'afs';
+    else if (url.startsWith('/overtime')) mod = 'overtime';
+    else if (url.startsWith('/sharepoint')) mod = 'sharepoint'; // covers /sharepoint and /sharepoint/uat-assets
+    else if (url.startsWith('/settings')) mod = 'settings'; // covers /settings and /settings/:page
+    else if (url.startsWith('/admin-settings')) mod = 'admin'; // covers /admin-settings and /admin-settings/:module
     this.activeModule.set(mod);
   }
 
   setModule(mod: AppModule) {
-    this.activeModule.set(mod);
     const routeMap: Record<AppModule, string> = {
       home: '/dashboard',
       assets: '/assets/dashboard',
@@ -514,7 +749,11 @@ export class ShellComponent implements OnInit, OnDestroy {
       idp: '/idp/dashboard',
       insights: '/ins',
       budget: '/budget',
-      afs: '/afs'
+      afs: '/afs',
+      overtime: '/overtime',
+      sharepoint: '/sharepoint',
+      admin: '/admin-settings/assets',
+      settings: '/settings/access-management'
     };
     this.router.navigate([routeMap[mod]]);
   }
@@ -714,78 +953,120 @@ export class ShellComponent implements OnInit, OnDestroy {
     }
   ];
 
-  payrollNavGroups: NavGroup[] = [
+  // Mirrors the standalone Payroll sidebar (client/src/app/layout/sidebar).
+  // Dashboard + Employee Self-Service are rendered as top-level links above.
+  // Routes are prefixed with /payroll by the template.
+  payrollNavGroups: BudgetNavGroup[] = [
     {
       title: 'HR Management', icon: 'people',
       items: [
-        { label: 'Employees', icon: 'badge', route: '/employees' },
         { label: 'Job Profiles', icon: 'description', route: '/job-profiles' },
         { label: 'Positions', icon: 'work', route: '/positions' },
         { label: 'Organogram', icon: 'account_tree', route: '/organogram' },
-        { label: 'Employee Self-Service', icon: 'person', route: '/ess' }
-      ]
-    },
-    {
-      title: 'Payroll', icon: 'payments',
-      items: [
-        { label: 'Payroll Overview', icon: 'dashboard', route: '' },
-        { label: 'Payroll Run', icon: 'play_circle', route: '/run' },
-        { label: 'Payslip View', icon: 'receipt_long', route: '/payslip-view' },
-        { label: 'Wages', icon: 'monetization_on', route: '/wages' },
-        { label: 'Claims', icon: 'request_quote', route: '/claims' },
+        { label: 'Employees', icon: 'badge', route: '/employees' },
         { label: 'Salary Structure', icon: 'tune', route: '/salary-structure' }
       ]
     },
     {
-      title: 'Benefits & Deductions', icon: 'account_balance_wallet',
+      title: 'Payroll Management', icon: 'payments',
       items: [
-        { label: 'Benefits', icon: 'health_and_safety', route: '/benefits' },
-        { label: 'Medical Aid Schemes', icon: 'local_hospital', route: '/medical-aid-schemes' },
-        { label: 'Retirement Funds', icon: 'savings', route: '/retirement-funds' },
-        { label: 'Trade Unions', icon: 'groups', route: '/trade-unions' },
-        { label: 'Pay Points', icon: 'point_of_sale', route: '/pay-points' }
+        { label: 'Payslips', icon: 'receipt_long', route: '/payroll/payslip-view' },
+        { label: 'Payroll Run', icon: 'play_circle', route: '/payroll/run' }
+      ],
+      subGroups: [
+        {
+          label: 'Transactions', icon: 'swap_horiz',
+          children: [
+            { label: 'Wages', icon: 'monetization_on', route: '/payroll/wages' },
+            { label: 'Overtime', icon: 'more_time', route: '/payroll/overtime' },
+            { label: 'Installments', icon: 'event_repeat', route: '/payroll/installments' },
+            { label: 'Claims', icon: 'request_quote', route: '/payroll/claims' }
+          ]
+        }
       ]
     },
     {
-      title: 'Leave & Time', icon: 'event_available',
+      title: 'Time Management', icon: 'schedule',
       items: [
-        { label: 'Leave Management', icon: 'event_note', route: '/leave' },
-        { label: 'Time & Attendance', icon: 'schedule', route: '/time' }
+        { label: 'Attendance', icon: 'co_present', route: '/time/attendance' }
       ]
     },
     {
-      title: 'Performance & Skills', icon: 'trending_up',
+      title: 'Leave Management', icon: 'event_note',
       items: [
-        { label: 'Performance', icon: 'assessment', route: '/performance' },
-        { label: 'Skills Audit', icon: 'school', route: '/skills' },
-        { label: 'Disciplinary', icon: 'gavel', route: '/disciplinary' },
-        { label: 'Recruitment', icon: 'person_search', route: '/recruitment' }
+        { label: 'Leave Requests', icon: 'description', route: '/leave/requests' },
+        { label: 'Leave Adjustments', icon: 'tune', route: '/leave/adjustments' },
+        { label: 'Leave Calendar', icon: 'calendar_month', route: '/leave/calendar' }
       ]
     },
     {
       title: 'Reports', icon: 'bar_chart',
       items: [
-        { label: 'Reports Centre', icon: 'summarize', route: '/reports' }
+        { label: 'Reports', icon: 'summarize', route: '/reports' }
       ]
     },
     {
-      title: 'Settings', icon: 'settings',
-      items: [
-        { label: 'Municipality', icon: 'location_city', route: '/settings/municipality' },
-        { label: 'Constants', icon: 'numbers', route: '/settings/constants' },
-        { label: 'Employee Types', icon: 'category', route: '/settings/employee-types' },
-        { label: 'Task Grades', icon: 'grade', route: '/settings/task-grades' },
-        { label: 'Conditions', icon: 'rule', route: '/settings/conditions' },
-        { label: 'Tax Tables', icon: 'table_chart', route: '/settings/tax' },
-        { label: 'IRP5 Source Codes', icon: 'code', route: '/settings/irp5-source-codes' },
-        { label: 'Leave Types', icon: 'event', route: '/settings/leave-types' },
-        { label: 'Salary Heads', icon: 'payments', route: '/settings/salary-heads' },
-        { label: 'Payroll Cycles', icon: 'loop', route: '/settings/payroll-cycles' },
-        { label: 'GL Integration', icon: 'sync', route: '/settings/gl-integration' },
-        { label: 'Bank Settings', icon: 'account_balance', route: '/settings/bank' },
-        { label: 'Security', icon: 'security', route: '/settings/security' },
-        { label: 'Workflows', icon: 'linear_scale', route: '/settings/workflows' },
-        { label: 'Data Conversion', icon: 'cloud_upload', route: '/settings/data-conversion' }
+      title: 'Configuration', icon: 'settings',
+      subGroups: [
+        {
+          label: 'Company', icon: 'business',
+          children: [
+            { label: 'Municipality Details', icon: 'location_city', route: '/settings/municipality' },
+            { label: 'Constants', icon: 'numbers', route: '/settings/constants' }
+          ]
+        },
+        {
+          label: 'HR Structure', icon: 'account_tree',
+          children: [
+            { label: 'Employee Sub Types', icon: 'category', route: '/settings/employee-types' },
+            { label: 'Conditions of Service', icon: 'rule', route: '/settings/conditions' },
+            { label: 'Task Grades & Notches', icon: 'grade', route: '/settings/task-grades' },
+            { label: 'Upper Limits', icon: 'vertical_align_top', route: '/settings/upper-limits' },
+            { label: 'Employment Change Reasons', icon: 'sync_alt', route: '/settings/employment-changes' },
+            { label: 'Approval Config', icon: 'approval', route: '/settings/approval-config' }
+          ]
+        },
+        {
+          label: 'Payroll Setup', icon: 'tune',
+          children: [
+            { label: 'Tax Tables', icon: 'table_chart', route: '/settings/tax' },
+            { label: 'IRP5 Source Codes', icon: 'code', route: '/settings/irp5-source-codes' },
+            { label: 'Payroll Cycles', icon: 'loop', route: '/settings/payroll-cycles' },
+            { label: 'Tax Year Setup', icon: 'event', route: '/settings/tax-year-setup' }
+          ]
+        },
+        {
+          label: 'Time', icon: 'schedule',
+          children: [
+            { label: 'Work Shifts', icon: 'work_history', route: '/config/work-shifts' },
+            { label: 'Shift Rotations', icon: 'sync', route: '/config/shift-rotations' }
+          ]
+        },
+        {
+          label: 'Leave', icon: 'event_note',
+          children: [
+            { label: 'Leave Configuration', icon: 'rule', route: '/config/leave' },
+            { label: 'Public Holidays', icon: 'flag', route: '/config/leave/public-holidays' }
+          ]
+        },
+        {
+          label: 'Benefits', icon: 'health_and_safety',
+          children: [
+            { label: 'Medical Aid Schemes', icon: 'local_hospital', route: '/medical-aid-schemes' },
+            { label: 'Retirement Funds', icon: 'savings', route: '/retirement-funds' },
+            { label: 'Trade Unions', icon: 'groups', route: '/trade-unions' }
+          ]
+        },
+        {
+          label: 'Pay Structure', icon: 'account_balance_wallet',
+          children: [
+            { label: 'Pay Points', icon: 'point_of_sale', route: '/pay-points' },
+            { label: 'Salary Transactions', icon: 'payments', route: '/settings/salary-heads' },
+            { label: 'Salary Transaction Groups', icon: 'list_alt', route: '/settings/salary-trans-groups' },
+            { label: 'Claim Types', icon: 'category', route: '/settings/claim-configurations' },
+            { label: 'GL Integration', icon: 'sync', route: '/settings/gl-integration' }
+          ]
+        }
       ]
     }
   ];
@@ -829,65 +1110,57 @@ export class ShellComponent implements OnInit, OnDestroy {
     }
   ];
 
-  insightsNavGroups: NavGroup[] = [
-    { title: 'Configuration', icon: 'settings', items: [
-      { label: 'Performance Cycles', icon: 'loop', route: '/config/cycles' },
-      { label: 'KPI Groups', icon: 'category', route: '/config/kpi-groups' },
-      { label: 'Units of Measure', icon: 'straighten', route: '/config/units' },
-      { label: 'Data Types', icon: 'data_object', route: '/config/data-types' },
-      { label: 'Progress Statuses', icon: 'pending', route: '/config/statuses' },
-      { label: 'Scorecard Types', icon: 'view_list', route: '/config/scorecard-types' }
+  // As of 2026-08-26 (PerformanceSync.md Pass 4), this is a byte-for-byte mirror of
+  // perf-app's own real, current sidebar
+  // (Insight-Performance-Hub/artifacts/perf-app/src/app/layout/sidebar/sidebar.component.ts's
+  // `NAV` array) -- confirmed against BOTH the local standalone source AND the live
+  // deployed production site (platinum-performance-ui.azurewebsites.net), which are
+  // in agreement. Earlier passes had accumulated a much more elaborate, partly
+  // aspirational nav (Individual, Moderation, AI Insights, Integrations, Audit Trail,
+  // an "Approve SDBIP" link, a 13-item Configuration submenu, etc.) that never existed
+  // in perf-app's real sidebar at all -- those routes/components still exist in
+  // libs/ins (harmless, just unlinked), but showing them in nav was itself the bug the
+  // user reported ("a lot of things missing" -- really a lot of things *extra* that
+  // didn't match the real product). Re-verify against sidebar.component.ts's `NAV`
+  // constant directly if this ever needs to change again, not against libs/ins/routes.ts
+  // alone -- a route existing there does not mean the real product links to it.
+  insightsNav: InsightsNavEntry[] = [
+    { kind: 'link', label: 'Dashboard', icon: 'dashboard', route: '/dashboard' },
+    { kind: 'group', title: 'SDBIP', icon: 'apartment', items: [
+      { label: 'Compile', icon: 'task_alt', route: '/org-planning/scorecards' },
+      { label: 'Review', icon: 'find_in_page', route: '/org-planning/review-sdbip' },
     ]},
-    { title: 'Weightings', icon: 'balance', items: [
-      { label: 'NKPA Weightings', icon: 'pie_chart', route: '/weightings/nkpa' },
-      { label: 'Competency Req.', icon: 'bar_chart', route: '/weightings/competencies' }
+    { kind: 'group', title: 'Revised SDBIP', icon: 'autorenew', items: [
+      { label: 'Compile', icon: 'task_alt', route: '/revised-sdbip/capture' },
+      { label: 'Review', icon: 'find_in_page', route: '/revised-sdbip/review' },
     ]},
-    { title: 'Deadlines', icon: 'schedule', items: [
-      { label: 'Submission Deadlines', icon: 'event_note', route: '/deadlines/submissions' },
-      { label: 'Report Fields', icon: 'event_busy', route: '/deadlines/report-fields' }
+    { kind: 'group', title: 'Departmental SDBIP', icon: 'groups', items: [
+      { label: 'Compile', icon: 'task_alt', route: '/departmental/scorecards' },
+      { label: 'Review', icon: 'find_in_page', route: '/departmental/review' },
     ]},
-    { title: 'Notifications', icon: 'notifications', items: [
-      { label: 'Notification Centre', icon: 'mail_outline', route: '/notifications' },
-      { label: 'Notification Config', icon: 'settings', route: '/notifications/config' }
+    { kind: 'group', title: 'Quarterly Actuals', icon: 'fact_check', items: [
+      { label: 'Capture', icon: 'description', route: '/actuals/submit' },
+      { label: 'Manager Review', icon: 'manage_accounts', route: '/actuals/review-line-manager' },
+      { label: 'PMS Review', icon: 'manage_accounts', route: '/actuals/review-pms-manager' },
+      { label: 'Internal Audit', icon: 'verified', route: '/actuals/review-internal-audit' },
     ]},
-    { title: 'Org Planning', icon: 'corporate_fare', items: [
-      { label: 'KPI Scorecards', icon: 'account_tree', route: '/org-planning/scorecards' },
-      { label: 'Quarterly Targets', icon: 'calendar_month', route: '/org-planning/quarterly-targets' }
+    { kind: 'group', title: 'Mid-Year', icon: 'event_note', items: [
+      { label: 'Capture', icon: 'description', route: '/mid-year/capture' },
+      { label: 'Manager Review', icon: 'manage_accounts', route: '/mid-year/manager-review' },
+      { label: 'PMS Review', icon: 'manage_accounts', route: '/mid-year/pms-review' },
+      { label: 'Internal Audit', icon: 'verified', route: '/mid-year/internal-audit' },
     ]},
-    { title: 'SDBIP', icon: 'business', items: [
-      { label: 'SDBIP Overview', icon: 'description', route: '/sdbip/overview' },
-      { label: 'Strategic Objectives', icon: 'flag', route: '/sdbip/objectives' }
+    { kind: 'group', title: 'Annual', icon: 'calendar_month', items: [
+      { label: 'Capture', icon: 'description', route: '/annual/capture' },
+      { label: 'Manager Review', icon: 'manage_accounts', route: '/annual/manager-review' },
+      { label: 'PMS Review', icon: 'manage_accounts', route: '/annual/pms-review' },
+      { label: 'Internal Audit', icon: 'verified', route: '/annual/internal-audit' },
     ]},
-    { title: 'Departmental', icon: 'apartment', items: [
-      { label: 'Dept Scorecards', icon: 'dashboard', route: '/departmental/scorecards' },
-      { label: 'KPI Assignments', icon: 'assignment', route: '/departmental/kpi-assignments' }
-    ]},
-    { title: 'Individual', icon: 'person', items: [
-      { label: 'My Performance', icon: 'trending_up', route: '/individual/my-performance' },
-      { label: 'Agreements', icon: 'handshake', route: '/individual/agreements' },
-      { label: 'Reviewers', icon: 'supervisor_account', route: '/individual/reviewers' },
-      { label: 'Competencies', icon: 'school', route: '/individual/competencies' },
-      { label: 'Assessments', icon: 'rate_review', route: '/individual/assessments' }
-    ]},
-    { title: 'Actuals & Evidence', icon: 'fact_check', items: [
-      { label: 'Submit Actuals', icon: 'data_usage', route: '/actuals/submit' },
-      { label: 'Evidence Upload', icon: 'upload_file', route: '/actuals/evidence' },
-      { label: 'Corrective Actions', icon: 'build', route: '/actuals/corrective-actions' }
-    ]},
-    { title: 'Moderation', icon: 'gavel', items: [
-      { label: 'Review Queue', icon: 'playlist_add_check', route: '/moderation/queue' },
-      { label: 'Moderation Panel', icon: 'campaign', route: '/moderation/panel' }
-    ]},
-    { title: 'Reports', icon: 'assessment', items: [
-      { label: 'Report Centre', icon: 'analytics', route: '/reports/centre' },
-      { label: 'Standard Reports', icon: 'summarize', route: '/reports/standard' },
-      { label: 'Custom Reports', icon: 'tune', route: '/reports/custom' }
-    ]},
-    { title: 'Admin', icon: 'admin_panel_settings', items: [
-      { label: 'User Management', icon: 'manage_accounts', route: '/admin/users' },
-      { label: 'Role Permissions', icon: 'settings_applications', route: '/admin/roles' },
-      { label: 'Workflows', icon: 'account_tree', route: '/admin/workflows' }
-    ]}
+    { kind: 'link', label: 'Reports', icon: 'menu_book', route: '/reports/centre' },
+    { kind: 'link', label: 'Bulk Upload', icon: 'upload_file', route: '/bulk-upload' },
+    { kind: 'link', label: 'Departments', icon: 'domain', route: '/admin/departments' },
+    { kind: 'link', label: 'Employees', icon: 'group', route: '/admin/users' },
+    { kind: 'link', label: 'Configuration', icon: 'settings', route: '/config' },
   ];
 
   budgetNavGroups: BudgetNavGroup[] = [
@@ -897,28 +1170,53 @@ export class ShellComponent implements OnInit, OnDestroy {
         {
           label: 'Projects', icon: 'folder_open',
           children: [
-            { label: 'Project Budgets', icon: 'folder', route: '/projects' },
-            { label: 'Export Original Budget', icon: 'file_download', route: '/projects/export-original-budget' },
-            { label: 'Export Adjustment Budget', icon: 'tune', route: '/projects/export-adjustment-budget' },
-            { label: 'Import Projects', icon: 'file_upload', route: '/projects/import' },
+            { label: 'Project Budgets', icon: 'table_chart', route: '/projects' },
+            { label: 'Project Budgets Grid', icon: 'grid_on', route: '/projects/grid' },
+            { label: 'Export Original Budget', icon: 'download', route: '/projects/export-original-budget' },
+            { label: 'Export Adjustment Budget', icon: 'download', route: '/projects/export-adjustment-budget' },
+            { label: 'Import Projects', icon: 'upload', route: '/projects/import' },
             { label: 'Register Projects / Exception List', icon: 'app_registration', route: '/projects/register' },
-            { label: 'Add Zero Budget Items to Current Budget', icon: 'exposure_zero', route: '/projects/zero-budget' },
-            { label: 'CP3 Project Sync', icon: 'sync', route: '/projects/cp3-sync' }
+            { label: 'Add Zero Budget Items to Current Budget', icon: 'add_circle_outline', route: '/projects/zero-budget' }
           ]
         },
         {
           label: 'Budget Approval', icon: 'approval',
           children: [
             { label: 'Approve Draft', icon: 'rate_review', route: '/budget-approval/approve-draft' },
-            { label: 'Approve Final', icon: 'check_circle', route: '/budget-approval/approve-final' }
+            { label: 'Approve Final', icon: 'verified', route: '/budget-approval/approve-final' }
+          ]
+        },
+        {
+          label: 'Virements', icon: 'swap_horiz',
+          children: [
+            { label: 'Virement Approval Levels', icon: 'layers', route: '/virement-approval-levels' },
+            { label: 'Virement Policy', icon: 'policy', route: '/virement-policy' },
+            { label: 'Virements', icon: 'swap_horiz', route: '/virements' },
+            { label: 'Virement Approvals', icon: 'task_alt', route: '/virement-approvals' }
+          ]
+        },
+        {
+          label: 'Adjustments', icon: 'tune',
+          children: [
+            { label: 'Request Adjustment', icon: 'request_page', route: '/adjustments/request' },
+            { label: 'Approve Adjustment Budget', icon: 'task_alt', route: '/adjustments/approve' }
+          ]
+        },
+        {
+          label: 'mSCOA Strings', icon: 'code',
+          children: [
+            { label: 'Tabled Budget', icon: 'table_chart', route: '/budget-strings/tabled-budget' },
+            { label: 'Original Budget', icon: 'description', route: '/budget-strings/original-budget' },
+            { label: 'Tabled IDP (PRTA)', icon: 'account_tree', route: '/budget-strings/tabled-idp' },
+            { label: 'Original IDP (PROR)', icon: 'account_tree', route: '/budget-strings/original-idp' },
+            { label: 'Adjustment Budget', icon: 'tune', route: '/budget-strings/adjustment-budget' },
+            { label: 'Adjustment IDP (PRAD)', icon: 'tune', route: '/budget-strings/adjustment-idp' },
+            { label: 'Virement', icon: 'swap_horiz', route: '/budget-strings/virement' }
           ]
         }
       ],
       items: [
-        { label: 'Budget Versions', icon: 'history', route: '/budget-versions' },
-        { label: 'mSCOA Strings', icon: 'code', route: '/budget-strings' },
-        { label: 'Virements', icon: 'swap_horiz', route: '/virements' },
-        { label: 'Virement Policy', icon: 'policy', route: '/virement-policy' }
+        { label: 'Budget Versions', icon: 'history', route: '/budget-versions' }
       ]
     },
     {
@@ -959,10 +1257,39 @@ export class ShellComponent implements OnInit, OnDestroy {
       items: [
         { label: 'Validation', icon: 'verified', route: '/validation' },
         { label: 'Reports', icon: 'description', route: '/reports' },
-        { label: 'Analytics', icon: 'insights', route: '/analytics' }
+        { label: 'Analytics', icon: 'trending_up', route: '/analytics' }
       ]
     }
   ];
+
+  overtimeNavItems: NavItem[] = [
+    { label: 'Dashboard', icon: 'dashboard', route: '/overtime/dashboard' },
+    { label: 'Overtime Capture', icon: 'edit_note', route: '/overtime/capture', flag: 'canAccessCapture' },
+    { label: 'Overtime Enquiry', icon: 'search', route: '/overtime/enquiry', flag: 'canAccessEnquiry' },
+    { label: 'Payroll Processing', icon: 'payments', route: '/overtime/payroll-processing', flag: 'canAccessPayroll' },
+    { label: 'Overtime Setup', icon: 'settings', route: '/overtime/setup', flag: 'canAccessConfig' },
+  ];
+
+  /**
+   * Overtime nav items filtered by the signed-in user's MeDto access flags — mirrors the access
+   * control enforced server-side by libs/overtime's permission.guard.ts (same flag names), so an
+   * item a user can't open is hidden instead of just being blocked on click.
+   *
+   * UserContextService is resolved lazily (via Injector, not a constructor param) so its
+   * constructor-triggered GET /overtime-app/api/auth/me only fires once the user actually opens
+   * the Overtime module — not on every app load regardless of module. Angular memoizes the
+   * root-provided singleton, so repeated calls are cheap and return the same instance/signal.
+   *
+   * While access is still resolving (me() === null), items are shown (fail open) to avoid a
+   * flash of "Dashboard only" — the underlying route guard still blocks/redirects if a user
+   * clicks through before resolution completes, so this is a display nicety, not the security
+   * boundary.
+   */
+  visibleOvertimeNavItems = computed(() => {
+    const userCtx = this.injector.get(UserContextService, null, { optional: true });
+    const me = userCtx?.me() ?? null;
+    return this.overtimeNavItems.filter(item => !item.flag || me === null || !!me[item.flag]);
+  });
 
   afsNavGroups: NavGroup[] = [
     {

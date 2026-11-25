@@ -1,0 +1,122 @@
+
+{AppName}/
+│
+├── {AppName}-API/                           .NET 10 Web API Backend
+│   ├── Configuration/                       Strongly-typed config classes
+│   │   └── JwtSettings.cs
+│   │
+│   ├── Controllers/                         API controllers (one per domain)
+│   │   ├── AuthController.cs
+│   │   ├── DashboardController.cs
+│   │   └── {Domain}Controller.cs
+│   │
+│   ├── Data/                                Database context
+│   │   └── ApplicationDbContext.cs          Central DbContext with Fluent API mappings
+│   │
+│   ├── DTOs/                                Data Transfer Objects
+│   │   ├── Requests/                        Input/request models
+│   │   │   └── {Domain}RequestDto.cs
+│   │   └── Responses/                       Output/response models
+│   │       └── {Domain}ResponseDto.cs
+│   │
+│   ├── Extensions/                          Extension methods
+│   │   └── ServiceCollectionExtensions.cs   Modular DI registration
+│   │
+│   ├── Helpers/                             Utility classes
+│   │   └── ClaimsHelper.cs                  JWT claim extraction
+│   │
+│   ├── Middleware/                           HTTP pipeline middleware
+│   │   ├── ExceptionHandlingMiddleware.cs    Global exception handler
+│   │   ├── CorrelationIdMiddleware.cs        Request correlation tracking
+│   │   ├── RequestLoggingMiddleware.cs       HTTP request/response logging
+│   │   └── PerformanceMonitoringMiddleware.cs  Slow request detection
+│   │
+│   ├── Models/                              Domain entities
+│   │   ├── Domain/                          Entity classes mapped to DB tables
+│   │   │   └── {Entity}.cs
+│   │   └── Common/                          Shared response models
+│   │       └── ApiResponse.cs
+│   │
+│   ├── Repositories/                        Data access layer (if using Repository Pattern)
+│   │   ├── Interfaces/                      Repository contracts
+│   │   │   └── I{Domain}Repository.cs
+│   │   └── {Domain}Repository.cs
+│   │
+│   ├── Services/                            Business logic layer
+│   │   ├── Interfaces/                      Service contracts
+│   │   │   └── I{Domain}Service.cs
+│   │   └── {Domain}Service.cs
+│   │
+│   ├── Migrations/                          Database migration scripts (if applicable)
+│   │
+│   ├── Properties/
+│   │   └── launchSettings.json
+│   │
+│   ├── logs/                                Runtime log files (gitignored)
+│   ├── Program.cs                           Entry point, DI, middleware pipeline
+│   ├── {AppName}-API.csproj                 Project file with NuGet packages
+│   └── appsettings.json                     Connection strings, JWT, logging config
+│
+├── {AppName}-UI/                            Angular 21 Frontend
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── core/                        Singleton services, guards, interceptors, models
+│   │   │   │   ├── guards/
+│   │   │   │   │   ├── auth.guard.ts        Redirects unauthenticated users
+│   │   │   │   │   └── role.guard.ts        Restricts by user role
+│   │   │   │   ├── interceptors/
+│   │   │   │   │   ├── auth.interceptor.ts  Attaches JWT to requests
+│   │   │   │   │   └── error.interceptor.ts Captures HTTP errors globally
+│   │   │   │   ├── models/
+│   │   │   │   │   └── {domain}.model.ts    One model file per domain
+│   │   │   │   └── services/
+│   │   │   │       ├── auth.service.ts      Authentication & user state
+│   │   │   │       └── {domain}.service.ts  One service per domain
+│   │   │   │
+│   │   │   ├── features/                    Feature modules (one folder per domain)
+│   │   │   │   ├── dashboard/
+│   │   │   │   │   ├── dashboard.component.ts
+│   │   │   │   │   ├── dashboard.component.html
+│   │   │   │   │   └── dashboard.component.scss
+│   │   │   │   ├── {feature-name}/
+│   │   │   │   │   ├── {feature-name}.component.ts
+│   │   │   │   │   ├── {feature-name}.component.html
+│   │   │   │   │   └── {feature-name}.component.scss
+│   │   │   │   └── auth/
+│   │   │   │       ├── login/
+│   │   │   │       └── register/
+│   │   │   │
+│   │   │   ├── layout/                      App shell (shared chrome)
+│   │   │   │   ├── layout.component.ts      Sidebar + topbar + <router-outlet>
+│   │   │   │   ├── layout.component.html
+│   │   │   │   └── layout.component.scss
+│   │   │   │
+│   │   │   ├── app.component.ts             Root component
+│   │   │   ├── app.config.ts                Providers (router, HTTP, interceptors)
+│   │   │   └── app.routes.ts                Lazy-loaded route definitions
+│   │   │
+│   │   ├── assets/                          Static assets (images, icons, global styles)
+│   │   │   └── styles/
+│   │   │       └── {appname}-styles.scss    Global premium styling
+│   │   ├── environments/
+│   │   │   ├── environment.ts               Dev config
+│   │   │   └── environment.prod.ts          Prod config
+│   │   ├── styles.scss                      Global styles entry point
+│   │   ├── index.html                       HTML entry point
+│   │   └── main.ts                          Bootstrap entry point
+│   │
+│   ├── proxy.conf.json                      Dev proxy: /api → backend
+│   ├── angular.json                         Angular CLI configuration
+│   ├── package.json                         Dependencies
+│   └── tsconfig.json                        TypeScript configuration
+│
+├── docs/                                    Project documentation
+│   ├── api-specs/                           API specifications
+│   ├── help-manuals/                        User manuals
+│   └── STANDARDS.md                         Project-specific standards
+│
+├── server/                                  Launcher (if applicable)
+│   └── index.js                             Node.js entry point (starts all services)
+│
+└── README.md                                Project overview
+```

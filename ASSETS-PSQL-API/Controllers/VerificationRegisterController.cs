@@ -855,31 +855,33 @@ public class VerificationRegisterItemController : ControllerBase
         LEFT JOIN ""Const_Asset_CIDMS_Municipal_Services"" bms ON vi.""BasicMunicipalityService"" = bms.""AssetMunicipalServicesID""";
 
     [HttpGet("by-register/{registerId:int}")]
-    public async Task<IActionResult> GetByRegister(int registerId, [FromQuery] string? tab, [FromQuery] string? search)
+    public async Task<IActionResult> GetByRegister(int registerId, [FromQuery] string? tab, [FromQuery] string? search,
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 50)
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
-        var sql = ItemSelect + @" WHERE vi.""VerificationRegister_ID"" = @registerId";
         var p = new DynamicParameters();
         p.Add("registerId", registerId);
 
+        var where = @" WHERE vi.""VerificationRegister_ID"" = @registerId";
         if (tab == "manage")
-        {
-            sql += @" AND (vi.""Verification_Flag"" IS NULL OR vi.""Verification_Flag"" = 'Revisit – Not Approved' OR vi.""Verification_Flag"" = 'Revisited')";
-        }
+            where += @" AND (vi.""Verification_Flag"" IS NULL OR vi.""Verification_Flag"" = 'Revisit – Not Approved' OR vi.""Verification_Flag"" = 'Revisited')";
         else if (tab == "approve")
-        {
-            sql += @" AND vi.""Verification_Flag"" = 'Submitted for Approval'";
-        }
-
+            where += @" AND vi.""Verification_Flag"" = 'Submitted for Approval'";
         if (!string.IsNullOrWhiteSpace(search))
         {
-            sql += @" AND (vi.""Description"" ILIKE @search OR vi.""Barcode"" ILIKE @search OR vi.""SerialNumber"" ILIKE @search OR vi.""MunicipalAssetID"" ILIKE @search)";
+            where += @" AND (vi.""Description"" ILIKE @search OR vi.""Barcode"" ILIKE @search OR vi.""SerialNumber"" ILIKE @search OR vi.""MunicipalAssetID"" ILIKE @search)";
             p.Add("search", "%" + search + "%");
         }
-        sql += @" ORDER BY vi.""VerificationItem_ID""";
-        var items = await conn.QueryAsync<dynamic>(sql, p);
-        return Ok(items);
+
+        var totalCount = await conn.ExecuteScalarAsync<int>(
+            @"SELECT COUNT(*) FROM ""Asset_VerificationRegisterItem"" vi" + where, p);
+
+        p.Add("offset", (page - 1) * pageSize);
+        p.Add("pageSize", pageSize);
+        var items = await conn.QueryAsync<dynamic>(
+            ItemSelect + where + @" ORDER BY vi.""VerificationItem_ID"" LIMIT @pageSize OFFSET @offset", p);
+        return Ok(new { items, totalCount });
     }
 
     [HttpGet("{id:int}")]

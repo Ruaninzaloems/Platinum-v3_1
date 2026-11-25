@@ -57,18 +57,23 @@ export class ConstantsApiService {
     return this.http.get<any>(`${this.base}/scoa-project-structure-consolidated/${id}`);
   }
 
-  getScoaFunctionConsolidated(enabledOnly?: boolean, finYearText?: string): Observable<any[]> {
+  getScoaFunctionConsolidated(enabledOnly?: boolean, finYearText?: string, parentId?: number, rootOnly?: boolean, postingLevel?: string): Observable<any[]> {
     let params = new HttpParams();
     if (enabledOnly != null) params = params.set('enabledOnly', enabledOnly);
-    if (finYearText) params = params.set('finYearText', finYearText);
+    if (finYearText)         params = params.set('finYearText', finYearText);
+    if (parentId != null)    params = params.set('parentId', parentId);
+    if (rootOnly != null)    params = params.set('rootOnly', rootOnly);
+    if (postingLevel)        params = params.set('postingLevel', postingLevel);
     return this.http.get<any[]>(`${this.base}/scoa-function-structure-consolidated`, { params });
   }
 
-  getScoaFundsConsolidated(enabledOnly?: boolean, finYearText?: string, postingLevel?: string): Observable<any[]> {
+  getScoaFundsConsolidated(enabledOnly?: boolean, finYearText?: string, postingLevel?: string, parentId?: number, rootOnly?: boolean): Observable<any[]> {
     let params = new HttpParams();
     if (enabledOnly != null) params = params.set('enabledOnly', enabledOnly);
     if (finYearText) params = params.set('finYearText', finYearText);
     if (postingLevel) params = params.set('postingLevel', postingLevel);
+    if (parentId != null) params = params.set('parentId', parentId);
+    if (rootOnly != null) params = params.set('rootOnly', rootOnly);
     return this.http.get<any[]>(`${this.base}/scoa-funds-structure-consolidated`, { params });
   }
 
@@ -76,10 +81,12 @@ export class ConstantsApiService {
     return this.getScoaFundsConsolidated(true, finYearText, 'Yes');
   }
 
-  getScoaRegionalConsolidated(enabledOnly?: boolean, finYearText?: string): Observable<any[]> {
+  getScoaRegionalConsolidated(enabledOnly?: boolean, finYearText?: string, parentId?: number, rootOnly?: boolean): Observable<any[]> {
     let params = new HttpParams();
     if (enabledOnly != null) params = params.set('enabledOnly', enabledOnly);
     if (finYearText) params = params.set('finYearText', finYearText);
+    if (parentId != null) params = params.set('parentId', parentId);
+    if (rootOnly != null) params = params.set('rootOnly', rootOnly);
     return this.http.get<any[]>(`${this.base}/scoa-regional-structure-consolidated`, { params });
   }
 
@@ -103,14 +110,52 @@ export class ConstantsApiService {
     return this.http.get<any[]>(`${this.base}/scoa-structure-consolidated`, { params });
   }
 
+  searchScoaFunctionConsolidated(search: string, take = 50): Observable<any[]> {
+    let params = new HttpParams()
+      .set('enabledOnly', true)
+      .set('postingLevel', 'Yes')
+      .set('search', search)
+      .set('take', take);
+    return this.http.get<any[]>(`${this.base}/scoa-function-structure-consolidated`, { params });
+  }
+
+  searchScoaFundsConsolidated(search: string, take = 50): Observable<any[]> {
+    let params = new HttpParams()
+      .set('enabledOnly', true)
+      .set('postingLevel', 'Yes')
+      .set('search', search)
+      .set('take', take);
+    return this.http.get<any[]>(`${this.base}/scoa-funds-structure-consolidated`, { params });
+  }
+
+  searchScoaRegionalConsolidated(search: string, take = 50): Observable<any[]> {
+    let params = new HttpParams()
+      .set('enabledOnly', true)
+      .set('postingLevel', 'Yes')
+      .set('search', search)
+      .set('take', take);
+    return this.http.get<any[]>(`${this.base}/scoa-regional-structure-consolidated`, { params });
+  }
+
+  searchScoaCostingConsolidated(search: string, take = 50): Observable<any[]> {
+    let params = new HttpParams()
+      .set('enabledOnly', true)
+      .set('postingLevel', 'Yes')
+      .set('search', search)
+      .set('take', take);
+    return this.http.get<any[]>(`${this.base}/scoa-costing-structure-consolidated`, { params });
+  }
+
   getScoaStructureConsolidatedById(id: number): Observable<any> {
     return this.http.get<any>(`${this.base}/scoa-structure-consolidated/${id}`);
   }
 
-  getScoaCostingConsolidated(enabledOnly?: boolean, postingLevel?: string): Observable<any[]> {
+  getScoaCostingConsolidated(enabledOnly?: boolean, finYearText?: string, parentId?: number, rootOnly?: boolean): Observable<any[]> {
     let params = new HttpParams();
     if (enabledOnly != null) params = params.set('enabledOnly', enabledOnly);
-    if (postingLevel) params = params.set('postingLevel', postingLevel);
+    if (finYearText) params = params.set('finYearText', finYearText);
+    if (parentId != null) params = params.set('parentId', parentId);
+    else if (rootOnly) params = params.set('rootOnly', true);
     return this.http.get<any[]>(`${this.base}/scoa-costing-structure-consolidated`, { params });
   }
 
@@ -125,7 +170,7 @@ export class ConstantsApiService {
   }
 
   getPlanCapitalOperationalTypes(): Observable<any[]> {
-    return this.http.get<any[]>('/api/ems/const/const-plancapitaloperationaltypes-sys?pageSize=200');
+    return this.http.get<any[]>('/budget-app/api/ems/const/const-plancapitaloperationaltypes-sys?pageSize=200');
   }
 
   getStatuses(usedBy?: string): Observable<any[]> {
@@ -139,5 +184,26 @@ export class ConstantsApiService {
     if (finYear) params = params.set('finYear', finYear);
     if (enabledOnly) params = params.set('enabledOnly', true);
     return this.http.get<any[]>(`${this.base}/project-types`, { params });
+  }
+
+  getMunicipalClassificationTree(rootOnly?: boolean, deptId?: number, parentId?: number): Observable<any[]> {
+    let params = new HttpParams();
+    if (rootOnly != null) params = params.set('rootOnly', rootOnly);
+    if (deptId != null)   params = params.set('deptId', deptId);
+    if (parentId != null) params = params.set('parentId', parentId);
+    return this.http.get<any[]>(`${this.base}/municipal-classification-tree`, { params });
+  }
+
+  getProjectItems(finYear?: string, search?: string): Observable<any[]> {
+    let params = new HttpParams();
+    if (finYear) params = params.set('finYear', finYear);
+    if (search)  params = params.set('search', search);
+    return this.http.get<any[]>(`${this.base}/project-items`, { params });
+  }
+
+  getBudgetSplitOptions(enabledOnly = true): Observable<any[]> {
+    let params = new HttpParams();
+    if (enabledOnly) params = params.set('enabledOnly', true);
+    return this.http.get<any[]>(`${this.base}/budget-split-options`, { params });
   }
 }

@@ -1,4 +1,4 @@
-:host { display: block; }
+:host { display: block; --section-accent: #8b5cf6; }
 
 .list-summary {
   display: flex;
@@ -71,13 +71,6 @@
   white-space: nowrap;
 }
 
-.list-card {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-}
 .table-wrap {
   overflow-x: auto;
 }
@@ -174,24 +167,7 @@
 }
 
 .detail-card {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 20px 24px;
-  margin-bottom: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-}
-
-.section-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #0f2b46;
-  margin-bottom: 16px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #e5e7eb;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  overflow: hidden;
 }
 
 .field-value {

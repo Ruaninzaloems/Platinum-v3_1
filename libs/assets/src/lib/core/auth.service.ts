@@ -1,48 +1,52 @@
-import { Injectable, signal, computed } from '@angular/core';
-import { Router } from '@angular/router';
+import { Injectable, signal } from '@angular/core';
 
-export interface AuthUser {
-  username: string;
-  displayName: string;
-  role: string;
-}
+const SESSION_KEY = 'auth_user_id';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private _currentUser = signal<AuthUser | null>(this.loadUser());
-  currentUser = this._currentUser.asReadonly();
-  isAuthenticated = computed(() => !!this._currentUser());
+  private _userId = signal<number | null>(this._readFromStorage());
+  private _resolved = signal<boolean>(false);
 
-  constructor(private router: Router) {}
+  readonly userId = this._userId.asReadonly();
+  readonly resolved = this._resolved.asReadonly();
 
-  private loadUser(): AuthUser | null {
+  private _readFromStorage(): number | null {
     try {
-      const stored = localStorage.getItem('platinum_user');
-      return stored ? JSON.parse(stored) : null;
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      if (raw !== null) {
+        const parsed = parseInt(raw, 10);
+        return isNaN(parsed) ? null : parsed;
+      }
     } catch {
-      return null;
     }
+    return null;
   }
 
-  login(username: string, password: string): boolean {
-    if (username === 'admin' && password === 'admin123') {
-      const user: AuthUser = {
-        username: 'admin',
-        displayName: 'System Administrator',
-        role: 'SYSTEM_ADMIN'
-      };
-      localStorage.setItem('platinum_user', JSON.stringify(user));
-      localStorage.setItem('platinum_token', 'demo-token-' + Date.now());
-      this._currentUser.set(user);
-      return true;
+  setUserId(id: number): void {
+    try {
+      sessionStorage.setItem(SESSION_KEY, String(id));
+    } catch {
     }
-    return false;
+    this._userId.set(id);
   }
 
-  logout(): void {
-    localStorage.removeItem('platinum_user');
-    localStorage.removeItem('platinum_token');
-    this._currentUser.set(null);
-    this.router.navigate(['/login']);
+  markResolved(): void {
+    this._resolved.set(true);
+  }
+
+  clearUserId(): void {
+    this.clearSession();
+  }
+
+  clearSession(): void {
+    try {
+      sessionStorage.removeItem(SESSION_KEY);
+    } catch {
+    }
+    this._userId.set(null);
+  }
+
+  getCurrentUserId(): number | null {
+    return this._userId();
   }
 }

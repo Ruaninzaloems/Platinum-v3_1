@@ -80,4 +80,10 @@ export class ServiceGroupsComponent implements OnInit {
       error: function(this: ServiceGroupsComponent, err: any) { this.snackBar.open(err.error?.error || 'Update failed', 'OK', { duration: 4000 }); }.bind(this)
     });
   }
+
+  exportToExcel(): void {
+    this.api.exportServiceGroups().subscribe({
+      next: (blob: Blob) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'service_groups_export.xlsx'; a.click(); URL.revokeObjectURL(url); }
+    });
+  }
 }

@@ -57,7 +57,7 @@ const checkSegregation = (entityType) => {
           tableName = 'payroll_runs';
           break;
         case 'leave_transaction':
-          tableName = 'leave_transactions';
+          tableName = 'leave_transactions_legacy';
           break;
         case 'overtime':
           tableName = 'overtime_transactions';

@@ -367,7 +367,7 @@ export class InventoryService {
   }
 
   getStorePermissions(params?: ApiListParams): Observable<any[]> {
-    return this.api.apiGet<any[]>('/api/inventory-settings/store-permissions', params);
+    return this.api.apiGet<any[]>('/inventory-settings/store-permissions', params);
   }
 
   getHighValueItems(params?: ApiListParams): Observable<PagedResult<HighValueAsset>> {

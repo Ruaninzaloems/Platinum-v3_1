@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, BehaviorSubject, tap, catchError, of } from 'rxjs';
+import { environment } from '../../environment';
 
 export interface PlatinumHealthStatus {
   connected: boolean;
@@ -140,7 +141,9 @@ export interface PlatinumSyncResult {
 
 @Injectable({ providedIn: 'root' })
 export class PlatinumApiService {
-  private baseUrl = '/api/platinum';
+  // Monorepo adaptation: prefix with the AFS apiPrefix so requests route through
+  // the shell proxy (/afs-app/api/* → AFS Node API :9000), matching api.service.ts.
+  private baseUrl = (environment.apiPrefix || '') + '/api/platinum';
   private connectionStatus = new BehaviorSubject<'unknown' | 'connected' | 'disconnected'>('unknown');
   connectionStatus$ = this.connectionStatus.asObservable();
 

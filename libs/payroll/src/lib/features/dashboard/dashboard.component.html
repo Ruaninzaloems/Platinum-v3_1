@@ -1,6 +1,6 @@
 <div class="page-header">
   <div>
-    <h1 class="page-title">Executive Dashboard</h1>
+    <h1 class="page-title">Payroll Control Centre</h1>
     <p class="page-subtitle">
       mSCOA HR & Payroll Management System
       <span class="period-badge" *ngIf="cp">
@@ -52,6 +52,7 @@
         <thead>
           <tr>
             <th>Payroll</th>
+            <th>Pay Frequency</th>
             <th>Cycle Type</th>
             <th>Period</th>
             <th>Status</th>
@@ -59,10 +60,11 @@
         </thead>
         <tbody>
           <tr *ngIf="currentCyclesData.cycles.length === 0">
-            <td colspan="4" style="text-align:center; color:#94a3b8; padding:24px;">No active cycles configured</td>
+            <td colspan="5" style="text-align:center; color:#94a3b8; padding:24px;">No active cycles configured</td>
           </tr>
           <tr *ngFor="let c of currentCyclesData.cycles">
             <td>{{ c.payroll }}</td>
+            <td>{{ c.pay_frequency }}</td>
             <td>{{ c.cycle_type }}</td>
             <td>{{ c.period }}</td>
             <td><span class="cycle-status" [class]="'cs-' + (c.status || 'none').toLowerCase().replace(' ', '-')">{{ c.status }}</span></td>
@@ -143,12 +145,23 @@
   </div>
 
   <div class="alert-row" style="margin-top:1.5rem">
-    <div class="alert-card" style="cursor:pointer" [style.border-left]="'3px solid ' + (workflowCount > 0 ? 'var(--warning)' : 'var(--success)')" (click)="navigateToModule('settings-workflows')">
-      <div class="alert-icon" [ngClass]="workflowCount > 0 ? 'alert-warning' : 'alert-success'"><app-icon name="clock" [size]="16"></app-icon></div>
+    <div class="alert-card" style="cursor:pointer" [style.border-left]="'3px solid ' + (myApprovalCounts.total > 0 ? 'var(--warning)' : 'var(--success)')" (click)="navigateToModule('approvals')">
+      <div class="alert-icon" [ngClass]="myApprovalCounts.total > 0 ? 'alert-warning' : 'alert-success'"><app-icon name="clock" [size]="16"></app-icon></div>
       <div>
-        <div class="alert-label">Pending Approvals</div>
-        <div class="alert-value" [style.color]="workflowCount > 0 ? 'var(--warning-dark)' : 'var(--success-dark)'">{{ formatNumber(workflowCount) }}</div>
-        <div class="alert-detail">Workflow items awaiting action</div>
+        <div class="alert-label">My Approvals</div>
+        <div class="alert-value" [style.color]="myApprovalCounts.total > 0 ? 'var(--warning-dark)' : 'var(--success-dark)'">{{ formatNumber(myApprovalCounts.total) }}</div>
+        <div class="alert-detail">
+          @if (myApprovalCounts.total > 0) {
+            <span style="display:inline-flex;gap:8px;flex-wrap:wrap">
+              @if (myApprovalCounts.CLAIM > 0) { <span>Claims {{ myApprovalCounts.CLAIM }}</span> }
+              @if (myApprovalCounts.WAGE > 0) { <span>Wages {{ myApprovalCounts.WAGE }}</span> }
+              @if (myApprovalCounts.OVERTIME > 0) { <span>Overtime {{ myApprovalCounts.OVERTIME }}</span> }
+              @if (myApprovalCounts.INSTALLMENT > 0) { <span>Installments {{ myApprovalCounts.INSTALLMENT }}</span> }
+            </span>
+          } @else {
+            <span>Inbox is clear</span>
+          }
+        </div>
       </div>
     </div>
     <div class="alert-card" style="cursor:pointer" [style.border-left]="'3px solid ' + (probationCount > 0 ? 'var(--warning)' : 'var(--success)')" (click)="navigateToModule('employees')">
@@ -177,49 +190,6 @@
     </div>
   </div>
 
-  <div class="pipeline">
-    <div class="pipeline-step pipeline-step-clickable" (click)="navigateToModule('payroll')">
-      <div class="step-icon"><app-icon name="file" [size]="16"></app-icon></div>
-      <div class="step-count">{{ pr.pending_runs || 0 }}</div>
-      <div class="step-label">Pending</div>
-      <div class="step-bar" style="background: var(--text-muted)"></div>
-    </div>
-    <div class="pipeline-arrow"><app-icon name="arrowRight" [size]="16"></app-icon></div>
-    <div class="pipeline-step pipeline-step-clickable" (click)="navigateToModule('payroll')">
-      <div class="step-icon"><app-icon name="settings" [size]="16"></app-icon></div>
-      <div class="step-count">{{ pr.processing_runs || 0 }}</div>
-      <div class="step-label">Processing</div>
-      <div class="step-bar" style="background: var(--info)"></div>
-    </div>
-    <div class="pipeline-arrow"><app-icon name="arrowRight" [size]="16"></app-icon></div>
-    <div class="pipeline-step pipeline-step-clickable" (click)="navigateToModule('payroll')">
-      <div class="step-icon"><app-icon name="check" [size]="16"></app-icon></div>
-      <div class="step-count">{{ pr.completed_runs || 0 }}</div>
-      <div class="step-label">Completed</div>
-      <div class="step-bar" style="background: var(--success)"></div>
-    </div>
-    <div class="pipeline-arrow"><app-icon name="arrowRight" [size]="16"></app-icon></div>
-    <div class="pipeline-step pipeline-step-clickable" (click)="navigateToModule('payroll')">
-      <div class="step-icon"><app-icon name="dollar" [size]="16"></app-icon></div>
-      <div class="step-count">{{ formatCurrency(pr.total_paye || 0) }}</div>
-      <div class="step-label">PAYE</div>
-      <div class="step-bar" style="background: var(--primary)"></div>
-    </div>
-    <div class="pipeline-arrow"><app-icon name="arrowRight" [size]="16"></app-icon></div>
-    <div class="pipeline-step pipeline-step-clickable" (click)="navigateToModule('payroll')">
-      <div class="step-icon"><app-icon name="home" [size]="16"></app-icon></div>
-      <div class="step-count">{{ formatCurrency(pr.total_uif || 0) }}</div>
-      <div class="step-label">UIF</div>
-      <div class="step-bar" style="background: var(--warning)"></div>
-    </div>
-    <div class="pipeline-arrow"><app-icon name="arrowRight" [size]="16"></app-icon></div>
-    <div class="pipeline-step pipeline-step-clickable" (click)="navigateToModule('payroll')">
-      <div class="step-icon"><app-icon name="award" [size]="16"></app-icon></div>
-      <div class="step-count">{{ formatCurrency(pr.total_sdl || 0) }}</div>
-      <div class="step-label">SDL</div>
-      <div class="step-bar" style="background: var(--purple)"></div>
-    </div>
-  </div>
 
   <div class="two-col">
     <div class="dept-chart" *ngIf="deptData && deptData.length > 0">
@@ -318,14 +288,15 @@
       <table>
         <thead>
           <tr>
-            <th>Code</th><th>Name</th><th>Position</th><th>Department</th><th>Division</th><th>Annual Salary</th><th>Status</th>
+            <th>ID</th><th>Code</th><th>Name</th><th>Position</th><th>Department</th><th>Division</th><th>Annual Salary</th><th>Status</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngIf="empListState.data.length === 0">
-            <td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px">No employees found</td>
+            <td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px">No employees found</td>
           </tr>
           <tr *ngFor="let emp of empListState.data">
+            <td>{{ emp.id }}</td>
             <td><strong>{{ emp.employee_code }}</strong></td>
             <td>{{ emp.title || '' }} {{ emp.first_name }} {{ emp.surname }}</td>
             <td>{{ emp.position_title || '-' }}</td>

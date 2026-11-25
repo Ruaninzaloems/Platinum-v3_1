@@ -20,7 +20,7 @@ export class CriticalityGradesComponent implements OnInit {
   loading = signal(true);
   showForm = signal(false);
   editingId = signal<number | null>(null);
-  formData = { criticalityGradeDesc: '' };
+  formData = { criticalityGradeDesc: '', enabled: 1 };
   showImport = signal(false);
   importFile = signal<File | null>(null);
   importing = signal(false);
@@ -42,21 +42,24 @@ export class CriticalityGradesComponent implements OnInit {
   }
 
   openAdd(): void {
-    this.formData = { criticalityGradeDesc: '' };
+    this.formData = { criticalityGradeDesc: '', enabled: 1 };
     this.editingId.set(null);
     this.showForm.set(true);
   }
 
   openEdit(item: any): void {
-    this.formData = { criticalityGradeDesc: item.criticalityGradeDesc };
-    this.editingId.set(item.criticalityGrade_ID);
+    this.formData = { criticalityGradeDesc: item.criticalityGradeDesc, enabled: item.enabled ?? 1 };
+    this.editingId.set(item.criticalityGradeId);
     this.showForm.set(true);
   }
 
   cancelForm(): void {
+
     this.showForm.set(false);
     this.editingId.set(null);
   }
+
+  onEnabledChange(event: Event): void { this.formData.enabled = (event.target as HTMLInputElement).checked ? 1 : 0; }
 
   save(): void {
     const id = this.editingId();
@@ -75,7 +78,7 @@ export class CriticalityGradesComponent implements OnInit {
 
   confirmDelete(item: any): void {
     if (confirm('Are you sure you want to delete "' + item.criticalityGradeDesc + '"?')) {
-      this.api.deleteCriticalityGrade(item.criticalityGrade_ID).subscribe({
+      this.api.deleteCriticalityGrade(item.criticalityGradeId).subscribe({
         next: function(this: CriticalityGradesComponent) { this.loadData(); this.snackBar.open('Criticality grade deleted', 'OK', { duration: 3000 }); }.bind(this),
         error: function(this: CriticalityGradesComponent, err: any) { this.snackBar.open(err.error?.error || 'Delete failed', 'OK', { duration: 4000 }); }.bind(this)
       });
@@ -135,6 +138,12 @@ export class CriticalityGradesComponent implements OnInit {
         a.click();
         URL.revokeObjectURL(url);
       }
+    });
+  }
+
+  exportToExcel(): void {
+    this.api.exportCriticalityGrades().subscribe({
+      next: (blob: Blob) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'criticality_grades_export.xlsx'; a.click(); URL.revokeObjectURL(url); }
     });
   }
 }

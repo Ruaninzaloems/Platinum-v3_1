@@ -20,7 +20,7 @@ import { Component, OnInit, signal } from '@angular/core';
     loading = signal(true);
     showForm = signal(false);
     editingId = signal<number | null>(null);
-    formData: any = { name: '' };
+    formData: any = { name: '', enabled: 1 };
     showImport = signal(false);
     importFile = signal<File | null>(null);
     importing = signal(false);
@@ -42,16 +42,18 @@ import { Component, OnInit, signal } from '@angular/core';
     }
 
     openAdd(): void {
-      this.formData = { name: '' };
+      this.formData = { name: '', enabled: 1 };
       this.editingId.set(null);
       this.showForm.set(true);
     }
 
     openEdit(item: any): void {
-      this.formData = { name: item.name };
+      this.formData = { name: item.name, enabled: item.enabled ?? 1 };
       this.editingId.set(item.assetConfig_TransactionType_ID);
       this.showForm.set(true);
     }
+
+    onEnabledChange(event: Event): void { this.formData.enabled = (event.target as HTMLInputElement).checked ? 1 : 0; }
 
     cancelForm(): void {
       this.showForm.set(false);
@@ -135,6 +137,12 @@ import { Component, OnInit, signal } from '@angular/core';
           a.click();
           URL.revokeObjectURL(url);
         }
+      });
+    }
+
+    exportToExcel(): void {
+      this.api.exportTransactionTypes().subscribe({
+        next: (blob: Blob) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'transaction_types_export.xlsx'; a.click(); URL.revokeObjectURL(url); }
       });
     }
   }

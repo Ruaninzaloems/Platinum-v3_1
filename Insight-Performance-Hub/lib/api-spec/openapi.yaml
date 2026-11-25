@@ -517,6 +517,76 @@ paths:
               schema:
                 $ref: "#/components/schemas/ScorecardType"
 
+  /national-kpas:
+    get:
+      operationId: listNationalKpas
+      tags: [nationalKpas]
+      summary: List national key performance areas
+      responses:
+        "200":
+          description: National KPAs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NationalKpa"
+    post:
+      operationId: createNationalKpa
+      tags: [nationalKpas]
+      summary: Create a national KPA
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNationalKpaInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NationalKpa"
+
+  /national-kpas/{id}:
+    delete:
+      operationId: deleteNationalKpa
+      tags: [nationalKpas]
+      summary: Delete a national KPA
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+    patch:
+      operationId: updateNationalKpa
+      tags: [nationalKpas]
+      summary: Update a national KPA
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNationalKpaInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NationalKpa"
+
   /nkpa-weightings:
     get:
       operationId: listNkpaWeightings
@@ -738,6 +808,125 @@ paths:
       responses:
         "204":
           description: Deleted
+
+  /sdbip-field-configs:
+    get:
+      operationId: listSdbipFieldConfigs
+      tags: [sdbipFieldConfigs]
+      summary: List SDBIP field configurations
+      parameters:
+        - name: sdbipType
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [original, revised, departmental, quarterly, midyear, annual]
+      responses:
+        "200":
+          description: List of field configurations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SdbipFieldConfig"
+
+  /sdbip-field-configs/{sdbipType}:
+    put:
+      operationId: saveSdbipFieldConfigs
+      tags: [sdbipFieldConfigs]
+      summary: Replace field configuration for an SDBIP type
+      parameters:
+        - name: sdbipType
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [original, revised, departmental, quarterly, midyear, annual]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveSdbipFieldConfigsInput"
+      responses:
+        "200":
+          description: Saved field configurations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SdbipFieldConfig"
+
+  /sdbip-field-configs/{sdbipType}/usage:
+    get:
+      operationId: getSdbipFieldUsage
+      tags: [sdbipFieldConfigs]
+      summary: Count KPIs holding data for each configured field
+      parameters:
+        - name: sdbipType
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [original, revised, departmental]
+      responses:
+        "200":
+          description: KPI data counts keyed by fieldKind:fieldKey
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SdbipFieldUsage"
+
+  /kpi-rating-thresholds:
+    get:
+      operationId: listKpiRatingThresholds
+      tags: [kpiRatingThresholds]
+      summary: List KPI rating thresholds (seeded with National Treasury defaults)
+      responses:
+        "200":
+          description: Rating thresholds ordered by level descending
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KpiRatingThreshold"
+    put:
+      operationId: saveKpiRatingThresholds
+      tags: [kpiRatingThresholds]
+      summary: Replace the KPI rating threshold bands
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveKpiRatingThresholdsInput"
+      responses:
+        "200":
+          description: Saved rating thresholds
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KpiRatingThreshold"
+
+  /kpi-rating-thresholds/reset:
+    post:
+      operationId: resetKpiRatingThresholds
+      tags: [kpiRatingThresholds]
+      summary: Reset rating thresholds to National Treasury defaults
+      responses:
+        "200":
+          description: Default rating thresholds
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KpiRatingThreshold"
 
   /competency-requirements:
     get:
@@ -1041,6 +1230,54 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Scorecard"
+
+  /scorecards/{scorecardId}/quarter-targets:
+    get:
+      operationId: listScorecardQuarterTargets
+      tags: [scorecardKpis]
+      summary: List quarter targets for all KPIs in a scorecard
+      parameters:
+        - name: scorecardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Quarter targets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KpiQuarterTarget"
+
+  /scorecards/{id}/export:
+    get:
+      operationId: exportScorecard
+      tags: [scorecards]
+      summary: Export a scorecard's KPI table as xlsx, pdf or docx
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [xlsx, pdf, docx]
+            default: xlsx
+      responses:
+        "200":
+          description: Exported file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
 
   /scorecards/{scorecardId}/kpis:
     get:
@@ -1560,6 +1797,11 @@ paths:
           in: query
           schema:
             type: string
+        - name: periodType
+          in: query
+          schema:
+            type: string
+            enum: [quarterly, mid_year, annual]
       responses:
         "200":
           description: Actual list
@@ -1581,6 +1823,11 @@ paths:
           required: true
           schema:
             type: integer
+        - name: periodType
+          in: query
+          schema:
+            type: string
+            enum: [quarterly, mid_year, annual]
       responses:
         "200":
           description: Actual list
@@ -1686,6 +1933,11 @@ paths:
           in: query
           schema:
             type: integer
+        - name: periodType
+          in: query
+          schema:
+            type: string
+            enum: [quarterly, mid_year, annual]
       responses:
         "200":
           description: Evidence list
@@ -1718,6 +1970,60 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/KpiEvidenceDocument"
+
+  /evidence/upload-url:
+    post:
+      operationId: requestEvidenceUploadUrl
+      tags: [evidence]
+      summary: Request a presigned URL for uploading an evidence file
+      responses:
+        "200":
+          description: Presigned upload URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uploadURL:
+                    type: string
+                  objectPath:
+                    type: string
+                required: [uploadURL, objectPath]
+
+  /evidence/{id}/download:
+    get:
+      operationId: downloadEvidence
+      tags: [evidence]
+      summary: Download an evidence file
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: File stream
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /evidence/{id}:
+    delete:
+      operationId: deleteEvidence
+      tags: [evidence]
+      summary: Delete an evidence document
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
 
   /evidence/{id}/verify:
     post:
@@ -2312,6 +2618,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/TrendlineData"
 
+  /dashboards/org-scorecard:
+    get:
+      operationId: getOrgScorecard
+      tags: [dashboards]
+      summary: Get organisational scorecard status breakdown per NKPA and department
+      parameters:
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Organisational scorecard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgScorecardData"
+
   /dashboards/top-underperforming:
     get:
       operationId: getTopUnderperforming
@@ -2380,6 +2709,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EvidenceComplianceData"
+
+  /dashboards/municipal-health:
+    get:
+      operationId: getMunicipalHealth
+      tags: [dashboards]
+      summary: Get municipal health composite score
+      parameters:
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Municipal health score data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MunicipalHealthData"
 
   /reports/runs:
     get:
@@ -3525,6 +3873,9 @@ components:
           type: string
         abbreviation:
           type: string
+        dataTypeId:
+          type: integer
+          nullable: true
         cycleId:
           type: integer
         isActive:
@@ -3543,6 +3894,10 @@ components:
           type: string
         abbreviation:
           type: string
+          default: ""
+        dataTypeId:
+          type: integer
+          nullable: true
         cycleId:
           type: integer
         isActive:
@@ -3550,7 +3905,6 @@ components:
           default: true
       required:
         - name
-        - abbreviation
         - cycleId
 
     UpdateUnitOfMeasureInput:
@@ -3560,6 +3914,9 @@ components:
           type: string
         abbreviation:
           type: string
+        dataTypeId:
+          type: integer
+          nullable: true
         isActive:
           type: boolean
 
@@ -3715,6 +4072,63 @@ components:
           type: string
         isActive:
           type: boolean
+
+    NationalKpa:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+        description:
+          type: string
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+      required:
+        - id
+        - name
+        - code
+        - description
+        - isActive
+        - sortOrder
+
+    CreateNationalKpaInput:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        description:
+          type: string
+          default: ""
+        isActive:
+          type: boolean
+          default: true
+        sortOrder:
+          type: integer
+          default: 0
+      required:
+        - name
+        - code
+
+    UpdateNationalKpaInput:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        description:
+          type: string
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
 
     NkpaWeighting:
       type: object
@@ -3903,6 +4317,150 @@ components:
           type: boolean
         sortOrder:
           type: integer
+
+    SdbipFieldConfig:
+      type: object
+      properties:
+        id:
+          type: integer
+        sdbipType:
+          type: string
+          enum: [original, revised, departmental, quarterly, midyear, annual]
+        fieldKind:
+          type: string
+          enum: [primary, custom]
+        fieldKey:
+          type: string
+        fieldLabel:
+          type: string
+        fieldType:
+          type: string
+          enum: [text, number, date, boolean, textarea, select, alphanumeric, percent]
+        isIncluded:
+          type: boolean
+        isRequired:
+          type: boolean
+        isLocked:
+          type: boolean
+        sortOrder:
+          type: integer
+      required:
+        - id
+        - sdbipType
+        - fieldKind
+        - fieldKey
+        - fieldLabel
+        - fieldType
+        - isIncluded
+        - isRequired
+        - isLocked
+        - sortOrder
+
+    SdbipFieldConfigItemInput:
+      type: object
+      properties:
+        fieldKind:
+          type: string
+          enum: [primary, custom]
+        fieldKey:
+          type: string
+        fieldLabel:
+          type: string
+        fieldType:
+          type: string
+          enum: [text, number, date, boolean, textarea, select, alphanumeric, percent]
+          default: text
+        isIncluded:
+          type: boolean
+          default: true
+        isRequired:
+          type: boolean
+          default: false
+        isLocked:
+          type: boolean
+          default: false
+        sortOrder:
+          type: integer
+          default: 0
+      required:
+        - fieldKind
+        - fieldKey
+        - fieldLabel
+
+    SaveSdbipFieldConfigsInput:
+      type: object
+      properties:
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/SdbipFieldConfigItemInput"
+      required:
+        - fields
+
+    SdbipFieldUsage:
+      type: object
+      properties:
+        usage:
+          type: object
+          additionalProperties:
+            type: integer
+      required:
+        - usage
+
+    KpiRatingThreshold:
+      type: object
+      properties:
+        id:
+          type: integer
+        level:
+          type: integer
+        label:
+          type: string
+        descriptor:
+          type: string
+        minPct:
+          type: integer
+          nullable: true
+        maxPct:
+          type: integer
+          nullable: true
+      required:
+        - id
+        - level
+        - label
+        - descriptor
+        - minPct
+        - maxPct
+
+    KpiRatingThresholdItemInput:
+      type: object
+      properties:
+        level:
+          type: integer
+        label:
+          type: string
+        descriptor:
+          type: string
+          default: ""
+        minPct:
+          type: integer
+          nullable: true
+        maxPct:
+          type: integer
+          nullable: true
+      required:
+        - level
+        - label
+
+    SaveKpiRatingThresholdsInput:
+      type: object
+      properties:
+        thresholds:
+          type: array
+          items:
+            $ref: "#/components/schemas/KpiRatingThresholdItemInput"
+      required:
+        - thresholds
 
     CompetencyRequirement:
       type: object
@@ -4133,6 +4691,9 @@ components:
         approvalComments:
           type: string
           nullable: true
+        returnComments:
+          type: string
+          nullable: true
         createdById:
           type: integer
         createdAt:
@@ -4244,6 +4805,13 @@ components:
           type: string
         isCumulative:
           type: boolean
+        customFields:
+          type: object
+          additionalProperties: true
+          nullable: true
+        returnComments:
+          type: string
+          nullable: true
         sortOrder:
           type: integer
         createdAt:
@@ -4342,6 +4910,10 @@ components:
           type: integer
         isCumulative:
           type: boolean
+        customFields:
+          type: object
+          additionalProperties: true
+          nullable: true
       required:
         - kpiNumber
         - description
@@ -4388,6 +4960,10 @@ components:
           type: integer
         isCumulative:
           type: boolean
+        customFields:
+          type: object
+          additionalProperties: true
+          nullable: true
 
     KpiQuarterTarget:
       type: object
@@ -4400,6 +4976,9 @@ components:
           type: integer
         targetValue:
           type: string
+        targetStatus:
+          type: string
+          enum: [active, na, on_hold]
         budgetValue:
           type: number
           nullable: true
@@ -4443,6 +5022,9 @@ components:
                 type: integer
               targetValue:
                 type: string
+              targetStatus:
+                type: string
+                enum: [active, na, on_hold]
               budgetValue:
                 type: number
               evidenceExpected:
@@ -4755,6 +5337,8 @@ components:
           type: integer
         kpiId:
           type: integer
+        periodType:
+          type: string
         quarter:
           type: integer
         actualValue:
@@ -4834,6 +5418,9 @@ components:
     CreateKpiActualInput:
       type: object
       properties:
+        periodType:
+          type: string
+          enum: [quarterly, mid_year, annual]
         quarter:
           type: integer
         actualValue:
@@ -4860,6 +5447,11 @@ components:
           type: string
         analysisNotes:
           type: string
+        qualitativeScorePct:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 200
         lateOverrideReason:
           type: string
       required:
@@ -4893,6 +5485,11 @@ components:
           type: string
         analysisNotes:
           type: string
+        qualitativeScorePct:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 200
 
     KpiEvidenceDocument:
       type: object
@@ -4901,6 +5498,8 @@ components:
           type: integer
         kpiId:
           type: integer
+        periodType:
+          type: string
         quarter:
           type: integer
         fileName:
@@ -5017,6 +5616,9 @@ components:
     UploadEvidenceInput:
       type: object
       properties:
+        periodType:
+          type: string
+          enum: [quarterly, mid_year, annual]
         quarter:
           type: integer
         fileName:
@@ -5029,6 +5631,9 @@ components:
           type: string
         description:
           type: string
+        filePath:
+          type: string
+          description: Object storage path returned by the upload-url flow
       required:
         - quarter
         - fileName
@@ -5174,6 +5779,10 @@ components:
           nullable: true
         isCumulative:
           type: boolean
+        customFields:
+          type: object
+          additionalProperties: true
+          nullable: true
         isInherited:
           type: boolean
         sortOrder:
@@ -5217,6 +5826,10 @@ components:
           type: integer
         isCumulative:
           type: boolean
+        customFields:
+          type: object
+          additionalProperties: true
+          nullable: true
       required:
         - kpiNumber
         - description
@@ -5247,6 +5860,10 @@ components:
           type: integer
         isCumulative:
           type: boolean
+        customFields:
+          type: object
+          additionalProperties: true
+          nullable: true
 
     KpiReviewSubmission:
       type: object
@@ -5691,6 +6308,56 @@ components:
                 type: integer
               periodChange:
                 type: number
+              score:
+                type: [number, "null"]
+                description: Weighted organisational average score for the quarter; null when no data captured
+              target:
+                type: number
+                description: Target score for the quarter (percent)
+
+    OrgScorecardCounts:
+      type: object
+      properties:
+        targetsSet:
+          type: integer
+        achieved:
+          type: integer
+        partiallyAchieved:
+          type: integer
+        notAchieved:
+          type: integer
+        overAchieved:
+          type: integer
+        onHold:
+          type: integer
+        notApplicable:
+          type: integer
+        unableToAssess:
+          type: integer
+
+    OrgScorecardRow:
+      allOf:
+        - $ref: "#/components/schemas/OrgScorecardCounts"
+        - type: object
+          properties:
+            name:
+              type: string
+
+    OrgScorecardData:
+      type: object
+      properties:
+        byNkpa:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrgScorecardRow"
+        nkpaTotal:
+          $ref: "#/components/schemas/OrgScorecardCounts"
+        byDepartment:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrgScorecardRow"
+        departmentTotal:
+          $ref: "#/components/schemas/OrgScorecardCounts"
 
     TopUnderperformingData:
       type: object
@@ -5792,6 +6459,22 @@ components:
                 type: integer
               completenessRate:
                 type: number
+
+    MunicipalHealthData:
+      type: object
+      properties:
+        performance:
+          type: number
+        evidenceCompliance:
+          type: number
+        workflowEfficiency:
+          type: number
+        composite:
+          type: number
+        band:
+          type: string
+        hasData:
+          type: boolean
 
     ReportRun:
       type: object

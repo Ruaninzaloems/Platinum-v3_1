@@ -53,7 +53,7 @@
   <button class="btn" (click)="openImportModal()">
     <app-icon name="upload" [size]="14"></app-icon> Import Employees
   </button>
-  <button class="btn btn-primary" routerLink="/employees/new">
+  <button class="btn btn-primary" routerLink="/payroll/employees/new">
     <app-icon name="plus" [size]="14"></app-icon> Add Employee
   </button>
 </div>
@@ -529,7 +529,7 @@
           <div class="form-grid">
             <div class="form-group full-width">
               <label>Employee</label>
-              <input class="form-control" [value]="terminateEmployee.employee_code + ' - ' + terminateEmployee.first_name + ' ' + terminateEmployee.surname" disabled>
+              <input class="form-control" [value]="terminateEmployee.id + ' | ' + terminateEmployee.employee_code + ' - ' + terminateEmployee.first_name + ' ' + terminateEmployee.surname" disabled>
             </div>
             <div class="form-group">
               <label>Termination Type <span class="required">*</span></label>
@@ -602,7 +602,7 @@
         @if (wizardStep === 4) {
           <div style="font-size:14px;font-weight:600;margin-bottom:12px"><app-icon name="check" [size]="16"></app-icon> Confirm Termination</div>
           <div class="info-grid" style="margin-bottom:16px">
-            <div class="info-item"><div class="info-label">Employee</div><div class="info-value">{{ terminateEmployee.first_name }} {{ terminateEmployee.surname }} ({{ terminateEmployee.employee_code }})</div></div>
+            <div class="info-item"><div class="info-label">Employee</div><div class="info-value">{{ terminateEmployee.id }} | {{ terminateEmployee.employee_code }} - {{ terminateEmployee.first_name }} {{ terminateEmployee.surname }}</div></div>
             <div class="info-item"><div class="info-label">Termination Type</div><div class="info-value">{{ getTermLabel() }}</div></div>
             <div class="info-item"><div class="info-label">Last Working Date</div><div class="info-value">{{ wizardState.last_working_date }}</div></div>
             <div class="info-item"><div class="info-label">Total Payout</div><div class="info-value" style="font-weight:700;color:var(--primary)">{{ formatCurrency(calculatedAmounts?.total_payout || 0) }}</div></div>
@@ -681,7 +681,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn" (click)="showImportModal = false">Cancel</button>
-        <a href="/api/v1/employees/import/template" class="btn" style="text-decoration:none"><app-icon name="download" [size]="14"></app-icon> Download Template</a>
+        <a href="/payroll-app/api/employees/import/template" class="btn" style="text-decoration:none"><app-icon name="download" [size]="14"></app-icon> Download Template</a>
         <button class="btn btn-primary" [disabled]="!importFile || importing" (click)="doImport()">
           @if (importing) { <div class="spinner" style="width:14px;height:14px"></div> Importing... } @else { <app-icon name="upload" [size]="14"></app-icon> Import }
         </button>

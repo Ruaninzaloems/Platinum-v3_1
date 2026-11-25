@@ -10,6 +10,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent],
   templateUrl: './municipality.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './municipality.component.css'
 })
 export class MunicipalityComponent implements OnInit {
@@ -79,7 +80,7 @@ export class MunicipalityComponent implements OnInit {
   }
 
   loadLogo(): void {
-    this.logoUrl = '/api/v1/settings/municipality/logo?t=' + Date.now();
+    this.logoUrl = '/payroll-app/api/settings/municipality/logo?t=' + Date.now();
     const img = new Image();
     img.onload = () => { this.logoUrl = img.src; this.cdr.detectChanges(); };
     img.onerror = () => { this.logoUrl = null; this.cdr.detectChanges(); };
@@ -97,7 +98,7 @@ export class MunicipalityComponent implements OnInit {
     }
     const formData = new FormData();
     formData.append('logo', file);
-    fetch('/api/v1/settings/municipality/logo', { method: 'POST', body: formData })
+    fetch('/payroll-app/api/settings/municipality/logo', { method: 'POST', body: formData })
       .then(r => r.json())
       .then(res => {
         if (res.success) {
@@ -117,7 +118,7 @@ export class MunicipalityComponent implements OnInit {
   }
 
   removeLogo(): void {
-    fetch('/api/v1/settings/municipality/logo', { method: 'DELETE' })
+    fetch('/payroll-app/api/settings/municipality/logo', { method: 'DELETE' })
       .then(r => r.json())
       .then(res => {
         if (res.success) {

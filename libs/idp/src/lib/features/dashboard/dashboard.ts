@@ -304,7 +304,13 @@ export class DashboardComponent implements OnInit {
         this.loading.set(false);
       }
     }).catch(err => {
-      this.errorMessage.set('Failed to load IDP cycles: ' + (err?.message || 'Network error'));
+      const status = err?.status ?? 0;
+      // status 0 after retries usually means a stale cached worker is intercepting
+      // the request — a normal refresh won't clear it, a hard refresh will.
+      const hint = status === 0
+        ? ' If this persists, do a hard refresh (Ctrl+Shift+R) to clear cached data.'
+        : '';
+      this.errorMessage.set('Failed to load IDP cycles: ' + (err?.message || 'Network error') + hint);
       this.loading.set(false);
     });
   }

@@ -2,6 +2,31 @@ import type { Express } from "express";
 import type { Server } from "http";
 import { getSession, requireAuth, handlePlatinumResult } from "./middleware";
 import { platinumGet, platinumPost, loginWithCredentials, logoutSession, isSessionAuthenticated, refreshSessionToken, getPlatinumApiUrl, getPlatinumDbName, clearLockoutCache, SITE_CONFIGS, getSiteConfig } from "../platinum-auth";
+import { isEmsConfigured } from "../ems-db";
+import { resolveAzureUser, computeFinYear } from "../ems-azure-auth";
+import { getEffectiveModuleCodes } from "../ems-modules";
+import { issueGlobalToken } from "../ems-jwt";
+
+/**
+ * Resolve the user's effective side-nav module codes and attach them to the
+ * session userData payload (consumed by apps/shell). Non-fatal: on failure we
+ * leave `modules` unresolved (undefined) rather than a restrictive set — the
+ * shell fails OPEN when the list is absent, so a transient lookup failure (or an
+ * EMS-less deployment) never locks a real user out of every module. An explicit
+ * array — even empty — is what actually enforces access.
+ */
+async function attachModuleAccess(userData: any, dbName: string): Promise<void> {
+  try {
+    userData.modules = await getEffectiveModuleCodes(
+      Number(userData.user_ID),
+      dbName,
+      !!userData.superUser,
+    );
+  } catch (e: any) {
+    console.warn('[Auth] Module-access lookup failed, leaving access unresolved (fail-open):', e.message);
+    delete userData.modules;
+  }
+}
 
 export function registerAuthRoutes(app: Express, httpServer: Server): void {
   app.get("/api/sites", (_req, res) => {
@@ -54,7 +79,7 @@ export function registerAuthRoutes(app: Express, httpServer: Server): void {
         };
         req.session.platinumAuth = demoSession;
         console.log(`[Auth] DEMO fast-path — instant session for ${username} on site ${site.name}`);
-        return res.json({ success: true, user: demoMatch.user, site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass } });
+        return res.json({ success: true, user: demoMatch.user, site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass }, token: issueGlobalToken(demoMatch.user) });
       }
 
       if (demoMode) {
@@ -68,7 +93,7 @@ export function registerAuthRoutes(app: Express, httpServer: Server): void {
         };
         req.session.platinumAuth = demoSession;
         console.log(`[Auth] DEMO MODE — Local session created for ${username} on site ${site.name}`);
-        res.json({ success: true, user: demoUser, site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass } });
+        res.json({ success: true, user: demoUser, site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass }, token: issueGlobalToken(demoUser) });
 
         clearLockoutCache(username);
         loginWithCredentials(username, password, dbName, siteId).then(result => {
@@ -88,11 +113,17 @@ export function registerAuthRoutes(app: Express, httpServer: Server): void {
         return res.status(401).json({ success: false, error: result.error || 'Invalid username or password' });
       }
       req.session.platinumAuth = result.session;
+      // EMS-backed users get their side-nav module access; demo/superusers are
+      // handled client-side (superUser === true → all modules).
+      if (isEmsConfigured() && result.session.userData) {
+        await attachModuleAccess(result.session.userData, dbName || site.dbName);
+      }
       console.log(`[Auth] Live session created for ${username} (user_ID: ${result.session.userData?.user_ID})`);
       res.json({
         success: true,
         user: result.session.userData,
         site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass },
+        token: issueGlobalToken(result.session.userData, dbName || site.dbName),
       });
     } catch (e: any) {
       console.error('[Auth] Login error:', e.message);
@@ -107,9 +138,86 @@ export function registerAuthRoutes(app: Express, httpServer: Server): void {
           userData: demoUser, posCashierId: null, authMode: 'override', loggedIn: true, siteId: site.id
         };
         req.session.platinumAuth = demoSession;
-        return res.json({ success: true, user: demoUser, site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass } });
+        return res.json({ success: true, user: demoUser, site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass }, token: issueGlobalToken(demoUser) });
       }
       return res.status(503).json({ success: false, error: 'Authentication service unavailable' });
+    }
+  });
+
+  // =====================================================
+  // AZURE AD (MSAL) LOGIN
+  // =====================================================
+  // The shell front end performs the MSAL popup, then posts the resulting
+  // claims here. We resolve (find-or-create) the matching EMS user directly in
+  // the EMS database and start a session — no password is involved.
+  app.post("/api/auth/createTokenAzure", async (req, res) => {
+    try {
+      const { azureUid, email, username, siteId, dbName } = req.body;
+      if (!azureUid || !email) {
+        return res.status(400).json({ success: false, error: "azureUid and email are required" });
+      }
+      if (!isEmsConfigured()) {
+        return res.status(503).json({ success: false, error: "EMS database is not configured on the server." });
+      }
+
+      const site = getSiteConfig(siteId || 'george');
+      // user_db keys the user_azure_link rows. Default to the site's db name;
+      // EMS_USER_DB lets you pin it to a fixed tenant label if needed.
+      const userDb = process.env.EMS_USER_DB || dbName || site.dbName;
+
+      const user = await resolveAzureUser({
+        azureUid,
+        email,
+        username: username || email,
+        userDb,
+      });
+
+      if (!user || !user.enabled) {
+        return res.status(401).json({ success: false, error: "Access denied — user is not an enabled EMS user." });
+      }
+
+      const userData = {
+        user_ID: user.userId,
+        userName: user.userName,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        eMail: user.email,
+        enabled: user.enabled,
+        superUser: user.superUser,
+        cashFloat: user.cashFloat,
+        finYear: computeFinYear(),
+        modules: [] as string[],
+      };
+      // Attach the user's effective side-nav module access (non-fatal).
+      await attachModuleAccess(userData, userDb);
+
+      // EMS-direct users have no upstream Platinum bearer token; use a synthetic
+      // marker (same pattern as the demo fast-path) so the session is valid.
+      const session: any = {
+        token: 'ems-azure-' + Date.now(),
+        tokenExpiry: Date.now() + 12 * 60 * 60 * 1000,
+        userData,
+        posCashierId: null,
+        authMode: 'azure',
+        loggedIn: true,
+        siteId: site.id,
+      };
+      req.session.platinumAuth = session;
+
+      console.log(`[Auth] Azure login — ${userData.firstName} ${userData.lastName} (user_ID: ${userData.user_ID}, db: ${userDb}) on site ${site.name}`);
+      return res.json({
+        success: true,
+        user: userData,
+        site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass },
+        token: issueGlobalToken(userData, userDb),
+      });
+    } catch (e: any) {
+      console.error('[Auth] createTokenAzure error:', e.message);
+      const ambiguous = typeof e.message === 'string' && e.message.includes('Multiple users');
+      return res.status(ambiguous ? 409 : 500).json({
+        success: false,
+        error: ambiguous ? e.message : (e.message || 'Azure login failed'),
+      });
     }
   });
 

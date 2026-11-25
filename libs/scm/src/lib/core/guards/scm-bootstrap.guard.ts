@@ -6,6 +6,10 @@ import { AuthService } from '../services/auth.service';
 
 let bootstrapInFlight: Promise<boolean> | null = null;
 
+function hasToken(token: string | null): boolean {
+  return !!token && token.length > 0;
+}
+
 function isJwt(token: string | null): boolean {
   return !!token && token.split('.').length === 3 && token.startsWith('eyJ');
 }
@@ -13,10 +17,22 @@ function isJwt(token: string | null): boolean {
 export const scmBootstrapGuard: CanActivateFn = () => {
   const authService = inject(AuthService);
   const router = inject(Router);
-  const token = localStorage.getItem('platinum_token');
+  const token = localStorage.getItem('scm_token');
 
-  if (isJwt(token)) {
-    return true;
+  if (hasToken(token)) {
+    if (!isJwt(token)) {
+      const storedUser = localStorage.getItem('scm_user');
+      if (storedUser) {
+        try {
+          const user = JSON.parse(storedUser);
+          if (user.superUser || user.role === 'admin') {
+            return true;
+          }
+        } catch {}
+      }
+    } else {
+      return true;
+    }
   }
 
   if (!bootstrapInFlight) {
@@ -24,8 +40,8 @@ export const scmBootstrapGuard: CanActivateFn = () => {
       authService.login('admin', 'admin123').subscribe({
         next: () => {
           bootstrapInFlight = null;
-          const t = localStorage.getItem('platinum_token');
-          resolve(isJwt(t));
+          const t = localStorage.getItem('scm_token');
+          resolve(hasToken(t));
         },
         error: () => {
           bootstrapInFlight = null;

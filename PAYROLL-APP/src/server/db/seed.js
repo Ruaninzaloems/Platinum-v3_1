@@ -41,7 +41,7 @@ async function seed() {
     await client.query(`UPDATE employees SET condition_of_service_id = 2 WHERE condition_of_service_id IN (${legacyCosIds})`);
     await client.query(`UPDATE job_profiles SET condition_of_service_id = 2 WHERE condition_of_service_id IN (${legacyCosIds})`);
     await client.query(`UPDATE positions SET condition_of_service_id = 2 WHERE condition_of_service_id IN (${legacyCosIds})`);
-    await client.query(`UPDATE leave_schemes SET condition_of_service_id = 2 WHERE condition_of_service_id IN (${legacyCosIds})`);
+    await client.query(`UPDATE leave_schemes_legacy SET condition_of_service_id = 2 WHERE condition_of_service_id IN (${legacyCosIds})`);
     await client.query(`DELETE FROM conditions_of_service WHERE code IN ('SALGBC_MAIN', 'TASK_GRADE', 'COUNCILLOR_COS', 'SHIFT_WORKER')`);
     await client.query(`SELECT setval('conditions_of_service_id_seq', COALESCE((SELECT MAX(id) FROM conditions_of_service), 1))`);
 
@@ -191,7 +191,7 @@ async function seed() {
       const r = await client.query(
         `INSERT INTO positions (position_code, title, department_id, division_id, job_profile_id, task_grade_id, employee_type_id, is_hod, parent_position_id, status, funded, start_date, created_by, updated_by)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'VACANT', TRUE, '2024-07-01', 1, 1)
-         ON CONFLICT (position_code) DO UPDATE SET title = EXCLUDED.title RETURNING id`,
+         ON CONFLICT (position_code) DO UPDATE SET title = EXCLUDED.title, parent_position_id = EXCLUDED.parent_position_id RETURNING id`,
         [p[0], p[1], deptMap[p[2]], p[3] ? divMap[p[3]] : null, jpMap[p[4]], tgMap[p[5]], p[6], p[7], parentPosId]
       );
       posIdMap[p[0]] = r.rows[0].id;
@@ -394,15 +394,15 @@ async function seed() {
       }
     }
 
-    await client.query(`INSERT INTO leave_schemes (code, name, employee_type_id, start_date) VALUES
+    await client.query(`INSERT INTO leave_schemes_legacy (code, name, employee_type_id, start_date) VALUES
       ('STAFF_LEAVE', 'Municipal Staff Leave Scheme', $1, '2024-01-01'),
       ('SENIOR_LEAVE', 'Senior Management Leave Scheme', $2, '2024-01-01'),
       ('CLLR_LEAVE', 'Ward Councillor Leave Scheme', $3, '2024-01-01')
     ON CONFLICT (code) DO NOTHING`, [etId('MUNICIPAL'), etId('SENIOR_MGMT'), etId('WARD_CLLR')]);
 
-    const lsId = (await client.query("SELECT id FROM leave_schemes WHERE code = 'STAFF_LEAVE' LIMIT 1")).rows[0].id;
+    const lsId = (await client.query("SELECT id FROM leave_schemes_legacy WHERE code = 'STAFF_LEAVE' LIMIT 1")).rows[0].id;
 
-    await client.query(`INSERT INTO leave_types (code, name, leave_scheme_id, accrual_days, accrual_frequency, max_accumulation, carry_over_days, paid) VALUES
+    await client.query(`INSERT INTO leave_types_legacy (code, name, leave_scheme_id, accrual_days, accrual_frequency, max_accumulation, carry_over_days, paid) VALUES
       ('ANNUAL', 'Annual Leave', $1, 21, 'ANNUAL', 48, 18, TRUE),
       ('SICK', 'Sick Leave', $1, 36, 'ANNUAL', 36, 0, TRUE),
       ('FAMILY', 'Family Responsibility Leave', $1, 5, 'ANNUAL', 5, 0, TRUE),
@@ -428,18 +428,18 @@ async function seed() {
       ('Day of Goodwill', '2025-12-26', TRUE)
     ON CONFLICT (name, holiday_date) DO NOTHING`);
 
-    const ltIds = await client.query('SELECT id, code FROM leave_types ORDER BY id');
+    const ltIds = await client.query('SELECT id, code FROM leave_types_legacy ORDER BY id');
     const ltMap = {};
     for (const l of ltIds.rows) ltMap[l.code] = l.id;
 
     for (const emp of empIds.rows) {
       await client.query(
-        `INSERT INTO employee_leave_balances (employee_id, leave_type_id, balance_days, accrued_days, taken_days, as_at_date)
+        `INSERT INTO employee_leave_balances_legacy (employee_id, leave_type_id, balance_days, accrued_days, taken_days, as_at_date)
          VALUES ($1, $2, $3, 21, $4, CURRENT_DATE) ON CONFLICT DO NOTHING`,
         [emp.id, ltMap['ANNUAL'], 15 + Math.floor(Math.random() * 10), Math.floor(Math.random() * 8)]
       );
       await client.query(
-        `INSERT INTO employee_leave_balances (employee_id, leave_type_id, balance_days, accrued_days, taken_days, as_at_date)
+        `INSERT INTO employee_leave_balances_legacy (employee_id, leave_type_id, balance_days, accrued_days, taken_days, as_at_date)
          VALUES ($1, $2, $3, 36, $4, CURRENT_DATE) ON CONFLICT DO NOTHING`,
         [emp.id, ltMap['SICK'], 30 + Math.floor(Math.random() * 6), Math.floor(Math.random() * 5)]
       );
@@ -453,7 +453,7 @@ async function seed() {
       const month = Math.floor(Math.random() * 3) + 1;
       const statusIdx = Math.floor(Math.random() * leaveStatuses.length);
       await client.query(
-        `INSERT INTO leave_transactions (employee_id, leave_type_id, start_date, end_date, days, status, reason, captured_by)
+        `INSERT INTO leave_transactions_legacy (employee_id, leave_type_id, start_date, end_date, days, status, reason, captured_by)
          VALUES ($1, $2, $3, $4, $5, $6, 'Personal leave request', 1)`,
         [empIds.rows[empIdx].id, ltMap['ANNUAL'],
          `2025-${String(month).padStart(2,'0')}-${String(startDay).padStart(2,'0')}`,
@@ -654,6 +654,230 @@ async function seed() {
     } else {
       console.log('Employee mapping corrections already applied, skipping.');
     }
+
+    const perfCheck = await client.query(`SELECT 1 FROM seed_migrations WHERE name = 'performance_seed_v1'`);
+    if (perfCheck.rows.length === 0) {
+      console.log('Seeding performance management data...');
+
+      const empRows = await client.query(`SELECT id, employee_code FROM employees WHERE status = 'ACTIVE' ORDER BY id LIMIT 25`);
+      const empIds = empRows.rows.map(r => r.id);
+      let deptIds = [];
+      try {
+        const { getDepartments } = require('../routes/department.routes');
+        const depts = await getDepartments();
+        deptIds = depts.map(d => d.id);
+      } catch (e) {
+        console.log('Could not fetch departments from external API, using empty list for goals');
+      }
+
+      await client.query(`INSERT INTO performance_periods (name, financial_year, start_date, end_date, status) VALUES
+        ('Annual Assessment 2024/25', '2024/2025', '2024-07-01', '2025-06-30', 'ACTIVE'),
+        ('Annual Assessment 2023/24', '2023/2024', '2023-07-01', '2024-06-30', 'CLOSED'),
+        ('Mid-Year Review 2024/25', '2024/2025', '2024-07-01', '2024-12-31', 'ACTIVE')
+      ON CONFLICT DO NOTHING`);
+
+      const ppRows = await client.query(`SELECT id FROM performance_periods ORDER BY id`);
+      const ppIds = ppRows.rows.map(r => r.id);
+      const activePeriod = ppIds[0] || 1;
+      const closedPeriod = ppIds[1] || 2;
+
+      const kpas = [
+        ['Financial Management', 'Submit monthly financial reports by the 15th', '%', '12 reports', '100%', 25],
+        ['Service Delivery', 'Achieve 90% resolution of citizen complaints within 5 days', '%', '90%', '90%', 20],
+        ['Governance & Compliance', 'Ensure 100% compliance with MFMA reporting requirements', '%', '100%', '100%', 20],
+        ['Human Resource Management', 'Reduce staff vacancy rate to below 10%', '%', '15%', '<10%', 15],
+        ['Infrastructure Development', 'Complete 80% of capital projects on schedule', '%', '70%', '80%', 20]
+      ];
+
+      for (let i = 0; i < Math.min(empIds.length, 15); i++) {
+        const eId = empIds[i];
+        const kpaSubset = kpas.slice(0, 3 + (i % 3));
+        for (const kpa of kpaSubset) {
+          const score = i < 8 ? (2 + Math.random() * 3).toFixed(1) : null;
+          const status = score ? (parseFloat(score) >= 3 ? 'COMPLETED' : 'REVIEWED') : 'DRAFT';
+          await client.query(
+            `INSERT INTO performance_indicators (period_id, employee_id, kpa, kpi, unit_of_measure, baseline, annual_target, weighting, q1_target, q2_target, q3_target, q4_target, q1_actual, q2_actual, q3_actual, q4_actual, score, status)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+             ON CONFLICT DO NOTHING`,
+            [activePeriod, eId, kpa[0], kpa[1], kpa[2], kpa[3], kpa[4], kpa[5],
+             '25%', '50%', '75%', '100%',
+             score ? `${(20 + Math.random() * 10).toFixed(0)}%` : null,
+             score ? `${(40 + Math.random() * 15).toFixed(0)}%` : null,
+             score ? `${(60 + Math.random() * 20).toFixed(0)}%` : null,
+             score ? `${(75 + Math.random() * 25).toFixed(0)}%` : null,
+             score, status]
+          );
+        }
+      }
+
+      for (let i = 0; i < Math.min(empIds.length, 8); i++) {
+        const eId = empIds[i];
+        const score = (2.5 + Math.random() * 2).toFixed(2);
+        let rating = 'MEETS';
+        if (parseFloat(score) >= 4.5) rating = 'OUTSTANDING';
+        else if (parseFloat(score) >= 3.5) rating = 'EXCEEDS';
+        else if (parseFloat(score) < 2.5) rating = 'BELOW';
+        await client.query(
+          `INSERT INTO performance_reviews (employee_id, period_id, reviewer_id, overall_score, rating, status, comments, reviewed_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+           ON CONFLICT DO NOTHING`,
+          [eId, activePeriod, empIds[0], score, rating,
+           i < 5 ? 'APPROVED' : 'SUBMITTED',
+           'Annual performance review based on KPA/KPI assessment results.']
+        );
+      }
+
+      if (empIds.length >= 5) {
+        await client.query(
+          `INSERT INTO feedback_360 (employee_id, period_id, initiated_by, status, overall_score) VALUES
+            ($1, $5, $1, 'COMPLETED', 3.80),
+            ($2, $5, $1, 'COMPLETED', 4.10),
+            ($3, $5, $1, 'IN_PROGRESS', NULL),
+            ($4, $5, $1, 'DRAFT', NULL)
+          ON CONFLICT DO NOTHING`,
+          [empIds[0], empIds[1], empIds[2], empIds[3], activePeriod]
+        );
+      }
+
+      if (empIds.length >= 12) {
+        await client.query(
+          `INSERT INTO pip_plans (employee_id, initiated_by, reason, start_date, end_date, status) VALUES
+            ($1, $3, 'Consistently below target on financial reporting KPIs. Three consecutive quarters of underperformance.', '2025-01-15', '2025-04-15', 'ACTIVE'),
+            ($2, $3, 'Service delivery targets not met for Q1 and Q2. Customer satisfaction scores declining.', '2024-11-01', '2025-02-28', 'COMPLETED')
+          ON CONFLICT DO NOTHING`,
+          [empIds[10], empIds[11], empIds[0]]
+        );
+
+        const pipRows = await client.query(`SELECT id FROM pip_plans ORDER BY id LIMIT 2`);
+        if (pipRows.rows.length >= 1) {
+          await client.query(
+            `INSERT INTO pip_milestones (pip_id, description, target_date, status) VALUES
+              ($1, 'Complete financial reporting training course', '2025-02-01', 'COMPLETED'),
+              ($1, 'Submit 2 consecutive on-time monthly reports', '2025-03-15', 'IN_PROGRESS'),
+              ($1, 'Achieve 90% accuracy on budget variance analysis', '2025-04-15', 'PENDING')
+            ON CONFLICT DO NOTHING`,
+            [pipRows.rows[0].id]
+          );
+        }
+      }
+
+      await client.query(
+        `INSERT INTO performance_goals (goal_name, description, financial_year, department_id, weight, target_value, status, parent_goal_id) VALUES
+          ('IDP Strategic Objective 1', 'Ensure sustainable financial management and good governance', '2024/2025', NULL, 30, '100% compliance', 'ACTIVE', NULL),
+          ('IDP Strategic Objective 2', 'Improve service delivery to all communities', '2024/2025', NULL, 25, '90% satisfaction', 'ACTIVE', NULL),
+          ('IDP Strategic Objective 3', 'Develop and maintain municipal infrastructure', '2024/2025', NULL, 25, '80% project completion', 'ACTIVE', NULL),
+          ('IDP Strategic Objective 4', 'Build institutional capacity and skills development', '2024/2025', NULL, 20, '95% positions filled', 'ACTIVE', NULL)
+        ON CONFLICT DO NOTHING`
+      );
+
+      const goalRows = await client.query(`SELECT id FROM performance_goals WHERE parent_goal_id IS NULL ORDER BY id LIMIT 4`);
+      if (goalRows.rows.length >= 4) {
+        if (deptIds.length >= 4) {
+          await client.query(
+            `INSERT INTO performance_goals (goal_name, description, financial_year, department_id, weight, target_value, status, parent_goal_id) VALUES
+              ('MFMA Compliance', 'Achieve unqualified audit opinion', '2024/2025', $1, 50, 'Clean audit', 'ACTIVE', $5),
+              ('Revenue Enhancement', 'Increase revenue collection rate to 92%', '2024/2025', $1, 50, '92%', 'ACTIVE', $5),
+              ('Water Service Delivery', 'Reduce water losses to below 25%', '2024/2025', $2, 40, '<25%', 'ACTIVE', $6),
+              ('Road Maintenance', 'Resurface 15km of municipal roads', '2024/2025', $2, 30, '15km', 'ACTIVE', $7),
+              ('Staff Development', 'Implement WSP training programmes', '2024/2025', $3, 60, '80% completion', 'ACTIVE', $8),
+              ('Vacancy Rate', 'Fill critical vacancies within 90 days', '2024/2025', $4, 40, '<10% vacancy', 'ACTIVE', $8)
+            ON CONFLICT DO NOTHING`,
+            [deptIds[1], deptIds[3], deptIds[2], deptIds[0],
+             goalRows.rows[0].id, goalRows.rows[1].id, goalRows.rows[2].id, goalRows.rows[3].id]
+          );
+        } else {
+          await client.query(
+            `INSERT INTO performance_goals (goal_name, description, financial_year, department_id, weight, target_value, status, parent_goal_id) VALUES
+              ('MFMA Compliance', 'Achieve unqualified audit opinion', '2024/2025', NULL, 50, 'Clean audit', 'ACTIVE', $1),
+              ('Revenue Enhancement', 'Increase revenue collection rate to 92%', '2024/2025', NULL, 50, '92%', 'ACTIVE', $1),
+              ('Water Service Delivery', 'Reduce water losses to below 25%', '2024/2025', NULL, 40, '<25%', 'ACTIVE', $2),
+              ('Road Maintenance', 'Resurface 15km of municipal roads', '2024/2025', NULL, 30, '15km', 'ACTIVE', $3),
+              ('Staff Development', 'Implement WSP training programmes', '2024/2025', NULL, 60, '80% completion', 'ACTIVE', $4),
+              ('Vacancy Rate', 'Fill critical vacancies within 90 days', '2024/2025', NULL, 40, '<10% vacancy', 'ACTIVE', $4)
+            ON CONFLICT DO NOTHING`,
+            [goalRows.rows[0].id, goalRows.rows[1].id, goalRows.rows[2].id, goalRows.rows[3].id]
+          );
+        }
+      }
+
+      if (empIds.length >= 5) {
+        await client.query(
+          `INSERT INTO development_plans (employee_id, period_id, plan_type, title, description, provider, start_date, end_date, cost, status, progress) VALUES
+            ($1, $6, 'TRAINING', 'MFMA Financial Management Certificate', 'Complete National Treasury MFMA compliance training', 'National Treasury', '2024-08-01', '2025-01-31', 15000, 'IN_PROGRESS', 65),
+            ($2, $6, 'MENTORING', 'Leadership Development Programme', 'Executive mentoring for senior management development', 'SALGA', '2024-09-01', '2025-03-31', 8500, 'IN_PROGRESS', 40),
+            ($3, $6, 'COACHING', 'Performance Coaching Sessions', 'Monthly coaching to improve service delivery metrics', 'Internal', '2024-07-01', '2025-06-30', 0, 'IN_PROGRESS', 50),
+            ($4, $6, 'TRAINING', 'Supply Chain Management Course', 'CIDB/SCM compliance and procurement best practices', 'LGSETA', '2025-01-15', '2025-06-30', 12000, 'PLANNED', 0),
+            ($5, $6, 'CERTIFICATION', 'Municipal Finance Management Programme', 'NQF Level 7 qualification in public finance', 'Wits University', '2024-07-01', '2025-12-31', 45000, 'IN_PROGRESS', 30)
+          ON CONFLICT DO NOTHING`,
+          [empIds[0], empIds[1], empIds[2], empIds[3], empIds[4], activePeriod]
+        );
+      }
+
+      if (empIds.length >= 4) {
+        await client.query(
+          `INSERT INTO performance_checkins (employee_id, period_id, checkin_type, checkin_date, quarter, summary, achievements, challenges, status) VALUES
+            ($1, $5, 'QUARTERLY', '2024-09-30', 'Q1', 'Strong start to the assessment period. All financial reports submitted on time.', 'Met all reporting deadlines; budget variance under 2%', 'Staff shortages in accounts payable section', 'ACKNOWLEDGED'),
+            ($2, $5, 'QUARTERLY', '2024-09-30', 'Q1', 'Service delivery targets progressing well. Community satisfaction survey initiated.', 'Resolved 85% of complaints within SLA', 'Infrastructure backlog affecting response times', 'ACKNOWLEDGED'),
+            ($1, $5, 'QUARTERLY', '2024-12-31', 'Q2', 'Mid-year review completed. Slight improvement in compliance metrics.', 'Achieved 95% MFMA compliance score', 'Year-end audit preparation consuming significant resources', 'SUBMITTED'),
+            ($3, $5, 'MONTHLY', '2024-10-31', NULL, 'Monthly progress check - infrastructure projects on track.', 'Completed 3 road maintenance projects', 'Material supply chain delays', 'ACKNOWLEDGED'),
+            ($4, $5, 'QUARTERLY', '2024-09-30', 'Q1', 'HR targets partially met. Recruitment drive in progress.', 'Filled 5 critical vacancies', 'Extended vetting process for senior positions', 'ACKNOWLEDGED')
+          ON CONFLICT DO NOTHING`,
+          [empIds[0], empIds[1], empIds[2], empIds[3], activePeriod]
+        );
+      }
+
+      await client.query(`INSERT INTO seed_migrations (name) VALUES ('performance_seed_v1')`);
+      console.log('Performance management seed data applied.');
+    } else {
+      console.log('Performance seed data already applied, skipping.');
+    }
+
+    const wfMigCheck = await client.query(`SELECT 1 FROM seed_migrations WHERE name = 'approval_workflow_history_v1'`);
+    if (wfMigCheck.rows.length === 0) {
+      console.log('Applying approval workflow history migration...');
+      await client.query(`CREATE TABLE IF NOT EXISTS wage_transaction_history (
+        id SERIAL PRIMARY KEY,
+        wage_transaction_id INTEGER NOT NULL REFERENCES wage_transactions(id) ON DELETE CASCADE,
+        action VARCHAR(50) NOT NULL,
+        performed_by INTEGER REFERENCES users(id),
+        performed_at TIMESTAMP DEFAULT NOW(),
+        comments TEXT,
+        step_number INTEGER,
+        status_after VARCHAR(20)
+      )`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_wth_wage_tx_id ON wage_transaction_history(wage_transaction_id)`);
+      await client.query(`DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='claim_history' AND column_name='step_number') THEN
+          ALTER TABLE claim_history ADD COLUMN step_number INTEGER;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='claim_history' AND column_name='status_after') THEN
+          ALTER TABLE claim_history ADD COLUMN status_after VARCHAR(20);
+        END IF;
+      END $$`);
+      await client.query(`DO $$ BEGIN
+        ALTER TABLE wage_transactions DROP CONSTRAINT IF EXISTS wage_transactions_status_check;
+        ALTER TABLE wage_transactions ADD CONSTRAINT wage_transactions_status_check
+          CHECK (status IN ('PENDING','APPROVED','REJECTED','RETURNED','PROCESSED'));
+      END $$`);
+      await client.query(`INSERT INTO wage_transaction_history (wage_transaction_id, action, performed_by, comments, step_number, status_after)
+        SELECT wt.id, 'SUBMITTED', wt.created_by, 'Initial submission', NULL, 'PENDING'
+        FROM wage_transactions wt
+        WHERE NOT EXISTS (SELECT 1 FROM wage_transaction_history wth WHERE wth.wage_transaction_id = wt.id)
+      `);
+      await client.query(`INSERT INTO seed_migrations (name) VALUES ('approval_workflow_history_v1')`);
+      console.log('Approval workflow history migration applied.');
+    }
+
+    await client.query(`INSERT INTO users (id, username, email, password_hash, first_name, surname, employee_id, is_active)
+      VALUES
+        (1, 'admin', 'admin@mscoa.dev', '$2b$10$placeholder', 'System', 'Admin', 1, true),
+        (2, 'hr_mgr', 'hr@mscoa.dev', '$2b$10$placeholder', 'HR', 'Manager', 2, true),
+        (3, 'payroll', 'payroll@mscoa.dev', '$2b$10$placeholder', 'Payroll', 'Admin', 3, true),
+        (4, 'supervisor', 'supervisor@mscoa.dev', '$2b$10$placeholder', 'Team', 'Supervisor', 4, true),
+        (5, 'employee', 'employee@mscoa.dev', '$2b$10$placeholder', 'Regular', 'Employee', 5, true)
+      ON CONFLICT (id) DO NOTHING`);
+    await client.query(`SELECT setval('users_id_seq', GREATEST((SELECT COALESCE(MAX(id),0) FROM users), 5))`);
+    console.log('Dev users seeded.');
 
     await client.query('COMMIT');
     console.log('Database seeded successfully!');

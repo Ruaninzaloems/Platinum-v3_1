@@ -9,6 +9,7 @@
 export interface KpiQuarterActual {
   id: number;
   kpiId: number;
+  periodType?: string;
   quarter: number;
   actualValue: string;
   commentary?: string | null;

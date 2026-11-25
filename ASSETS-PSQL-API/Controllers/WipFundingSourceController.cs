@@ -40,6 +40,8 @@ public class WipFundingSourceController : ControllerBase
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var dup = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_Asset_WIPFundingSource"" WHERE LOWER(""SourceDesc"") = LOWER(@WIPFundingSourceDesc)", model) > 0;
+        if (dup) return Conflict(new { error = $"WIP funding source '{model.WIPFundingSourceDesc}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_WIPFundingSource"" (""SourceDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
             VALUES (@WIPFundingSourceDesc, COALESCE(@Enabled, 1), NOW(), 1)
@@ -53,6 +55,8 @@ public class WipFundingSourceController : ControllerBase
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var dup = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_Asset_WIPFundingSource"" WHERE LOWER(""SourceDesc"") = LOWER(@desc) AND ""FundingSourceID"" <> @id", new { desc = model.WIPFundingSourceDesc, id }) > 0;
+        if (dup) return Conflict(new { error = $"WIP funding source '{model.WIPFundingSourceDesc}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_WIPFundingSource""
             SET ""SourceDesc"" = @WIPFundingSourceDesc, ""Enabled"" = @Enabled, ""DateModified"" = NOW()
@@ -97,7 +101,9 @@ public class WipFundingSourceController : ControllerBase
         using var workbook = new XLWorkbook(stream);
         var ws = workbook.Worksheets.First();
         var errors = new List<ImportError>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var rows = new List<string>();
+        var rowNums = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         for (int r = 2; r <= ws.LastRowUsed()?.RowNumber(); r++)
         {
@@ -107,7 +113,13 @@ public class WipFundingSourceController : ControllerBase
                 errors.Add(new ImportError { Row = r, Column = "Funding Source", Value = val, Message = "Required field is empty" });
                 continue;
             }
+            if (!seen.Add(val))
+            {
+                errors.Add(new ImportError { Row = r, Column = "Funding Source", Value = val, Message = $"Duplicate: '{val}' appears more than once in the file" });
+                continue;
+            }
             rows.Add(val);
+            rowNums[val] = r;
         }
 
         if (errors.Count > 0)
@@ -115,15 +127,24 @@ public class WipFundingSourceController : ControllerBase
 
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
-        await using var txn = await conn.BeginTransactionAsync();
 
+        var dbErrors = new List<ImportError>();
+        foreach (var val in rows)
+        {
+            var exists = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_Asset_WIPFundingSource"" WHERE LOWER(""SourceDesc"") = LOWER(@val)", new { val }) > 0;
+            if (exists)
+                dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(val, out var rn) ? rn : 0, Column = "Funding Source", Value = val, Message = $"Duplicate: '{val}' already exists in the database" });
+        }
+        if (dbErrors.Count > 0)
+            return BadRequest(new ImportResult { Success = false, Errors = dbErrors });
+
+        await using var txn = await conn.BeginTransactionAsync();
         foreach (var val in rows)
         {
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_WIPFundingSource"" (""SourceDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
                 VALUES (@val, 1, NOW(), 1)", new { val }, txn);
         }
-
         await txn.CommitAsync();
         return Ok(new ImportResult { Success = true, Imported = rows.Count });
     }

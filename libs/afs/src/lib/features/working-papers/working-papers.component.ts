@@ -13,6 +13,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService } from '../../core/services/api.service';
 import { WorkingPaper, Compilation } from '../../core/models/interfaces';
 import { DocumentManagementService, DmsDocument } from '../document-management/document-management.service';
+import { AfsSharePointService } from '../../core/services/afs-sharepoint.service';
+import { environment } from '../../environment';
 import { DocumentUploadDialogComponent } from '../document-management/document-upload-dialog.component';
 import { DocumentPickerComponent } from '../document-management/document-picker.component';
 
@@ -217,10 +219,20 @@ export class CreateWorkingPaperDialogComponent {
                                   <div class="entry-item" style="display: flex; align-items: center; gap: 12px;">
                                     <mat-icon style="color: var(--platinum-text-muted);">insert_drive_file</mat-icon>
                                     <div style="flex: 1;">
-                                      <div style="font-size: 13px; font-weight: 500;">{{ doc.originalName || doc.fileName }}</div>
+                                      <div style="font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+                                        <span>{{ doc.originalName || doc.fileName }}</span>
+                                        @if (doc.storageProvider === 'sharepoint') {
+                                          <span class="sp-badge" matTooltip="Stored in SharePoint">
+                                            <mat-icon class="sp-badge-icon">cloud_done</mat-icon> SharePoint
+                                          </span>
+                                        }
+                                      </div>
                                       <div style="font-size: 11px; color: var(--platinum-text-muted);">{{ doc.documentType || 'working_paper' }} · {{ formatFileSize(doc.fileSize) }} · {{ doc.createdAt | date:'shortDate' }}</div>
                                     </div>
-                                    <button mat-icon-button matTooltip="Download document" (click)="downloadDoc(doc.id); $event.stopPropagation()">
+                                    <button mat-icon-button matTooltip="Open document" (click)="openDoc(doc); $event.stopPropagation()">
+                                      <mat-icon>open_in_new</mat-icon>
+                                    </button>
+                                    <button mat-icon-button matTooltip="Download document" (click)="downloadDoc(doc); $event.stopPropagation()">
                                       <mat-icon>download</mat-icon>
                                     </button>
                                   </div>
@@ -248,6 +260,7 @@ export class WorkingPapersComponent implements OnInit {
   private api = inject(ApiService);
   private dialog = inject(MatDialog);
   private dms = inject(DocumentManagementService);
+  private afsSp = inject(AfsSharePointService);
 
   workingPapers = signal<WorkingPaper[]>([]);
   loading = signal(false);
@@ -351,8 +364,25 @@ export class WorkingPapersComponent implements OnInit {
     });
   }
 
-  downloadDoc(docId: string) {
-    window.open(`/api/documents/${docId}/download`, '_blank');
+  downloadDoc(doc: DmsDocument) {
+    const sp = (doc as any).__spItem;
+    if (doc.storageProvider === 'sharepoint' && sp) {
+      this.afsSp.downloadAfsDocument(sp).catch(() => {
+        // fall back to opening the SharePoint web URL if direct download fails
+        if (sp.webUrl) window.open(sp.webUrl, '_blank');
+      });
+      return;
+    }
+    window.open(`${environment.apiPrefix}/api/documents/${doc.id}/download`, '_blank');
+  }
+
+  openDoc(doc: DmsDocument) {
+    const sp = (doc as any).__spItem;
+    if (doc.storageProvider === 'sharepoint' && sp?.webUrl) {
+      window.open(sp.webUrl, '_blank');   // open the file in SharePoint
+      return;
+    }
+    window.open(`${environment.apiPrefix}/api/documents/${doc.id}/download`, '_blank');
   }
 
   formatFileSize(bytes: number): string {

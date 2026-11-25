@@ -1,43 +1,30 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Globalization;
-using System.Diagnostics;
 using AssetManagement.Data;
 using AssetManagement.Middleware;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
-void StartBackgroundService(string workDir, string cmd, string args2)
+// ---------- Global App Settings (../.env) ----------
+// Loads the monorepo-root .env (see .env.example) into this process's
+// environment before configuration binds — DbConnectionFactory reads
+// DATABASE_URL/POSTGRES_URL from here. A real environment variable (Azure
+// App Setting, CI, an explicit export) always wins.
+static void LoadRootEnv()
 {
-    try
+    var envPath = Path.Combine(Directory.GetCurrentDirectory(), "..", ".env");
+    if (!File.Exists(envPath)) return;
+    foreach (var line in File.ReadAllLines(envPath))
     {
-        var psi = new ProcessStartInfo
-        {
-            FileName = cmd,
-            Arguments = args2,
-            WorkingDirectory = workDir,
-            UseShellExecute = false,
-            RedirectStandardOutput = false,
-            RedirectStandardError = false,
-            CreateNoWindow = true
-        };
-        Process.Start(psi);
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"[StartBackgroundService] Failed to start {cmd} {args2}: {ex.Message}");
+        var trimmed = line.Trim();
+        if (trimmed.Length == 0 || trimmed.StartsWith('#')) continue;
+        var idx = trimmed.IndexOf('=');
+        if (idx <= 0) continue;
+        var key = trimmed[..idx].Trim();
+        var value = trimmed[(idx + 1)..].Trim();
+        if (Environment.GetEnvironmentVariable(key) is null)
+            Environment.SetEnvironmentVariable(key, value);
     }
 }
-
-var workspace = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
-
-StartBackgroundService(workspace, "/bin/bash", "-c \"PORT=3004 AFS-UI/api/node_modules/.bin/tsx AFS-UI/api/index.ts\"");
-StartBackgroundService(workspace, "/bin/bash", "-c \"cd POS-API && PORT=3003 npx tsx index.ts\"");
-StartBackgroundService(workspace, "/bin/bash", "-c \"cd PAYROLL-APP && PORT=6000 node src/server/index.js\"");
-StartBackgroundService(workspace, "/bin/bash", "-c \"cd IDP-UI/PlatinumIDP && dotnet run\"");
-StartBackgroundService(workspace, "/bin/bash", "-c \"cd SCM-UI && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 4200 --proxy-config proxy.conf.json --serve-path /scm-app/\"");
-StartBackgroundService(workspace, "/bin/bash", "-c \"cd AFS-UI/client && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 8000 --proxy-config proxy.conf.json --serve-path /afs-app/\"");
-StartBackgroundService(workspace, "/bin/bash", "-c \"cd ASSETS-UI && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 5000 --proxy-config proxy.conf.json\"");
-
-Console.WriteLine("[Backend API] Background services launched.");
+LoadRootEnv();
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,11 +57,23 @@ builder.Services.AddTransient<AssetManagement.Services.BulkUploadValidationServi
 builder.Services.AddScoped<AssetManagement.Services.LookupService>();
 builder.Services.AddScoped<AssetManagement.Services.ScmInvoiceService>();
 builder.Services.AddScoped<AssetManagement.Services.ScmUnbundlingService>();
+builder.Services.AddScoped<AssetManagement.Services.EmailService>();
 builder.Services.AddScoped<AssetManagement.Services.LocationService>();
 builder.Services.AddHttpClient("internal", client => { client.BaseAddress = new Uri("http://localhost:3000"); client.Timeout = TimeSpan.FromMinutes(10); });
 var mssqlApiBaseUrl = builder.Configuration["MssqlApi:BaseUrl"] ?? "http://localhost:3001";
 builder.Services.AddHttpClient("mssql-api", client => { client.BaseAddress = new Uri(mssqlApiBaseUrl); client.Timeout = TimeSpan.FromMinutes(5); });
 builder.Services.AddScoped<AssetManagement.Services.InternalApiClient>();
+builder.Services.AddScoped<AssetManagement.Services.LedGeneralLedgerService>();
+
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProvider>();
+});
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProviderOptions>(options =>
+{
+    options.Level = System.IO.Compression.CompressionLevel.Fastest;
+});
 
 builder.Services.AddCors(options =>
 {
@@ -119,6 +118,7 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "swagger";
 });
 
+app.UseResponseCompression();
 app.UseCors();
 app.UseMiddleware<ErrorHandlerMiddleware>();
 app.UseRouting();
@@ -130,6 +130,9 @@ using (var scope = app.Services.CreateScope())
     await db.InitializeAsync();
 }
 
-app.Urls.Add("http://0.0.0.0:3000");
+
+
+var port = Environment.GetEnvironmentVariable("PORT") ?? "3000";
+app.Urls.Add($"http://0.0.0.0:{port}");
 
 app.Run();

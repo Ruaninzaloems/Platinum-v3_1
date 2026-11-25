@@ -18,6 +18,9 @@
       <button class="btn btn-primary" (click)="saveAll()"><app-icon name="check" [size]="14"></app-icon> Save All Changes</button>
     }
     <button class="btn" (click)="openCopyModal()"><app-icon name="file" [size]="14"></app-icon> Copy to New Year</button>
+    <button class="btn btn-primary" (click)="loadSarsDefaults()" [disabled]="!canLoadDefaults || loadingDefaults" [title]="canLoadDefaults ? 'Load official SARS tax values for the selected year' : 'No SARS defaults available for the selected year'">
+      <app-icon name="download" [size]="14"></app-icon> {{ loadingDefaults ? 'Loading...' : 'Load SARS Defaults' }}
+    </button>
   </div>
 
   @if (taxData) {

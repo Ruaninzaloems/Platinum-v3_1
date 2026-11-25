@@ -39,6 +39,7 @@ export class WipTransferApprovalsComponent implements OnInit, OnDestroy {
   approving = false;
   rejecting = false;
   approvalProgress = signal<any>(null);
+  approveError = signal<string>('');
   private progressInterval: any = null;
   private currentApproveKey: string = '';
 
@@ -127,6 +128,7 @@ export class WipTransferApprovalsComponent implements OnInit, OnDestroy {
     this.projects = [];
     this.scoaItems = [];
     this.approvalProgress.set(null);
+    this.approveError.set('');
   }
 
   onYearChange(): void {
@@ -198,6 +200,7 @@ export class WipTransferApprovalsComponent implements OnInit, OnDestroy {
   approve(): void {
     if (!this.canApprove()) return;
     this.approving = true;
+    this.approveError.set('');
     this.approvalProgress.set({ phase: 'approving', percent: 5, message: 'Initiating WIP transfer...' });
     var jobId = this.selectedJob.id;
     this.currentApproveKey = 'approve_wip_' + jobId;
@@ -226,7 +229,14 @@ export class WipTransferApprovalsComponent implements OnInit, OnDestroy {
         this.stopPolling();
         this.approving = false;
         this.approvalProgress.set(null);
-        this.snackBar.open(err.error?.error || err.error?.detail || 'Approval failed', 'OK', { duration: 8000 });
+        var base = err.error?.error || err.message || 'Approval failed';
+        var detail = err.error?.detail;
+        var inserted = err.error?.insertedBeforeFailure;
+        var msg = base;
+        if (detail) msg += ': ' + detail;
+        if (inserted != null) msg += ' (' + inserted + ' record(s) inserted before failure)';
+        this.approveError.set(msg);
+        this.snackBar.open(msg, 'Dismiss', { duration: 12000 });
       }.bind(this)
     });
   }

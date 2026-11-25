@@ -1,0 +1,86 @@
+<div class="config-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Clearing Accounts</h1>
+      <p class="page-subtitle">Configure GL clearing account project items for the dashboard balance tile</p>
+    </div>
+    <div class="header-actions">
+      <button mat-flat-button class="btn-primary" (click)="openAdd()">
+        <mat-icon>add</mat-icon> Add Clearing Account
+      </button>
+    </div>
+  </div>
+
+  @if (showForm()) {
+    <div class="form-card">
+      <h3 class="form-title">Add Clearing Account</h3>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Project *</label>
+          <select class="form-select" [ngModel]="selectedProjectId" (ngModelChange)="onProjectChange($event)">
+            <option [ngValue]="null">-- Select Project --</option>
+            @for (proj of projects(); track proj.projectId) {
+              <option [ngValue]="proj.projectId">{{proj.projectCode}} – {{proj.projectName}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Project Item (SCOA) *</label>
+          <select class="form-select" [(ngModel)]="selectedPlanProjectItemId" [disabled]="!selectedProjectId">
+            <option [ngValue]="null">-- Select Item --</option>
+            @for (pi of projectItems(); track pi.planProjectItemId) {
+              <option [ngValue]="pi.planProjectItemId">{{pi.scoaDesc || pi.scoaCode}}</option>
+            }
+          </select>
+          @if (projectItemsLoading) { <span class="loading-hint">Loading items...</span> }
+        </div>
+      </div>
+      <div class="form-actions">
+        <button mat-stroked-button (click)="cancelForm()">Cancel</button>
+        <button mat-flat-button class="btn-primary" (click)="save()" [disabled]="!isFormValid() || saving()">
+          {{saving() ? 'Saving...' : 'Add'}}
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="loading-container"><mat-spinner diameter="32"></mat-spinner></div>
+  } @else {
+    <div class="table-card">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Project</th>
+            <th>SCOA Code</th>
+            <th>Description</th>
+            <th>Fin Year</th>
+            <th>Date Added</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of items(); track item.id) {
+            <tr>
+              <td class="id-cell">{{item.id}}</td>
+              <td>{{item.projectCode ? item.projectCode + ' – ' + item.projectName : '—'}}</td>
+              <td class="code-cell">{{item.scoaCode || '—'}}</td>
+              <td>{{item.scoaShortDesc || '—'}}</td>
+              <td>{{item.finYear || '—'}}</td>
+              <td class="date-cell">{{item.dateCaptured | date:'mediumDate'}}</td>
+              <td class="actions-cell">
+                <button mat-icon-button (click)="confirmDelete(item)" title="Remove">
+                  <mat-icon class="action-icon delete">delete</mat-icon>
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (items().length === 0) {
+        <div class="empty-state">No clearing accounts configured. Add one to enable the dashboard balance tile.</div>
+      }
+    </div>
+  }
+</div>

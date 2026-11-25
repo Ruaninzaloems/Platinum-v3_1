@@ -13,6 +13,7 @@ import { DateInputComponent } from '../../../shared/components/date-input/date-i
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent, CurrencyZarPipe, DateSaPipe, DateInputComponent],
   templateUrl: './upper-limits.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './upper-limits.component.css'
 })
 export class UpperLimitsComponent implements OnInit {
@@ -145,7 +146,10 @@ export class UpperLimitsComponent implements OnInit {
       : this.api.post('/settings/upper-limits', payload);
     obs.subscribe({
       next: () => { this.ui.toast('success', this.editItem.id ? 'Updated' : 'Created', 'Upper limit saved'); this.showModal = false; this.load(); },
-      error: () => this.ui.toast('error', 'Error', 'Failed to save')
+      error: (err: any) => {
+        const msg = err?.error?.error?.message || err?.error?.message || 'Failed to save';
+        this.ui.toast('error', 'Error', msg);
+      }
     });
   }
 
@@ -154,7 +158,10 @@ export class UpperLimitsComponent implements OnInit {
     if (confirmed) {
       this.api.delete(`/settings/upper-limits/${item.id}`).subscribe({
         next: () => { this.ui.toast('success', 'Deleted', 'Upper limit removed'); this.load(); },
-        error: () => this.ui.toast('error', 'Error', 'Failed to delete')
+        error: (err: any) => {
+          const msg = err?.error?.error?.message || err?.error?.message || 'Failed to delete';
+          this.ui.toast('error', 'Error', msg);
+        }
       });
     }
   }

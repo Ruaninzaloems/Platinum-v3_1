@@ -1,0 +1,432 @@
+@if (loading()) {
+  <div class="loading-container">
+    <mat-spinner diameter="36"></mat-spinner>
+    <span>Loading maintenance plan…</span>
+  </div>
+} @else {
+  <div class="page-header">
+    <div class="back-section">
+      <button class="btn-back" (click)="goBack()">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <div>
+        <h1>{{plan()?.planName}}</h1>
+        <p class="subtitle">
+          {{plan()?.maintenanceTypeDesc}} &nbsp;·&nbsp; {{plan()?.frequencyDesc}}
+          @if (plan()?.assetBarcode) {
+            &nbsp;·&nbsp; {{plan()?.assetBarcode}}
+          }
+        </p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span class="status-badge" [class.active]="plan()?.isActive" [class.inactive]="!plan()?.isActive">
+        {{plan()?.isActive ? 'Active' : 'Inactive'}}
+      </span>
+      <button class="btn-danger-sm" (click)="deletePlan()">
+        <mat-icon>delete</mat-icon> Delete Plan
+      </button>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn" [class.active]="activeTab() === 'details'" (click)="setTab('details')">
+      <mat-icon>info</mat-icon> Plan Details
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'assets'" (click)="setTab('assets')">
+      <mat-icon>inventory_2</mat-icon> Assets
+      @if (planAssets().length > 0) {
+        <span class="tab-count">{{planAssets().length}}</span>
+      }
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'schedule'" (click)="setTab('schedule')">
+      <mat-icon>calendar_month</mat-icon> Schedule
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'workorders'" (click)="setTab('workorders')">
+      <mat-icon>construction</mat-icon> Work Orders
+    </button>
+  </div>
+
+  @if (activeTab() === 'details') {
+    <div class="form-card">
+      <h3>Plan Information</h3>
+      <div class="form-grid">
+        <div class="form-group full-width">
+          <label>Plan Name *</label>
+          <input type="text" [(ngModel)]="form.planName">
+        </div>
+        <div class="form-group">
+          <label>Maintenance Type *</label>
+          <select [(ngModel)]="form.maintenanceTypeId">
+            @for (t of maintTypes(); track t.maintTypeId) {
+              <option [value]="t.maintTypeId">{{t.maintTypeDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Frequency *</label>
+          <select [(ngModel)]="form.frequencyId">
+            @for (f of frequencies(); track f.frequencyId) {
+              <option [value]="f.frequencyId">{{f.frequencyDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Start Date</label>
+          <input type="date" [(ngModel)]="form.startDate">
+        </div>
+        <div class="form-group">
+          <label>Estimated Cost (R)</label>
+          <input type="number" [(ngModel)]="form.estimatedCost" min="0" step="0.01">
+        </div>
+        <div class="form-group">
+          <label>mSCOA Project</label>
+          <select [(ngModel)]="form.debitProjectId" (ngModelChange)="onProjectChange()">
+            <option [ngValue]="null">Select Project</option>
+            @for (p of planProjects(); track p.projectId) {
+              <option [value]="p.projectId">{{p.projectName}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-group">
+          <label>mSCOA Project Item</label>
+          <select [(ngModel)]="form.planProjectItemId" [disabled]="!form.debitProjectId">
+            <option [ngValue]="null">Select Item</option>
+            @for (pi of debitScoaItems(); track pi.planProjectItemId) {
+              <option [value]="pi.planProjectItemId">{{pi.scoaDesc || pi.scoaShortDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Active</label>
+          <select [(ngModel)]="form.isActive">
+            <option [ngValue]="true">Yes</option>
+            <option [ngValue]="false">No</option>
+          </select>
+        </div>
+        <div class="form-group full-width">
+          <label>Description</label>
+          <textarea [(ngModel)]="form.description" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-primary" (click)="savePlan()" [disabled]="saving()">
+          @if (saving()) { <mat-spinner diameter="16"></mat-spinner> }
+          Save Changes
+        </button>
+      </div>
+    </div>
+
+  }
+
+  @if (activeTab() === 'assets') {
+    <div class="content-card">
+      <div class="section-header">
+        <h3>Linked Assets</h3>
+        <button class="btn-add" (click)="openAddAssetPanel()">
+          <mat-icon>add</mat-icon> Add Asset
+        </button>
+      </div>
+
+      @if (assetsLoading()) {
+        <div class="loading-container">
+          <mat-spinner diameter="24"></mat-spinner>
+          <span>Loading assets…</span>
+        </div>
+      } @else if (planAssets().length === 0) {
+        <div class="empty-inline">No assets linked to this plan. Use "Add Asset" to link assets.</div>
+      } @else {
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Asset ID</th>
+                <th>Barcode</th>
+                <th>Description</th>
+                <th>Asset Class</th>
+                <th>Department</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (a of planAssets(); track a.assetRegisterItemId; let idx = $index) {
+                <tr>
+                  <td class="sort-num">{{idx + 1}}</td>
+                  <td><span class="barcode-badge">{{a.assetRegisterItemId || '—'}}</span></td>
+                  <td><span class="barcode-badge">{{a.barcode || '—'}}</span></td>
+                  <td>{{a.description}}</td>
+                  <td>{{a.assetClassDesc || '—'}}</td>
+                  <td>{{a.department || '—'}}</td>
+                  <td class="action-cell">
+                    <button class="btn-icon danger" (click)="removeAssetFromPlan(a)" title="Remove">
+                      <mat-icon>remove_circle_outline</mat-icon>
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+
+      @if (showAddAssetPanel()) {
+        <div class="add-asset-panel">
+          <h4>Add Asset to Plan</h4>
+          <div class="add-asset-search-row">
+            <div class="asset-search-wrap">
+              <input
+                type="text"
+                [value]="addAssetSearchTerm"
+                (input)="onAddAssetSearch($event)"
+                (blur)="closeAddAssetDropdown()"
+                (focus)="addAssetShowDropdown = true"
+                placeholder="Search by barcode or description…">
+              @if (addAssetShowDropdown && addAssetResults().length > 0) {
+                <ul class="asset-dropdown">
+                  @for (a of addAssetResults(); track a.assetRegisterItemId) {
+                    <li (mousedown)="selectAddAsset(a)">
+                      <span class="asset-barcode">{{a.barcode || a.assetRegisterItemId}}</span>
+                      <span class="asset-desc">{{a.description}}</span>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+            @if (addAssetSelected()) {
+              <div class="selected-asset-chip">
+                <mat-icon>check_circle</mat-icon>
+                {{addAssetSelected()?.barcode}} — {{addAssetSelected()?.description}}
+                <button class="clear-btn" (click)="clearAddAsset()"><mat-icon>close</mat-icon></button>
+              </div>
+            }
+          </div>
+          <div class="form-actions">
+            <button class="btn-secondary" (click)="closeAddAssetPanel()">Cancel</button>
+            <button class="btn-primary" (click)="confirmAddAsset()" [disabled]="!addAssetSelected() || addingAsset()">
+              @if (addingAsset()) { <mat-spinner diameter="16"></mat-spinner> }
+              Add Asset
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  @if (activeTab() === 'schedule') {
+    <div class="content-card">
+      <div class="section-header">
+        <h3>Maintenance Schedule</h3>
+        <div class="generate-row">
+          <label>Generate</label>
+          <input type="number" [(ngModel)]="generateCount" min="1" max="60" style="width:60px">
+          <label>entries</label>
+          <button class="btn-primary" (click)="generateSchedule()" [disabled]="generating()">
+            @if (generating()) { <mat-spinner diameter="16"></mat-spinner> }
+            <mat-icon>auto_fix_high</mat-icon> Generate
+          </button>
+        </div>
+      </div>
+
+      @if (scheduleLoading()) {
+        <div class="loading-container">
+          <mat-spinner diameter="24"></mat-spinner>
+          <span>Loading schedule…</span>
+        </div>
+      } @else if (schedule().length === 0) {
+        <div class="empty-inline">No schedule entries yet. Use the Generate button to create upcoming maintenance dates.</div>
+      } @else {
+        <div class="schedule-table-wrap">
+          <table class="schedule-table">
+            <thead>
+              <tr>
+                <th>Scheduled Date</th>
+                <th>Status</th>
+                <th>Actual Date</th>
+                <th>Actual Cost</th>
+                <th>Notes</th>
+                <th>Work Order</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (entry of schedule(); track entry.scheduleId) {
+                @if (isEditingSchedule(entry)) {
+                  <tr class="edit-row">
+                    <td>{{formatDate(entry.scheduledDate)}}</td>
+                    <td>
+                      <select [(ngModel)]="scheduleForm.status" class="inline-select">
+                        @for (s of scheduleStatuses; track s) {
+                          <option [value]="s">{{s}}</option>
+                        }
+                      </select>
+                    </td>
+                    <td><input type="date" [(ngModel)]="scheduleForm.actualDate" class="inline-input"></td>
+                    <td><input type="number" [(ngModel)]="scheduleForm.actualCost" min="0" step="0.01" class="inline-input" style="width:100px"></td>
+                    <td><input type="text" [(ngModel)]="scheduleForm.notes" class="inline-input"></td>
+                    <td>
+                      @if (entry.workOrderCount > 0) {
+                        <span class="wo-badge">{{entry.workOrderCount}} WO{{entry.workOrderCount > 1 ? 's' : ''}}</span>
+                      }
+                    </td>
+                    <td>
+                      <button class="btn-save-sm" (click)="saveSchedule(entry)">Save</button>
+                      <button class="btn-cancel-sm" (click)="cancelEditSchedule()">Cancel</button>
+                    </td>
+                  </tr>
+                } @else {
+                  <tr>
+                    <td>{{formatDate(entry.scheduledDate)}}</td>
+                    <td>
+                      <span class="status-badge {{getScheduleStatusClass(entry.status)}}">{{entry.status}}</span>
+                    </td>
+                    <td>{{formatDate(entry.actualDate)}}</td>
+                    <td>{{formatCost(entry.actualCost)}}</td>
+                    <td class="notes-cell">{{entry.notes || '—'}}</td>
+                    <td>
+                      @if (entry.workOrderCount > 0) {
+                        <span class="wo-badge">{{entry.workOrderCount}} WO{{entry.workOrderCount > 1 ? 's' : ''}}</span>
+                      } @else {
+                        <span class="muted">—</span>
+                      }
+                    </td>
+                    <td class="action-cell">
+                      <button class="btn-icon" (click)="startEditSchedule(entry)" title="Edit"><mat-icon>edit</mat-icon></button>
+                      <button class="btn-icon wo-btn" (click)="openRaiseWoForm(entry)" title="Raise Work Order">
+                        <mat-icon>construction</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+
+    @if (showRaiseWoForm()) {
+      <div class="raise-wo-overlay">
+        <div class="raise-wo-panel">
+          <div class="raise-wo-header">
+            <h3>Raise Work Order</h3>
+            <p class="raise-wo-subtitle">
+              Schedule entry: {{formatDate(raiseWoEntry()?.scheduledDate)}}
+            </p>
+          </div>
+          <div class="form-grid raise-wo-grid">
+            <div class="form-group full-width">
+              <label>Work Order Description *</label>
+              <input type="text" [(ngModel)]="raiseWoForm.workOrderDesc">
+            </div>
+            <div class="form-group full-width">
+              <label>Asset *</label>
+              <select [(ngModel)]="raiseWoForm.assetRegisterItemId">
+                <option [ngValue]="null">— Select Asset —</option>
+                @for (a of planAssets(); track a.assetRegisterItemId) {
+                  <option [value]="a.assetRegisterItemId">{{a.barcode ? a.barcode + ' — ' : ''}}{{a.description}}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Work Order Date</label>
+              <input type="date" [(ngModel)]="raiseWoForm.workOrderDate">
+            </div>
+            <div class="form-group">
+              <label>Amount (R)</label>
+              <input type="number" [(ngModel)]="raiseWoForm.amount" min="0" step="0.01">
+            </div>
+            <div class="form-group">
+              <label>Service Group / Maintainer</label>
+              <select [(ngModel)]="raiseWoForm.maintainerId">
+                <option [ngValue]="null">— None —</option>
+                @for (sg of serviceGroups(); track sg.assetServiceGroupId) {
+                  <option [value]="sg.assetServiceGroupId">{{sg.assetServiceGroupDesc}}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group">
+              <label>mSCOA Project</label>
+              <select [(ngModel)]="raiseWoForm.debitProjectId" (ngModelChange)="onWoProjectChange()">
+                <option [ngValue]="null">— None —</option>
+                @for (p of woPlanProjects(); track p.projectId) {
+                  <option [value]="p.projectId">{{p.projectName}}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group">
+              <label>mSCOA Project Item</label>
+              <select [(ngModel)]="raiseWoForm.debitPlanProjectItemId" [disabled]="!raiseWoForm.debitProjectId">
+                <option [ngValue]="null">— None —</option>
+                @for (pi of woDebitScoaItems(); track pi.planProjectItemId) {
+                  <option [value]="pi.planProjectItemId">{{pi.scoaDesc || pi.scoaShortDesc}}</option>
+                }
+              </select>
+            </div>
+          </div>
+          <div class="raise-wo-note">
+            <mat-icon>info</mat-icon>
+            Work order will be set to <strong>Planned</strong> type, <strong>Open</strong> status,
+            and linked to this schedule entry automatically.
+          </div>
+          <div class="form-actions">
+            <button class="btn-secondary" (click)="cancelRaiseWoForm()">Cancel</button>
+            <button class="btn-primary" (click)="submitRaiseWo()" [disabled]="woSubmitting()">
+              @if (woSubmitting()) { <mat-spinner diameter="16"></mat-spinner> }
+              <mat-icon>construction</mat-icon> Create Work Order
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+  }
+
+  @if (activeTab() === 'workorders') {
+    <div class="content-card">
+      <h3>Work Orders</h3>
+      @if (workOrdersLoading()) {
+        <div class="loading-container">
+          <mat-spinner diameter="24"></mat-spinner>
+          <span>Loading work orders…</span>
+        </div>
+      } @else if (workOrders().length === 0) {
+        <div class="empty-inline">No work orders have been raised from this plan yet.</div>
+      } @else {
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>WO #</th>
+                <th>Schedule Date</th>
+                <th>Description</th>
+                <th>Asset</th>
+                <th>Date</th>
+                <th>Amount</th>
+                <th>Type</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (wo of workOrders(); track wo.maintenanceWorksOrderId) {
+                <tr>
+                  <td>
+                    <span class="wo-badge wo-badge-link" (click)="navigateToWorkOrder(wo.maintenanceWorksOrderId)" title="Open Work Order">
+                      #{{wo.maintenanceWorksOrderId}} <mat-icon style="font-size:12px;width:12px;height:12px;vertical-align:middle">open_in_new</mat-icon>
+                    </span>
+                  </td>
+                  <td>{{wo.scheduledDate ? formatDate(wo.scheduledDate) : '—'}}</td>
+                  <td class="desc-cell">{{wo.workOrderDesc}}</td>
+                  <td class="desc-cell">{{wo.assetBarcode ? wo.assetBarcode + ' — ' + wo.assetDescription : wo.assetDescription || '—'}}</td>
+                  <td>{{formatDate(wo.workOrderDate)}}</td>
+                  <td>{{formatCost(wo.amount)}}</td>
+                  <td>{{getWoTypeLabel(wo)}}</td>
+                  <td>{{getWoStatusLabel(wo.workOrderStatusId)}}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+}

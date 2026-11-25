@@ -26,7 +26,7 @@
           @for (c of cases; track c.id) {
             <tr>
               <td><strong>{{ c.case_number }}</strong></td>
-              <td>{{ c.first_name }} {{ c.surname }}</td>
+              <td>{{ c.employee_id || '-' }} | {{ c.employee_code || '-' }} - {{ c.first_name }} {{ c.surname }}</td>
               <td>{{ c.department_name || '-' }}</td>
               <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.charge_description }}</td>
               <td>{{ formatDate(c.offence_date) }}</td>
@@ -55,7 +55,7 @@
     <select class="form-control" style="max-width:350px" [(ngModel)]="progressionEmployeeId">
       <option [ngValue]="null">-- Select Employee --</option>
       @for (e of employees; track e.id) {
-        <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option>
+        <option [ngValue]="e.id">{{ e.id }} | {{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option>
       }
     </select>
     <button class="btn btn-primary" (click)="loadProgression()"><app-icon name="search" [size]="14"></app-icon> View Timeline</button>
@@ -104,7 +104,7 @@
           @for (g of grievances; track g.id) {
             <tr>
               <td><strong>{{ g.grievance_number }}</strong></td>
-              <td>{{ g.first_name }} {{ g.surname }}</td>
+              <td>{{ g.employee_id || '-' }} | {{ g.employee_code || '-' }} - {{ g.first_name }} {{ g.surname }}</td>
               <td>{{ g.category || '-' }}</td>
               <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ g.description }}</td>
               <td>{{ formatDate(g.date_submitted) }}</td>
@@ -133,7 +133,7 @@
       <div class="modal-body">
         <div class="form-group"><label>Employee</label>
           <select class="form-control" [(ngModel)]="caseForm.employee_id">
-            @for (e of employees; track e.id) { <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option> }
+            @for (e of employees; track e.id) { <option [ngValue]="e.id">{{ e.id }} | {{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option> }
           </select>
         </div>
         <div class="form-group"><label>Charge Description</label><textarea class="form-control" [(ngModel)]="caseForm.charge_description"></textarea></div>
@@ -190,7 +190,7 @@
       <div class="modal-body">
         <div class="form-group"><label>Employee</label>
           <select class="form-control" [(ngModel)]="grievanceForm.employee_id">
-            @for (e of employees; track e.id) { <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option> }
+            @for (e of employees; track e.id) { <option [ngValue]="e.id">{{ e.id }} | {{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option> }
           </select>
         </div>
         <div class="form-group"><label>Category</label>

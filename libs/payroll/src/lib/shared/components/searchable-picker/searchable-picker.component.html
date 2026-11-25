@@ -1,0 +1,78 @@
+<div class="sp-root" [class.is-open]="open" [class.is-disabled]="disabled">
+  <button
+    type="button"
+    class="sp-trigger"
+    [class.is-placeholder]="!selectedItem"
+    [disabled]="disabled"
+    (click)="toggleOpen()"
+  >
+    <span class="sp-trigger-label">{{ loading ? 'Loading...' : triggerLabel }}</span>
+    @if (triggerCountLabel) {
+      <span class="sp-count-badge sp-count-badge--trigger">{{ triggerCountLabel }}</span>
+    }
+    @if (canClear && !loading) {
+      <span
+        class="sp-trigger-clear"
+        role="button"
+        [attr.aria-label]="clearText"
+        title="{{ clearText }}"
+        (click)="clearSelection($event)"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </span>
+    }
+    <span class="sp-trigger-chevron" aria-hidden="true">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </span>
+  </button>
+
+  @if (open) {
+    <div class="sp-popover">
+      <div class="sp-search">
+        <span class="sp-search-icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </span>
+        <input
+          #searchInput
+          type="text"
+          class="sp-search-input"
+          [placeholder]="searchPlaceholder"
+          [(ngModel)]="search"
+          (ngModelChange)="onSearchChange()"
+          (keydown)="onSearchKeydown($event)"
+        />
+        @if (popoverCountLabel) {
+          <span class="sp-count-badge sp-count-badge--popover">{{ popoverCountLabel }}</span>
+        }
+      </div>
+
+      <div class="sp-list">
+        @if (canClear) {
+          <div class="sp-clear-row" (click)="clearSelection()">{{ clearText }}</div>
+        }
+        @if (loading) {
+          <div class="sp-empty">Loading...</div>
+        } @else if (items.length === 0) {
+          <div class="sp-empty">{{ emptyText }}</div>
+        } @else if (filteredItems.length === 0) {
+          <div class="sp-empty">{{ noMatchText }}</div>
+        } @else {
+          @for (item of filteredItems; track trackById($index, item); let i = $index) {
+            <div
+              class="sp-option"
+              [class.is-selected]="isSelected(item)"
+              [class.is-highlighted]="i === highlightIndex"
+              (click)="selectItem(item)"
+              (mouseenter)="highlightIndex = i"
+            >
+              <div class="sp-option-primary">{{ primaryText(item) }}</div>
+              @if (secondaryText(item)) {
+                <div class="sp-option-secondary">{{ secondaryText(item) }}</div>
+              }
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+</div>

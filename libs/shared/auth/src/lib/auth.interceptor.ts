@@ -13,11 +13,30 @@ const FIRST_PARTY_API_PREFIXES = [
   '/payroll-app/api/',
   '/afs-app/api/',
   '/budget-app/api/',
-  '/perf-app/api/',
+  '/insights-app/api/',
 ];
 
-/** Hosts that explicitly accept the SCM Azure JWT bearer token. */
-const SCM_BEARER_HOSTS = ['rep-scm-api.azurewebsites.net'];
+/** Default SCM Azure backend host. Overridable via the SCM_API_URL App Setting, which
+ *  server.js injects as window.__PLATINUM_ENV__.SCM_API_URL (so the host can be changed
+ *  on the web app without a code change). Only used when that setting is absent, i.e.
+ *  local `ng serve` (server.js isn't in the loop there) -- must point at the same host
+ *  production actually uses (platinum-scm-api), not a stale/different deployment;
+ *  confirmed 2026-09-01 that rep-scm-api rejects the shared dev-fallback credentials
+ *  that platinum-scm-api accepts, so local dev was pointed at the wrong backend. */
+const SCM_DEFAULT_URL = 'https://platinum-scm-api.azurewebsites.net';
+
+/** The configured SCM backend host (from the injected runtime env, else the default). */
+function scmHost(): string {
+  const url =
+    (typeof globalThis !== 'undefined' && (globalThis as any).__PLATINUM_ENV__?.SCM_API_URL) ||
+    SCM_DEFAULT_URL;
+  try { return new URL(url).host; } catch { return 'rep-scm-api.azurewebsites.net'; }
+}
+
+/** The George Platinum API (Access Management) — its own .NET backend, Bearer-authenticated.
+ *  Reached via the shell proxy (/george-app/api → georgeplatinumuatapi) to avoid CORS. */
+const GEORGE_PREFIXES = ['/george-app/api/'];
+const GEORGE_HOSTS = ['georgeplatinumuatapi.azurewebsites.net'];
 
 function isFirstPartyApi(url: string): boolean {
   // Same-origin relative URLs starting with one of the proxied prefixes.
@@ -28,7 +47,88 @@ function isFirstPartyApi(url: string): boolean {
 }
 
 function isScmBearerTarget(url: string): boolean {
-  return SCM_BEARER_HOSTS.some(h => url.includes(h));
+  return url.includes(scmHost());
+}
+
+function isGeorgeTarget(url: string): boolean {
+  return GEORGE_PREFIXES.some(p => url.startsWith(p)) || GEORGE_HOSTS.some(h => url.includes(h));
+}
+
+/** The Overtime module's own backend — reads the legacy Platinum permission tables
+ *  (Sys_RolePermission / User_UserRoles) keyed by User_UserDetail.UserName. It has no
+ *  concept of the shell's session; the shell must bridge its real POS-authenticated
+ *  identity in via X-Username so DevCurrentUserService resolves the right person
+ *  instead of falling back to an arbitrary default user. */
+const OVERTIME_PREFIXES = ['/overtime-app/api/'];
+
+function isOvertimeTarget(url: string): boolean {
+  return OVERTIME_PREFIXES.some(p => url.startsWith(p));
+}
+
+/** The Performance module's api-server — identifies the caller via a lowercase
+ *  `x-user` header (username), same bridge shape as Overtime's X-Username. Was
+ *  previously hardcoded to a demo user when perf-app ran as a separate iframed
+ *  app; now that it's native shell code, bridge the shell's real user in. */
+const PERFORMANCE_PREFIXES = ['/insights-app/api/'];
+
+function isPerformanceTarget(url: string): boolean {
+  return PERFORMANCE_PREFIXES.some(p => url.startsWith(p));
+}
+
+/** The Assets module's API: the unprefixed `/api/` root (shell proxies it to ASSETS_API_URL) and
+ *  the legacy `/ASSETS-API/` path. A separately-hosted backend with its own auth, so its 401s
+ *  must not be read as the shell session expiring. `/api/auth/*` is still handled separately. */
+const ASSETS_PREFIXES = ['/api/', '/ASSETS-API/'];
+
+function isAssetsTarget(url: string): boolean {
+  return ASSETS_PREFIXES.some(p => url.startsWith(p));
+}
+
+/** Token for the George API: a dedicated george_token if configured, else the session token. */
+function georgeToken(fallback: string | null): string | null {
+  try {
+    const t = localStorage.getItem('george_token');
+    if (t) return t;
+  } catch { /* ignore */ }
+  return fallback;
+}
+
+/**
+ * Token for the SCM Azure backend: the dedicated scm_token acquired via SCM-API's own
+ * /auth/login (see @platinumv3/scm's AuthService.acquireTokenForDevSession) -- never the
+ * shell's own session token, which SCM-API's JWT middleware will always reject (it's not
+ * a token SCM-API issued). Mirrors georgeToken()'s dedicated-key-first pattern exactly.
+ */
+function scmToken(): string | null {
+  try {
+    return localStorage.getItem('scm_token');
+  } catch { return null; }
+}
+
+/**
+ * Module prefixes that have migrated onto POS-API's global auth JWT
+ * (issued at login by ems-jwt.ts, verified by that module's own backend
+ * instead of trusting an unsigned bridge header). Starts empty -- each
+ * module's prefix is added here as part of its own migration milestone
+ * (Performance -> Payroll -> Overtime -> SCM, per the global-auth plan),
+ * once that backend actually validates the JWT's signature.
+ *
+ * During a module's transition window its OLD bridge header
+ * (X-Username / x-user) keeps being sent alongside the new Authorization
+ * header -- not replaced -- so a backend rollback is a one-line revert with
+ * no shell redeploy needed. Only once a module fully enforces the JWT should
+ * its old header be removed here and its prefix added to the 401-handler's
+ * exclusion list below (a genuinely expired global session should then log
+ * the user out, since a 401 from that module now means the real thing).
+ */
+const GLOBAL_JWT_PREFIXES: string[] = [
+  '/insights-app/api/', // Performance — migrated 2026-09-08, verifies the JWT in api-server/src/Middleware/auth.ts
+  '/payroll-app/api/',  // Payroll — migrated 2026-09-09, verifies the JWT in src/server/middleware/auth.js
+  '/overtime-app/api/', // Overtime — migrated 2026-09-09, verifies the JWT in Program.cs/JwtCurrentUserService.cs
+];
+
+function isGlobalJwtTarget(url: string): boolean {
+  return GLOBAL_JWT_PREFIXES.some(p => url.startsWith(p));
 }
 
 /**
@@ -39,15 +139,41 @@ function isScmBearerTarget(url: string): boolean {
  *  - Authorization: Bearer ONLY when calling the SCM Azure backend that
  *    actually accepts the token. Prevents leaking the SCM JWT to other hosts.
  *  - On 401 from a non-auth endpoint, tears down the local session and
- *    redirects to /login.
+ *    redirects to /login — EXCEPT for the SCM and George backends, whose 401
+ *    just means their own token is missing/invalid (not that the app session
+ *    expired), so they must not bounce the user to /login.
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
   const headers: Record<string, string> = {};
-  if (isScmBearerTarget(req.url)) {
-    const token = auth.getToken();
+  const scm = isScmBearerTarget(req.url);
+  if (scm) {
+    // SCM-API now dual-accepts either its own token or POS-API's global JWT
+    // (see SCM-API/Program.cs's ValidIssuers/IssuerSigningKeys) — prefer the
+    // dedicated scm_token (still minted by bridgeScmAuth() at login) so
+    // scm_perms-shaped authorization keeps working exactly as before, but
+    // fall back to the global token if it's ever unset (e.g. bridgeScmAuth
+    // failed) instead of sending no Authorization header at all.
+    const token = scmToken() || auth.getGlobalToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+  }
+  const george = isGeorgeTarget(req.url);
+  if (george) {
+    const token = georgeToken(auth.getToken());
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+  }
+  if (isOvertimeTarget(req.url)) {
+    const userName = auth.user()?.userName;
+    if (userName) headers['X-Username'] = userName;
+  }
+  if (isPerformanceTarget(req.url)) {
+    const userName = auth.user()?.userName;
+    if (userName) headers['x-user'] = userName;
+  }
+  if (isGlobalJwtTarget(req.url)) {
+    const token = auth.getGlobalToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
 
@@ -56,10 +182,23 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     setHeaders: headers,
   });
 
+  const performance = isPerformanceTarget(req.url);
+  const overtime = isOvertimeTarget(req.url);
+  const assets = isAssetsTarget(req.url);
+
   return next(cloned).pipe(
     catchError((err: HttpErrorResponse) => {
-      if (err.status === 401 && !req.url.includes('/auth/')) {
-        auth.logout().catch(() => router.navigate(['/login']));
+      // A 401 from SCM, George, Performance, Overtime or Assets just means THEIR own
+      // token/header is missing or unrecognised — those backends have no concept of the shell's
+      // session, so a 401 from them must NOT tear down the app session (that's POS-API's domain)
+      // or bounce the user to /login. Without this, clicking into Performance while its backend
+      // rejects the bridged x-user header force-logs-out the entire shell. Assets is the same:
+      // its API is a separately-hosted deployment with its own authentication, and its 401s
+      // were bouncing users to /login the moment they opened the module.
+      if (err.status === 401 && !req.url.includes('/auth/') && !george && !scm && !performance && !overtime && !assets) {
+        // Soft teardown: don't persist the logged-out flag, so an expected upstream 401 doesn't
+        // permanently suppress the auto-admin session on the next reload.
+        auth.logout(false).catch(() => router.navigate(['/login']));
       }
       return throwError(() => err);
     })

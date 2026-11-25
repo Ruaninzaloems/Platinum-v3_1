@@ -1,4 +1,5 @@
-import { pgTable, serial, text, integer, doublePrecision, boolean, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, doublePrecision, boolean, timestamp, date, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { performanceCyclesTable } from "./performance-cycles";
 import { usersTable } from "./users";
 
@@ -7,11 +8,15 @@ export const scorecardsTable = pgTable("scorecards", {
   name: text("name").notNull(),
   cycleId: integer("cycle_id").notNull().references(() => performanceCyclesTable.id),
   scorecardType: text("scorecard_type").notNull().default("organisational"),
+  // For 'revised' scorecards: the approved organisational SDBIP this revision was copied from.
+  parentScorecardId: integer("parent_scorecard_id"),
   departmentId: integer("department_id"),
   status: text("status").notNull().default("Draft"),
   approvedById: integer("approved_by_id").references(() => usersTable.id),
   approvedAt: timestamp("approved_at"),
   approvalComments: text("approval_comments"),
+  returnComments: text("return_comments"),
+  fieldConfigSnapshot: jsonb("field_config_snapshot").$type<Record<string, unknown>[] | null>(),
   createdById: integer("created_by_id").notNull().references(() => usersTable.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -40,16 +45,29 @@ export const scorecardKpisTable = pgTable("scorecard_kpis", {
   kpiGroupId: integer("kpi_group_id"),
   status: text("status").notNull().default("Draft"),
   isCumulative: boolean("is_cumulative").notNull().default(false),
+  customFields: jsonb("custom_fields").$type<Record<string, string | number | boolean | null>>(),
+  returnComments: text("return_comments"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => [
+  // Organisational scorecards use purely numeric KPI numbers (1..N); this partial
+  // unique index makes duplicates impossible at the database level while leaving
+  // free-form numbers on other scorecard types (e.g. "BSD-01") untouched.
+  // Renumbering must use a two-phase update (temp non-numeric values first) to
+  // avoid transient conflicts, since unique indexes are checked per statement.
+  uniqueIndex("scorecard_kpis_scorecard_number_uq")
+    .on(t.scorecardId, t.kpiNumber)
+    .where(sql`${t.kpiNumber} ~ '^[0-9]+$'`),
+]);
 
 export const kpiQuarterTargetsTable = pgTable("kpi_quarter_targets", {
   id: serial("id").primaryKey(),
   kpiId: integer("kpi_id").notNull().references(() => scorecardKpisTable.id),
   quarter: integer("quarter").notNull(),
   targetValue: text("target_value").notNull(),
+  // 'active' | 'na' | 'on_hold' — flagged quarters are excluded from dashboards/statistics.
+  targetStatus: text("target_status").notNull().default("active"),
   budgetValue: doublePrecision("budget_value"),
   evidenceExpected: text("evidence_expected"),
   isApprovedBaseline: boolean("is_approved_baseline").notNull().default(false),

@@ -1,6 +1,7 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { UiService } from '../../../core/services/ui.service';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
@@ -9,7 +10,8 @@ import { StatusBadgeComponent } from '../../../shared/components/status-badge/st
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent],
+  host: { 'data-accent': 'reports' },
+  imports: [CommonModule, FormsModule, RouterLink, IconComponent, StatusBadgeComponent],
   templateUrl: './reports.component.html',
   styleUrl: './reports.component.css'
 })
@@ -188,7 +190,7 @@ export class ReportsComponent implements OnInit {
   }
 
   downloadReport(path: string, name: string): void {
-    window.open(`/api/v1${path}`, '_blank');
+    window.open(`/payroll-app/api${path}`, '_blank');
     this.ui.toast('success', name, `Downloading ${name}`);
   }
 

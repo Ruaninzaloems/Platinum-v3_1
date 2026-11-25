@@ -6,11 +6,12 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService } from '../../core/api.service';
+import { AssetDocumentPanelComponent } from '../../shared/asset-document-panel/asset-document-panel.component';
 
 @Component({
   selector: 'app-prior-period-adjustments',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatIconModule, MatProgressSpinnerModule, MatSnackBarModule, MatTooltipModule],
+  imports: [CommonModule, FormsModule, MatIconModule, MatProgressSpinnerModule, MatSnackBarModule, MatTooltipModule, AssetDocumentPanelComponent],
   templateUrl: './prior-period-adjustments.component.html',
   styleUrls: ['./prior-period-adjustments.component.css']
 })
@@ -75,6 +76,9 @@ export class PriorPeriodAdjustmentsComponent implements OnInit {
   selectedCrScoaItemId: string = '';
 
   submitting = false;
+  submitSuccess = false;
+  lastSubmittedId: number | null = null;
+  lastSubmittedPpaAssetId: number = 0;
 
   reviewFilter: string = 'Pending';
   reviewList = signal<any[]>([]);
@@ -95,6 +99,12 @@ export class PriorPeriodAdjustmentsComponent implements OnInit {
     { value: 7, label: 'January' }, { value: 8, label: 'February' }, { value: 9, label: 'March' },
     { value: 10, label: 'April' }, { value: 11, label: 'May' }, { value: 12, label: 'June' },
   ];
+
+  ppaDocCount = signal(0);
+
+  onPpaDocumentsChanged(docs: any[]) {
+    this.ppaDocCount.set((docs || []).length);
+  }
 
   constructor(private api: ApiService, private snackBar: MatSnackBar) {}
 
@@ -304,8 +314,10 @@ export class PriorPeriodAdjustmentsComponent implements OnInit {
     this.api.submitPriorPeriodAdjustment(body).subscribe({
       next: function(res: any) {
         self.submitting = false;
+        self.lastSubmittedId = res.id ? Number(res.id) : null;
+        self.lastSubmittedPpaAssetId = Number(self.selectedAsset?.AssetRegisterItem_ID || self.selectedAsset?.assetRegisterItem_ID || self.selectedAsset?.assetId) || 0;
+        self.submitSuccess = true;
         self.snackBar.open('Prior period adjustment submitted (ID: ' + res.id + '). Awaiting approval.', 'OK', { duration: 6000 });
-        self.resetCapture();
         self.loadReviewList();
       },
       error: function(err: any) {
@@ -341,6 +353,9 @@ export class PriorPeriodAdjustmentsComponent implements OnInit {
   }
 
   resetCapture(): void {
+    this.submitSuccess = false;
+    this.lastSubmittedId = null;
+    this.lastSubmittedPpaAssetId = 0;
     this.captureStep = 1;
     this.searchId = '';
     this.searchDesc = '';
@@ -455,5 +470,9 @@ export class PriorPeriodAdjustmentsComponent implements OnInit {
     var n = parseFloat(v);
     if (isNaN(n)) return '—';
     return n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  getPpaAssetId(): number {
+    return Number(this.selectedAsset?.AssetRegisterItem_ID || this.selectedAsset?.assetRegisterItem_ID || this.selectedAsset?.assetId) || 0;
   }
 }

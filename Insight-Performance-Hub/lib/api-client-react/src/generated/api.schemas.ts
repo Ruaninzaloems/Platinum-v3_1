@@ -112,13 +112,15 @@ export interface UnitOfMeasure {
   id: number;
   name: string;
   abbreviation: string;
+  dataTypeId?: number | null;
   cycleId: number;
   isActive: boolean;
 }
 
 export interface CreateUnitOfMeasureInput {
   name: string;
-  abbreviation: string;
+  abbreviation?: string;
+  dataTypeId?: number | null;
   cycleId: number;
   isActive?: boolean;
 }
@@ -126,6 +128,7 @@ export interface CreateUnitOfMeasureInput {
 export interface UpdateUnitOfMeasureInput {
   name?: string;
   abbreviation?: string;
+  dataTypeId?: number | null;
   isActive?: boolean;
 }
 
@@ -218,6 +221,31 @@ export interface UpdateScorecardTypeInput {
   code?: string;
   description?: string;
   isActive?: boolean;
+}
+
+export interface NationalKpa {
+  id: number;
+  name: string;
+  code: string;
+  description: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface CreateNationalKpaInput {
+  name: string;
+  code: string;
+  description?: string;
+  isActive?: boolean;
+  sortOrder?: number;
+}
+
+export interface UpdateNationalKpaInput {
+  name?: string;
+  code?: string;
+  description?: string;
+  isActive?: boolean;
+  sortOrder?: number;
 }
 
 export type NkpaWeightingScope =
@@ -368,6 +396,117 @@ export interface UpdateReportFieldInput {
   sortOrder?: number;
 }
 
+export type SdbipFieldConfigSdbipType =
+  (typeof SdbipFieldConfigSdbipType)[keyof typeof SdbipFieldConfigSdbipType];
+
+export const SdbipFieldConfigSdbipType = {
+  original: "original",
+  revised: "revised",
+  departmental: "departmental",
+  quarterly: "quarterly",
+  midyear: "midyear",
+  annual: "annual",
+} as const;
+
+export type SdbipFieldConfigFieldKind =
+  (typeof SdbipFieldConfigFieldKind)[keyof typeof SdbipFieldConfigFieldKind];
+
+export const SdbipFieldConfigFieldKind = {
+  primary: "primary",
+  custom: "custom",
+} as const;
+
+export type SdbipFieldConfigFieldType =
+  (typeof SdbipFieldConfigFieldType)[keyof typeof SdbipFieldConfigFieldType];
+
+export const SdbipFieldConfigFieldType = {
+  text: "text",
+  number: "number",
+  date: "date",
+  boolean: "boolean",
+  textarea: "textarea",
+  select: "select",
+  alphanumeric: "alphanumeric",
+  percent: "percent",
+} as const;
+
+export interface SdbipFieldConfig {
+  id: number;
+  sdbipType: SdbipFieldConfigSdbipType;
+  fieldKind: SdbipFieldConfigFieldKind;
+  fieldKey: string;
+  fieldLabel: string;
+  fieldType: SdbipFieldConfigFieldType;
+  isIncluded: boolean;
+  isRequired: boolean;
+  isLocked: boolean;
+  sortOrder: number;
+}
+
+export type SdbipFieldConfigItemInputFieldKind =
+  (typeof SdbipFieldConfigItemInputFieldKind)[keyof typeof SdbipFieldConfigItemInputFieldKind];
+
+export const SdbipFieldConfigItemInputFieldKind = {
+  primary: "primary",
+  custom: "custom",
+} as const;
+
+export type SdbipFieldConfigItemInputFieldType =
+  (typeof SdbipFieldConfigItemInputFieldType)[keyof typeof SdbipFieldConfigItemInputFieldType];
+
+export const SdbipFieldConfigItemInputFieldType = {
+  text: "text",
+  number: "number",
+  date: "date",
+  boolean: "boolean",
+  textarea: "textarea",
+  select: "select",
+  alphanumeric: "alphanumeric",
+  percent: "percent",
+} as const;
+
+export interface SdbipFieldConfigItemInput {
+  fieldKind: SdbipFieldConfigItemInputFieldKind;
+  fieldKey: string;
+  fieldLabel: string;
+  fieldType?: SdbipFieldConfigItemInputFieldType;
+  isIncluded?: boolean;
+  isRequired?: boolean;
+  isLocked?: boolean;
+  sortOrder?: number;
+}
+
+export interface SaveSdbipFieldConfigsInput {
+  fields: SdbipFieldConfigItemInput[];
+}
+
+export type SdbipFieldUsageUsage = { [key: string]: number };
+
+export interface SdbipFieldUsage {
+  usage: SdbipFieldUsageUsage;
+}
+
+export interface KpiRatingThreshold {
+  id: number;
+  level: number;
+  label: string;
+  descriptor: string;
+  minPct: number | null;
+  maxPct: number | null;
+}
+
+export interface KpiRatingThresholdItemInput {
+  level: number;
+  label: string;
+  descriptor?: string;
+  minPct?: number | null;
+  maxPct?: number | null;
+}
+
+export interface SaveKpiRatingThresholdsInput {
+  thresholds: KpiRatingThresholdItemInput[];
+}
+
 export interface CompetencyRequirement {
   id: number;
   name: string;
@@ -469,6 +608,7 @@ export interface Scorecard {
   approvedById?: number | null;
   approvedAt?: string | null;
   approvalComments?: string | null;
+  returnComments?: string | null;
   createdById: number;
   createdAt?: string;
   updatedAt?: string;
@@ -491,6 +631,8 @@ export interface WorkflowTransitionInput {
   action: string;
   comments?: string;
 }
+
+export type ScorecardKpiCustomFields = { [key: string]: unknown } | null;
 
 export interface ScorecardKpi {
   id: number;
@@ -515,6 +657,8 @@ export interface ScorecardKpi {
   kpiGroupId?: number | null;
   status: string;
   isCumulative: boolean;
+  customFields?: ScorecardKpiCustomFields;
+  returnComments?: string | null;
   sortOrder: number;
   createdAt?: string;
   updatedAt?: string;
@@ -534,6 +678,10 @@ export interface SdbipRevisionLog {
   userName: string;
   createdAt?: string;
 }
+
+export type CreateScorecardKpiInputCustomFields = {
+  [key: string]: unknown;
+} | null;
 
 export interface CreateScorecardKpiInput {
   kpiNumber: string;
@@ -555,7 +703,12 @@ export interface CreateScorecardKpiInput {
   dataTypeId?: number;
   kpiGroupId?: number;
   isCumulative?: boolean;
+  customFields?: CreateScorecardKpiInputCustomFields;
 }
+
+export type UpdateScorecardKpiInputCustomFields = {
+  [key: string]: unknown;
+} | null;
 
 export interface UpdateScorecardKpiInput {
   kpiNumber?: string;
@@ -577,13 +730,24 @@ export interface UpdateScorecardKpiInput {
   dataTypeId?: number;
   kpiGroupId?: number;
   isCumulative?: boolean;
+  customFields?: UpdateScorecardKpiInputCustomFields;
 }
+
+export type KpiQuarterTargetTargetStatus =
+  (typeof KpiQuarterTargetTargetStatus)[keyof typeof KpiQuarterTargetTargetStatus];
+
+export const KpiQuarterTargetTargetStatus = {
+  active: "active",
+  na: "na",
+  on_hold: "on_hold",
+} as const;
 
 export interface KpiQuarterTarget {
   id: number;
   kpiId: number;
   quarter: number;
   targetValue: string;
+  targetStatus?: KpiQuarterTargetTargetStatus;
   budgetValue?: number | null;
   evidenceExpected?: string | null;
   isApprovedBaseline: boolean;
@@ -595,9 +759,19 @@ export interface KpiQuarterTarget {
   updatedAt?: string;
 }
 
+export type UpsertQuarterTargetsInputTargetsItemTargetStatus =
+  (typeof UpsertQuarterTargetsInputTargetsItemTargetStatus)[keyof typeof UpsertQuarterTargetsInputTargetsItemTargetStatus];
+
+export const UpsertQuarterTargetsInputTargetsItemTargetStatus = {
+  active: "active",
+  na: "na",
+  on_hold: "on_hold",
+} as const;
+
 export type UpsertQuarterTargetsInputTargetsItem = {
   quarter: number;
   targetValue: string;
+  targetStatus?: UpsertQuarterTargetsInputTargetsItemTargetStatus;
   budgetValue?: number;
   evidenceExpected?: string;
   revisionReason?: string;
@@ -733,6 +907,7 @@ export interface SdbipRevision {
 export interface KpiQuarterActual {
   id: number;
   kpiId: number;
+  periodType?: string;
   quarter: number;
   actualValue: string;
   commentary?: string | null;
@@ -760,7 +935,17 @@ export interface KpiQuarterActual {
   updatedAt?: string;
 }
 
+export type CreateKpiActualInputPeriodType =
+  (typeof CreateKpiActualInputPeriodType)[keyof typeof CreateKpiActualInputPeriodType];
+
+export const CreateKpiActualInputPeriodType = {
+  quarterly: "quarterly",
+  mid_year: "mid_year",
+  annual: "annual",
+} as const;
+
 export interface CreateKpiActualInput {
+  periodType?: CreateKpiActualInputPeriodType;
   quarter: number;
   actualValue: string;
   commentary?: string;
@@ -774,6 +959,11 @@ export interface CreateKpiActualInput {
   overperformanceReason?: string;
   budgetImplication?: string;
   analysisNotes?: string;
+  /**
+   * @minimum 0
+   * @maximum 200
+   */
+  qualitativeScorePct?: number | null;
   lateOverrideReason?: string;
 }
 
@@ -790,11 +980,17 @@ export interface UpdateKpiActualInput {
   overperformanceReason?: string;
   budgetImplication?: string;
   analysisNotes?: string;
+  /**
+   * @minimum 0
+   * @maximum 200
+   */
+  qualitativeScorePct?: number | null;
 }
 
 export interface KpiEvidenceDocument {
   id: number;
   kpiId: number;
+  periodType?: string;
   quarter: number;
   fileName: string;
   fileSize: number;
@@ -847,13 +1043,25 @@ export interface CreateRemedialActionInput {
   evidenceDocumentId?: number;
 }
 
+export type UploadEvidenceInputPeriodType =
+  (typeof UploadEvidenceInputPeriodType)[keyof typeof UploadEvidenceInputPeriodType];
+
+export const UploadEvidenceInputPeriodType = {
+  quarterly: "quarterly",
+  mid_year: "mid_year",
+  annual: "annual",
+} as const;
+
 export interface UploadEvidenceInput {
+  periodType?: UploadEvidenceInputPeriodType;
   quarter: number;
   fileName: string;
   fileSize: number;
   mimeType: string;
   documentType?: string;
   description?: string;
+  /** Object storage path returned by the upload-url flow */
+  filePath?: string;
 }
 
 export interface UpdateRemedialActionInput {
@@ -911,6 +1119,8 @@ export interface DeptScorecardTransitionInput {
   comments?: string;
 }
 
+export type DeptScorecardKpiCustomFields = { [key: string]: unknown } | null;
+
 export interface DeptScorecardKpi {
   id: number;
   deptScorecardId: number;
@@ -926,11 +1136,14 @@ export interface DeptScorecardKpi {
   weighting: number;
   unitOfMeasureId?: number | null;
   isCumulative?: boolean;
+  customFields?: DeptScorecardKpiCustomFields;
   isInherited?: boolean;
   sortOrder?: number;
   createdAt?: string;
   updatedAt?: string;
 }
+
+export type CreateDeptKpiInputCustomFields = { [key: string]: unknown } | null;
 
 export interface CreateDeptKpiInput {
   parentKpiId?: number;
@@ -945,7 +1158,10 @@ export interface CreateDeptKpiInput {
   weighting?: number;
   unitOfMeasureId?: number;
   isCumulative?: boolean;
+  customFields?: CreateDeptKpiInputCustomFields;
 }
+
+export type UpdateDeptKpiInputCustomFields = { [key: string]: unknown } | null;
 
 export interface UpdateDeptKpiInput {
   kpiNumber?: string;
@@ -959,6 +1175,7 @@ export interface UpdateDeptKpiInput {
   weighting?: number;
   unitOfMeasureId?: number;
   isCumulative?: boolean;
+  customFields?: UpdateDeptKpiInputCustomFields;
 }
 
 export interface KpiReviewSubmission {
@@ -1197,11 +1414,40 @@ export type TrendlineDataQuartersItem = {
   notAchieved?: number;
   total?: number;
   periodChange?: number;
+  /**
+   * Weighted organisational average score for the quarter; null when no data captured
+   * @nullable
+   */
+  score?: number | null;
+  /** Target score for the quarter (percent) */
+  target?: number;
 };
 
 export interface TrendlineData {
   totalKpis?: number;
   quarters?: TrendlineDataQuartersItem[];
+}
+
+export interface OrgScorecardCounts {
+  targetsSet?: number;
+  achieved?: number;
+  partiallyAchieved?: number;
+  notAchieved?: number;
+  overAchieved?: number;
+  onHold?: number;
+  notApplicable?: number;
+  unableToAssess?: number;
+}
+
+export type OrgScorecardRow = OrgScorecardCounts & {
+  name?: string;
+};
+
+export interface OrgScorecardData {
+  byNkpa?: OrgScorecardRow[];
+  nkpaTotal?: OrgScorecardCounts;
+  byDepartment?: OrgScorecardRow[];
+  departmentTotal?: OrgScorecardCounts;
 }
 
 export type TopUnderperformingDataItemsItem = {
@@ -1264,6 +1510,15 @@ export interface EvidenceComplianceData {
   summary?: EvidenceComplianceDataSummary;
   byDepartment?: EvidenceComplianceDataByDepartmentItem[];
   byKpi?: EvidenceComplianceDataByKpiItem[];
+}
+
+export interface MunicipalHealthData {
+  performance?: number;
+  evidenceCompliance?: number;
+  workflowEfficiency?: number;
+  composite?: number;
+  band?: string;
+  hasData?: boolean;
 }
 
 export interface ReportRun {
@@ -1791,6 +2046,22 @@ export const ListReportFieldsReportType = {
   annual: "annual",
 } as const;
 
+export type ListSdbipFieldConfigsParams = {
+  sdbipType?: ListSdbipFieldConfigsSdbipType;
+};
+
+export type ListSdbipFieldConfigsSdbipType =
+  (typeof ListSdbipFieldConfigsSdbipType)[keyof typeof ListSdbipFieldConfigsSdbipType];
+
+export const ListSdbipFieldConfigsSdbipType = {
+  original: "original",
+  revised: "revised",
+  departmental: "departmental",
+  quarterly: "quarterly",
+  midyear: "midyear",
+  annual: "annual",
+} as const;
+
 export type ListCompetencyRequirementsParams = {
   cycleId?: number;
 };
@@ -1814,6 +2085,19 @@ export type ListNotificationConfigsParams = {
 export type ListScorecardsParams = {
   cycleId?: number;
 };
+
+export type ExportScorecardParams = {
+  format?: ExportScorecardFormat;
+};
+
+export type ExportScorecardFormat =
+  (typeof ExportScorecardFormat)[keyof typeof ExportScorecardFormat];
+
+export const ExportScorecardFormat = {
+  xlsx: "xlsx",
+  pdf: "pdf",
+  docx: "docx",
+} as const;
 
 export type CreateRevisionLogsBodyEntriesItem = {
   kpiId?: number;
@@ -1845,7 +2129,30 @@ export type GenerateSdbipFromKpisBody = {
 export type ListAllActualsParams = {
   status?: string;
   reviewLevel?: string;
+  periodType?: ListAllActualsPeriodType;
 };
+
+export type ListAllActualsPeriodType =
+  (typeof ListAllActualsPeriodType)[keyof typeof ListAllActualsPeriodType];
+
+export const ListAllActualsPeriodType = {
+  quarterly: "quarterly",
+  mid_year: "mid_year",
+  annual: "annual",
+} as const;
+
+export type ListKpiActualsParams = {
+  periodType?: ListKpiActualsPeriodType;
+};
+
+export type ListKpiActualsPeriodType =
+  (typeof ListKpiActualsPeriodType)[keyof typeof ListKpiActualsPeriodType];
+
+export const ListKpiActualsPeriodType = {
+  quarterly: "quarterly",
+  mid_year: "mid_year",
+  annual: "annual",
+} as const;
 
 export type TransitionKpiActualBodyAction =
   (typeof TransitionKpiActualBodyAction)[keyof typeof TransitionKpiActualBodyAction];
@@ -1863,6 +2170,21 @@ export type TransitionKpiActualBody = {
 
 export type ListKpiEvidenceParams = {
   quarter?: number;
+  periodType?: ListKpiEvidencePeriodType;
+};
+
+export type ListKpiEvidencePeriodType =
+  (typeof ListKpiEvidencePeriodType)[keyof typeof ListKpiEvidencePeriodType];
+
+export const ListKpiEvidencePeriodType = {
+  quarterly: "quarterly",
+  mid_year: "mid_year",
+  annual: "annual",
+} as const;
+
+export type RequestEvidenceUploadUrl200 = {
+  uploadURL: string;
+  objectPath: string;
 };
 
 export type ListRemedialActionsParams = {
@@ -1923,6 +2245,11 @@ export type GetTrendlineParams = {
   quarter?: number;
 };
 
+export type GetOrgScorecardParams = {
+  cycleId: number;
+  quarter?: number;
+};
+
 export type GetTopUnderperformingParams = {
   cycleId: number;
   quarter?: number;
@@ -1936,6 +2263,10 @@ export type GetDeptRankingParams = {
 export type GetEvidenceComplianceParams = {
   cycleId: number;
   quarter?: number;
+};
+
+export type GetMunicipalHealthParams = {
+  cycleId: number;
 };
 
 export type ListReportRunsParams = {

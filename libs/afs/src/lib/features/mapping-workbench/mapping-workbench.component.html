@@ -306,6 +306,15 @@
                   matTooltip="Approve mapping run">
             <mat-icon>check</mat-icon> Approve
           </button>
+          <div *ngIf="isSystemAdmin" class="admin-override-toggle">
+            <mat-checkbox [(ngModel)]="adminOverride" color="warn">
+              Admin Override
+            </mat-checkbox>
+            <span class="admin-override-hint" *ngIf="adminOverride">
+              <mat-icon class="admin-override-warn-icon">warning</mat-icon>
+              Validation gates will be bypassed
+            </span>
+          </div>
         </div>
 
         <!-- Reviewer Acknowledgments (for approval) -->
@@ -707,11 +716,14 @@
           </h4>
 
           <div *ngFor="let finding of getSfpFindings()" class="sfp-finding-card" [ngClass]="'sfp-finding-' + finding.status">
-            <div class="sfp-finding-header">
+            <div class="sfp-finding-header" (click)="toggleFindingDrilldown(finding.code)" style="cursor: pointer;">
               <span class="sfp-severity-chip" [style.background]="getSeverityColor(finding.severity)">{{ finding.severity }}</span>
               <span class="sfp-finding-code">{{ finding.code }}</span>
               <span class="sfp-finding-title">{{ finding.title }}</span>
               <span class="sfp-status-badge" [ngClass]="getStatusBadgeClass(finding.status)">{{ finding.status }}</span>
+              <mat-icon class="drilldown-chevron" [class.drilldown-expanded]="expandedFindingCode === finding.code">
+                expand_more
+              </mat-icon>
             </div>
             <p class="sfp-finding-detail">{{ finding.detail }}</p>
 
@@ -722,6 +734,49 @@
 
             <div *ngIf="finding.diagnosticHint" class="sfp-diagnostic-hint">
               <mat-icon>lightbulb</mat-icon> {{ finding.diagnosticHint }}
+            </div>
+
+            <!-- Drill-through panel -->
+            <div *ngIf="expandedFindingCode === finding.code" class="drilldown-panel">
+              <mat-progress-bar *ngIf="findingDrilldownLoading" mode="indeterminate"></mat-progress-bar>
+              <div *ngIf="findingDrilldownData && !findingDrilldownLoading" class="drilldown-content">
+                <div class="drilldown-header">
+                  <div class="drilldown-summary">
+                    <span class="drilldown-label">{{ findingDrilldownData.summary }}</span>
+                    <span class="drilldown-meta">{{ findingDrilldownData.rowCount }} rows | Total: {{ formatRand(findingDrilldownData.totalAmount) }}</span>
+                  </div>
+                  <button mat-stroked-button color="primary" (click)="downloadFindingCsv(finding.code); $event.stopPropagation();">
+                    <mat-icon>download</mat-icon> Download CSV
+                  </button>
+                </div>
+                <div class="drilldown-table-wrapper" *ngIf="getDrilldownDisplayRows().length > 0">
+                  <table class="drilldown-table">
+                    <thead>
+                      <tr>
+                        <th>SCOA Code</th>
+                        <th>Description</th>
+                        <th class="amount-col">Amount (CY)</th>
+                        <th class="amount-col">Amount (PY)</th>
+                        <th *ngIf="getDrilldownDisplayRows()[0]?.disclosure">Disclosure</th>
+                        <th *ngIf="getDrilldownDisplayRows()[0]?.matchStatus">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let row of getDrilldownDisplayRows()">
+                        <td class="code-cell">{{ row.scoaItemCode }}</td>
+                        <td class="desc-cell">{{ row.description }}</td>
+                        <td class="amount-col">{{ formatRand(row.amount) }}</td>
+                        <td class="amount-col">{{ formatRand(row.priorYearAmount) }}</td>
+                        <td *ngIf="row.disclosure">{{ row.disclosure }}</td>
+                        <td *ngIf="row.matchStatus"><span class="match-status-chip">{{ row.matchStatus }}</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div *ngIf="findingDrilldownData.rowCount > 50" class="drilldown-truncated">
+                    Showing first 50 of {{ findingDrilldownData.rowCount }} rows. Download CSV for full data.
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Override metadata (if overridden) -->

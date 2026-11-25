@@ -12,17 +12,23 @@
     </div>
   </div>
 
-  <div class="wizard-tabs">
-    <div
-      *ngFor="let tab of tabs; let i = index"
-      class="wizard-tab"
-      [class.active]="isTabActive(tab.key)"
-      [class.completed]="isTabCompleted(tab.key)"
-      (click)="selectTab(tab.key)"
-    >
-      <mat-icon class="tab-icon">thumb_up</mat-icon>
-      <span class="tab-label">{{ tab.label }}</span>
-    </div>
+  <div class="wizard-stepper">
+    <ng-container *ngFor="let tab of tabs; let i = index; let last = last">
+      <div
+        class="wstep"
+        [class.wstep--active]="isTabActive(tab.key)"
+        [class.wstep--done]="isTabCompleted(tab.key)"
+        [class.wstep--locked]="isTabLocked(tab.key)"
+        (click)="selectTab(tab.key)"
+      >
+        <div class="wstep-num">
+          <mat-icon *ngIf="isTabCompleted(tab.key)" style="font-size:14px;width:14px;height:14px;">check</mat-icon>
+          <span *ngIf="!isTabCompleted(tab.key)">{{ i + 1 }}</span>
+        </div>
+        <span class="wstep-label">{{ tab.label }}</span>
+      </div>
+      <div class="wstep-line" *ngIf="!last" [class.wstep-line--done]="isTabCompleted(tab.key)"></div>
+    </ng-container>
   </div>
 
   <div class="wizard-body" *ngIf="!loading">
@@ -40,41 +46,58 @@
             </mat-select>
           </mat-form-field>
 
-          <mat-form-field appearance="outline">
-            <mat-label>Project Status *</mat-label>
-            <mat-select [(ngModel)]="form.projectStatus" [disabled]="!projectId">
-              <mat-option *ngFor="let s of statusOptions" [value]="s.status_ID">{{ s.statusDesc }}</mat-option>
-            </mat-select>
-          </mat-form-field>
+          <div class="field-wrap" [class.field-wrap--error]="detailsErrors['projectStatus']">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field-wrap__field">
+              <mat-label>Project Status *</mat-label>
+              <mat-select [(ngModel)]="form.projectStatus" [disabled]="!projectId" (ngModelChange)="clearDetailError('projectStatus')">
+                <mat-option *ngFor="let s of statusOptions" [value]="s.status_ID">{{ s.statusDesc }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <div class="field-error-msg" *ngIf="detailsErrors['projectStatus']">Project Status is required</div>
+          </div>
 
-          <mat-form-field appearance="outline" class="details-grid__full">
-            <mat-label>Project Name *</mat-label>
-            <input matInput [(ngModel)]="form.projectName" placeholder="Enter project name" />
-          </mat-form-field>
+          <div class="field-wrap details-grid__full" [class.field-wrap--error]="detailsErrors['projectName']">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field-wrap__field">
+              <mat-label>Project Name *</mat-label>
+              <input matInput [(ngModel)]="form.projectName" (ngModelChange)="clearDetailError('projectName')" placeholder="Enter project name" />
+            </mat-form-field>
+            <div class="field-error-msg" *ngIf="detailsErrors['projectName']">
+              {{ form.projectName?.trim() ? 'A project with this name already exists for the selected financial year.' : 'Project Name is required' }}
+            </div>
+          </div>
 
-          <mat-form-field appearance="outline" class="details-grid__full">
-            <mat-label>Project Description *</mat-label>
-            <textarea matInput [(ngModel)]="form.projectDescription" rows="3" placeholder="Enter project description"></textarea>
-          </mat-form-field>
+          <div class="field-wrap details-grid__full" [class.field-wrap--error]="detailsErrors['projectDescription']">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field-wrap__field">
+              <mat-label>Project Description *</mat-label>
+              <textarea matInput [(ngModel)]="form.projectDescription" (ngModelChange)="clearDetailError('projectDescription')" rows="3" placeholder="Enter project description"></textarea>
+            </mat-form-field>
+            <div class="field-error-msg" *ngIf="detailsErrors['projectDescription']">Project Description is required</div>
+          </div>
         </div>
       </div>
 
       <div class="form-section">
         <h4 class="section-heading">Budget Classification</h4>
         <div class="details-grid">
-          <mat-form-field appearance="outline">
-            <mat-label>Budget Type *</mat-label>
-            <mat-select [(ngModel)]="form.budgetType">
-              <mat-option *ngFor="let b of budgetTypeOptions" [value]="b.typeValue">{{ b.typeName }}</mat-option>
-            </mat-select>
-          </mat-form-field>
+          <div class="field-wrap" [class.field-wrap--error]="detailsErrors['budgetType']">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field-wrap__field">
+              <mat-label>Budget Type *</mat-label>
+              <mat-select [(ngModel)]="form.budgetType" (ngModelChange)="clearDetailError('budgetType')">
+                <mat-option *ngFor="let b of budgetTypeOptions" [value]="b.typeValue">{{ b.typeName }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <div class="field-error-msg" *ngIf="detailsErrors['budgetType']">Budget Type is required</div>
+          </div>
 
-          <mat-form-field appearance="outline">
-            <mat-label>Single/Multi-Year *</mat-label>
-            <mat-select [(ngModel)]="form.singleMultiYear">
-              <mat-option *ngFor="let o of singleMultiYearOptions" [value]="o">{{ o }}</mat-option>
-            </mat-select>
-          </mat-form-field>
+          <div class="field-wrap" [class.field-wrap--error]="detailsErrors['singleMultiYear']">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field-wrap__field">
+              <mat-label>Single/Multi-Year *</mat-label>
+              <mat-select [(ngModel)]="form.singleMultiYear" (ngModelChange)="clearDetailError('singleMultiYear')">
+                <mat-option *ngFor="let o of singleMultiYearOptions" [value]="o">{{ o }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <div class="field-error-msg" *ngIf="detailsErrors['singleMultiYear']">Single/Multi-Year is required</div>
+          </div>
 
           <mat-form-field appearance="outline">
             <mat-label>Project Type</mat-label>
@@ -96,14 +119,15 @@
           <div class="scoa-drill-trigger"
                (click)="toggleScoaDrill($event)"
                [class.scoa-drill-trigger--open]="scoaDrillOpen"
-               [class.scoa-drill-trigger--selected]="scoaDrillSelected">
+               [class.scoa-drill-trigger--selected]="scoaDrillSelected"
+               [class.scoa-drill-trigger--error]="detailsErrors['scoaProjectId']">
             <span class="scoa-drill-trigger-label">SCOA Project *</span>
             <span class="scoa-drill-trigger-value">
               <ng-container *ngIf="scoaDrillSelected">
                 <span class="scoa-drill-path-prefix" *ngIf="scoaDrillPathLabel">{{ scoaDrillPathLabel }} › </span>
                 <strong>{{ scoaDrillSelected.scoaShortDesc || scoaDrillSelected.scoaDesc }}</strong>
+                <span class="scoa-drill-selected-code" *ngIf="scoaDrillSelected.scoaCode">({{ scoaDrillSelected.scoaCode }})</span>
               </ng-container>
-              <span *ngIf="!scoaDrillSelected" class="scoa-drill-placeholder">— Select SCOA Project —</span>
             </span>
             <span class="scoa-drill-trigger-icons">
               <mat-icon *ngIf="scoaDrillSelected" class="scoa-drill-clear" (click)="clearScoaDrill($event)">close</mat-icon>
@@ -111,7 +135,7 @@
             </span>
           </div>
 
-          <div class="scoa-drill-panel" *ngIf="scoaDrillOpen">
+          <div class="scoa-drill-panel" *ngIf="scoaDrillOpen" [class.scoa-drill-panel--above]="scoaDrillOpenAbove">
             <div class="scoa-drill-nav" *ngIf="scoaDrillHistory.length > 0">
               <button type="button" class="scoa-drill-back" (click)="scoaDrillBack()">
                 <mat-icon>arrow_back</mat-icon>
@@ -130,13 +154,22 @@
                    class="scoa-drill-item"
                    [class.scoa-drill-item--leaf]="node.postingLevel === 'Yes'"
                    (click)="onScoaDrillSelect(node, $event)">
-                <span class="scoa-drill-item-label">{{ node.scoaShortDesc || node.scoaDesc }}</span>
+                <span class="scoa-drill-item-label">
+                  {{ node.scoaShortDesc || node.scoaDesc }}
+                  <span class="scoa-drill-item-code" *ngIf="node.scoaCode">({{ node.scoaCode }})</span>
+                </span>
                 <mat-icon class="scoa-drill-item-icon">{{ node.postingLevel === 'Yes' ? 'check_circle_outline' : 'chevron_right' }}</mat-icon>
               </div>
               <div class="scoa-drill-empty" *ngIf="scoaDrillItems.length === 0">No items found.</div>
             </div>
           </div>
         </div>
+        <div class="field-error-msg" *ngIf="detailsErrors['scoaProjectId']">A lowest-level SCOA Project must be selected</div>
+      </div>
+
+      <div class="details-validation-banner" *ngIf="detailsHasErrors">
+        <mat-icon>error_outline</mat-icon>
+        <span>Please fill in all required fields before continuing.</span>
       </div>
 
     </div>
@@ -156,7 +189,7 @@
             <mat-label>IDP Item *</mat-label>
             <mat-select [(ngModel)]="newIdpLink.idpItemId">
               <mat-option [value]="null">— Select —</mat-option>
-              <mat-option *ngFor="let item of idpItems" [value]="item.item_ID">{{ item.itemDesc }}</mat-option>
+              <mat-option *ngFor="let item of idpItems" [value]="item.item_ID">{{ item.path || item.itemDesc }}</mat-option>
             </mat-select>
           </mat-form-field>
 
@@ -248,7 +281,7 @@
                 </td>
                 <td colspan="5">
                   <mat-select [(ngModel)]="editingIdpLink!.idpItemId" class="form-select form-select--inline">
-                    <mat-option *ngFor="let item of idpItems" [value]="item.item_ID">{{ item.itemDesc }}</mat-option>
+                    <mat-option *ngFor="let item of idpItems" [value]="item.item_ID">{{ item.path || item.itemDesc }}</mat-option>
                   </mat-select>
                 </td>
                 <td>
@@ -761,14 +794,10 @@
     </div>
 
     <!-- ─── Tab: Register Project ─── -->
-    <div *ngIf="activeTab === 'register'" class="tab-panel register-panel">
+    <div *ngIf="activeTab === 'register'" class="tab-panel">
       <div class="form-section">
-        <h4 class="section-heading">Project Registration</h4>
-      </div>
-      <div class="register-card">
-        <mat-icon class="register-card__icon">how_to_reg</mat-icon>
-        <h3 class="register-card__title">Register Project</h3>
-        <p class="register-card__sub">Once registered, the project will be included in the active budget for the selected financial year.</p>
+        <h4 class="section-heading">Register Project</h4>
+        <p class="register-intro">Once registered, the project will be included in the active budget for the selected financial year.</p>
         <label class="register-checkbox">
           <input type="checkbox" [(ngModel)]="form.isRegistered" />
           <span class="register-checkbox__label">Register Project<span class="required">*</span></span>
@@ -779,18 +808,25 @@
   </div>
 
   <div class="wizard-footer">
-    <button class="btn-secondary" (click)="cancel()">Cancel</button>
-    <div class="footer-spacer"></div>
-    <button class="btn-secondary" *ngIf="!isFirstTab()" (click)="previous()">
-      <mat-icon>chevron_left</mat-icon> Previous
-    </button>
-    <button class="btn-primary" *ngIf="!isLastTab()" (click)="next()">
-      Next <mat-icon>chevron_right</mat-icon>
-    </button>
-    <button class="btn-primary btn-save" *ngIf="isLastTab()" (click)="save()" [disabled]="saving">
-      <mat-icon>{{ saving ? 'hourglass_empty' : 'check_circle' }}</mat-icon>
-      {{ saving ? 'Saving...' : 'Finish' }}
-    </button>
+    <div class="details-validation-banner footer-tab-banner" *ngIf="tabBannerError">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ tabBannerError }}</span>
+    </div>
+    <div class="footer-actions">
+      <button class="btn-secondary" (click)="cancel()">Cancel</button>
+      <div class="footer-spacer"></div>
+      <button class="btn-secondary" *ngIf="!isFirstTab()" (click)="previous()">
+        <mat-icon>chevron_left</mat-icon> Previous
+      </button>
+      <button class="btn-primary" *ngIf="!isLastTab()" (click)="next()" [disabled]="detailsSaving">
+        <mat-icon *ngIf="detailsSaving">hourglass_empty</mat-icon>
+        {{ detailsSaving ? 'Saving…' : 'Next' }} <mat-icon *ngIf="!detailsSaving">chevron_right</mat-icon>
+      </button>
+      <button class="btn-primary btn-save" *ngIf="isLastTab()" (click)="save()" [disabled]="saving">
+        <mat-icon>{{ saving ? 'hourglass_empty' : 'check_circle' }}</mat-icon>
+        {{ saving ? 'Saving...' : 'Finish' }}
+      </button>
+    </div>
   </div>
 
 </div>

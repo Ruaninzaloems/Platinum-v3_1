@@ -120,6 +120,36 @@ public class ReportsController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("mscoa-strings/export")]
+    public async Task<IActionResult> ExportMscoaStrings([FromQuery] int financialYearId, [FromQuery] string stringType = "", [FromQuery] string format = "csv")
+    {
+        var query = _db.BudgetStrings
+            .Include(s => s.ScoaItem).Include(s => s.ScoaFund).Include(s => s.ScoaFunction)
+            .Include(s => s.ScoaProjectNav).Include(s => s.ScoaRegion)
+            .Include(s => s.ScoaCosting).Include(s => s.ScoaMsc)
+            .Where(s => s.BudgetVersion.FinancialYearId == financialYearId)
+            .AsQueryable();
+
+        var strings = await query.OrderBy(s => s.ScoaItem.Code).ToListAsync();
+
+        var lines = strings.Select(s =>
+            $"{s.ScoaItem.Code}/{s.ScoaFund.Code}/{s.ScoaFunction.Code}/{s.ScoaProjectNav.Code}/{s.ScoaRegion.Code}/{s.ScoaCosting.Code}/{s.ScoaMsc.Code},{s.Year1Amount},{s.Year2Amount},{s.Year3Amount}"
+        ).ToList();
+
+        var header = $"NT SCOA String Export - Type: {stringType}";
+        var content = header + "\n" + string.Join("\n", lines);
+        var bytes = System.Text.Encoding.UTF8.GetBytes(content);
+
+        var (mime, ext) = format.ToLower() switch
+        {
+            "excel" => ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx"),
+            "text"  => ("text/plain", "txt"),
+            _       => ("text/csv", "csv")
+        };
+
+        return File(bytes, mime, $"SCOA_{stringType}_{financialYearId}.{ext}");
+    }
+
     [HttpGet("mtref-summary/{versionId}")]
     public async Task<IActionResult> GetMtrefSummary(int versionId) =>
         Ok(await _dashboardService.GetMtrefSummaryAsync(versionId));

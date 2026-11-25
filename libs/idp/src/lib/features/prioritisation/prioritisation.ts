@@ -48,13 +48,13 @@ import {
 
         <div class="tab-bar" data-testid="tab-bar">
           <button *ngFor="let tab of tabs" class="tab-btn" [class.active]="activeTab() === tab.key"
-            (click)="activeTab.set(tab.key)" [attr.data-testid]="'tab-' + tab.key">
+            (click)="switchTab(tab.key)" [attr.data-testid]="'tab-' + tab.key">
             <span class="material-icon" style="font-size:18px;">{{ tab.icon }}</span> {{ tab.label }}
           </button>
         </div>
 
         <!-- Tab 1: Scoring Board -->
-        <div *ngIf="activeTab() === 'scoring'" class="tab-content" data-testid="panel-scoring">
+        <div *ngIf="activeTab() === 'scoring'" class="idp-tab-content" data-testid="panel-scoring">
           <div class="scoring-layout">
             <div class="project-selector-panel card">
               <div class="card-header"><h2>Projects</h2>
@@ -111,7 +111,7 @@ import {
                     </div>
                   </div>
                   <div class="breakdown-legend">
-                    <span *ngFor="let cat of categories" class="legend-item">
+                    <span *ngFor="let cat of usedCategories()" class="legend-item">
                       <span class="legend-dot" [style.background]="getCategoryColor(cat)"></span> {{ cat }}
                     </span>
                   </div>
@@ -153,7 +153,7 @@ import {
         </div>
 
         <!-- Tab 2: Drag-and-Rank Board -->
-        <div *ngIf="activeTab() === 'ranking'" class="tab-content" data-testid="panel-ranking">
+        <div *ngIf="activeTab() === 'ranking'" class="idp-tab-content" data-testid="panel-ranking">
           <div class="card">
             <div class="card-header">
               <h2><span class="material-icon card-icon" style="font-size:18px;">format_list_numbered</span> Project Rankings</h2>
@@ -202,7 +202,7 @@ import {
         </div>
 
         <!-- Tab 3: Budget Impact Simulator -->
-        <div *ngIf="activeTab() === 'budget'" class="tab-content" data-testid="panel-budget">
+        <div *ngIf="activeTab() === 'budget'" class="idp-tab-content" data-testid="panel-budget">
           <div class="budget-summary-cards">
             <div class="kpi-tile budget-kpi">
               <div class="kpi-num" data-testid="text-total-budget">R{{ (budgetData()?.totalBudget || 0) / 1000000 | number:'1.1-1' }}M</div>
@@ -277,7 +277,7 @@ import {
         </div>
 
         <!-- Tab 4: AI Recommendations -->
-        <div *ngIf="activeTab() === 'ai'" class="tab-content" data-testid="panel-ai">
+        <div *ngIf="activeTab() === 'ai'" class="idp-tab-content" data-testid="panel-ai">
           <div class="card">
             <div class="card-header">
               <h2><span class="material-icon card-icon" style="font-size:18px;">auto_awesome</span> AI Recommendations</h2>
@@ -522,7 +522,7 @@ export class PrioritisationComponent implements OnInit {
   currentProjectIndex = signal(0);
   aiSelectedProjectId = 0;
 
-  localScores: Map<number, number> = new Map();
+  localScores = signal<Record<number, number>>({});
   budgetData = signal<BudgetSimulationResult | null>(null);
   budgetThreshold = 0;
   budgetToggles: Set<number> = new Set();
@@ -537,7 +537,7 @@ export class PrioritisationComponent implements OnInit {
     { key: 'ai', label: 'AI Recommendations', icon: 'auto_awesome' },
   ];
 
-  categories = ['Strategic', 'Community', 'Financial', 'Delivery'];
+  categories = ['Strategic', 'Impact', 'Compliance', 'Financial', 'Delivery'];
 
   constructor(private api: ApiService, private cycleState: CycleStateService) {}
 
@@ -550,6 +550,14 @@ export class PrioritisationComponent implements OnInit {
         this.onFrameworkChange(active.id);
       }
     });
+  }
+
+  switchTab(key: string) {
+    this.activeTab.set(key);
+    if ((key === 'ranking' || key === 'budget') && this.selectedFrameworkId) {
+      this.loadRankings(this.selectedFrameworkId);
+      if (key === 'budget') this.loadBudget(this.selectedFrameworkId);
+    }
   }
 
   onFrameworkChange(id: number) {
@@ -581,7 +589,10 @@ export class PrioritisationComponent implements OnInit {
   }
 
   private loadRankings(fwId: number) {
-    this.api.getRankings(fwId).subscribe(r => this.rankingsList.set(r));
+    this.api.getRankings(fwId).subscribe({
+      next: r => this.rankingsList.set(r),
+      error: err => console.error('Rankings load error:', err)
+    });
   }
 
   private loadBudget(fwId: number, threshold?: number) {
@@ -601,14 +612,21 @@ export class PrioritisationComponent implements OnInit {
     return this.activeCriteria().filter(c => c.category === cat);
   }
 
+  usedCategories(): string[] {
+    const cats = new Set(this.activeCriteria().map(c => c.category));
+    return this.categories.filter(c => cats.has(c));
+  }
+
   selectProject(p: IdpProject, index: number) {
     this.selectedProjectId = p.id;
     this.currentProjectIndex.set(index);
-    this.localScores.clear();
+    this.localScores.set({});
     this.api.getProjectScores(this.selectedFrameworkId, p.id).subscribe(scores => {
+      const map: Record<number, number> = {};
       scores.forEach(s => {
-        this.localScores.set(s.criteriaId, s.humanScore ?? 0);
+        map[s.criteriaId] = s.humanScore ?? s.blendedScore ?? 0;
       });
+      this.localScores.set(map);
     });
   }
 
@@ -633,11 +651,11 @@ export class PrioritisationComponent implements OnInit {
   }
 
   getScoreValue(criteriaId: number): number {
-    return this.localScores.get(criteriaId) ?? 0;
+    return this.localScores()[criteriaId] ?? 0;
   }
 
   setScoreValue(criteriaId: number, val: number) {
-    this.localScores.set(criteriaId, val);
+    this.localScores.update(scores => ({ ...scores, [criteriaId]: val }));
   }
 
   getScaleLabel(val: number): string {
@@ -648,21 +666,23 @@ export class PrioritisationComponent implements OnInit {
   liveComposite(): number {
     const fw = this.activeFramework();
     if (!fw) return 0;
+    const scores = this.localScores();
     return this.activeCriteria().reduce((sum, c) => {
-      const score = this.localScores.get(c.id) ?? 0;
+      const score = scores[c.id] ?? 0;
       return sum + (c.weight * score / 100);
     }, 0);
   }
 
   getWeightedContribution(c: PriorityCriteria): number {
-    const score = this.localScores.get(c.id) ?? 0;
+    const score = this.localScores()[c.id] ?? 0;
     return c.weight * score / 100;
   }
 
   getCategoryColor(cat: string): string {
     switch (cat) {
       case 'Strategic': return '#1565c0';
-      case 'Community': return '#2e7d32';
+      case 'Impact': return '#2e7d32';
+      case 'Compliance': return '#c62828';
       case 'Financial': return '#ef6c00';
       case 'Delivery': return '#7e57c2';
       default: return '#64748b';
@@ -671,11 +691,12 @@ export class PrioritisationComponent implements OnInit {
 
   saveAllScores() {
     const scores: any[] = [];
+    const currentScores = this.localScores();
     this.activeCriteria().forEach(c => {
       scores.push({
         criteriaId: c.id,
-        humanScore: this.localScores.get(c.id) ?? 0,
-        scoredBy: 'User',
+        humanScore: currentScores[c.id] ?? 0,
+        scoredBy: 1,
       });
     });
     this.api.scoreProjectAll(this.selectedFrameworkId, this.selectedProjectId, scores).subscribe({
@@ -683,21 +704,29 @@ export class PrioritisationComponent implements OnInit {
         this.loadRankings(this.selectedFrameworkId);
         this.loadBudget(this.selectedFrameworkId, this.budgetThreshold);
       },
-      error: (err: any) => alert('Failed to save scores: ' + (err.error || 'Unknown error'))
+      error: (err: any) => {
+        const msg = typeof err.error === 'string' ? err.error : (err.error?.message || err.error?.title || JSON.stringify(err.error) || 'Unknown error');
+        alert('Failed to save scores: ' + msg);
+      }
     });
   }
 
   aiRecommendProject() {
     this.api.aiRecommend(this.selectedFrameworkId, this.selectedProjectId).subscribe({
       next: (scores) => {
+        const updated = { ...this.localScores() };
         scores.forEach(s => {
           if (s.aiScore !== null && s.aiScore !== undefined) {
-            this.localScores.set(s.criteriaId, s.humanScore ?? this.localScores.get(s.criteriaId) ?? 0);
+            updated[s.criteriaId] = s.humanScore ?? updated[s.criteriaId] ?? 0;
           }
         });
+        this.localScores.set(updated);
         this.loadRankings(this.selectedFrameworkId);
       },
-      error: (err: any) => alert('AI recommendation failed: ' + (err.error || 'Unknown error'))
+      error: (err: any) => {
+        const msg = typeof err.error === 'string' ? err.error : (err.error?.message || err.error?.title || JSON.stringify(err.error) || 'Unknown error');
+        alert('AI recommendation failed: ' + msg);
+      }
     });
   }
 
@@ -875,7 +904,7 @@ export class PrioritisationComponent implements OnInit {
       projectId: this.aiSelectedProjectId,
       criteriaId: row.criteriaId,
       humanScore: row.aiScore,
-      scoredBy: 'User (accepted AI)',
+      scoredBy: 1,
     } as any).subscribe({
       next: () => {
         this.loadAiComparison(this.aiSelectedProjectId);

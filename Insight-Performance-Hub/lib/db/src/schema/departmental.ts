@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, doublePrecision, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, doublePrecision, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { performanceCyclesTable } from "./performance-cycles";
 import { usersTable } from "./users";
 import { scorecardsTable, scorecardKpisTable } from "./scorecards";
@@ -36,6 +36,7 @@ export const deptScorecardKpisTable = pgTable("dept_scorecard_kpis", {
   weighting: doublePrecision("weighting").notNull().default(0),
   unitOfMeasureId: integer("unit_of_measure_id"),
   isCumulative: boolean("is_cumulative").notNull().default(false),
+  customFields: jsonb("custom_fields").$type<Record<string, string | number | boolean | null>>(),
   isInherited: boolean("is_inherited").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),

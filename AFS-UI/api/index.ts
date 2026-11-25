@@ -1,9 +1,75 @@
 import express from 'express';
 import cors from 'cors';
 import { pool, query, pingDb } from './db';
+import {
+  demoFinancialYears,
+  demoDashboard,
+  demoCompilations,
+  demoFindingsDashboard,
+  demoRfiDashboard,
+  demoMfmaCommentary,
+  demoExceptionRegister,
+  demoEvidenceHeatmap,
+  demoMappingAudit,
+  demoAdjustmentsRegister,
+  demoIntegrityChecks,
+  demoMfmaSubmissions,
+  demoMfmaReport,
+} from './demo';
+import { artRouter } from './art';
+import { platinumRouter } from './platinum';
+import { calculateRatios } from './ratios';
+
+function isDbUnavailable(err: any): boolean {
+  const msg = String(err?.message || err || '').toLowerCase();
+  return (
+    msg.includes('connection terminated') ||
+    msg.includes('connection timeout') ||
+    msg.includes('econnrefused') ||
+    msg.includes('etimedout') ||
+    msg.includes('enotfound') ||
+    msg.includes('does not exist') ||
+    msg.includes('relation') ||
+    msg.includes('password authentication') ||
+    msg.includes('no pg_hba')
+  );
+}
+
+let dbKnownDown = false;
+let dbLastChecked = 0;
+const DB_RECHECK_MS = 60_000;
+
+async function isDbDown(): Promise<boolean> {
+  const now = Date.now();
+  if (dbKnownDown && now - dbLastChecked < DB_RECHECK_MS) return true;
+  if (!dbKnownDown && now - dbLastChecked < DB_RECHECK_MS) return false;
+  dbLastChecked = now;
+  try {
+    await Promise.race([
+      query('SELECT 1'),
+      // Azure PostgreSQL (cross-region / cold pooled connections) can take several
+      // seconds on the first query — use a generous timeout so a slow-but-healthy
+      // DB isn't falsely marked down (which would serve demo/zero data for 60s).
+      new Promise((_r, rej) => setTimeout(() => rej(new Error('timeout')), 10000)),
+    ]);
+    dbKnownDown = false;
+    return false;
+  } catch {
+    dbKnownDown = true;
+    return true;
+  }
+}
 
 const app = express();
-app.use(cors());
+const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+// Fail-safe: when no allowlist is configured we still permit credentialed
+// requests in development (NODE_ENV !== 'production'); in production an
+// empty allowlist disables cross-origin access entirely.
+const isProd = process.env.NODE_ENV === 'production';
+app.use(cors({
+  origin: corsOrigins.length > 0 ? corsOrigins : (isProd ? false : true),
+  credentials: true,
+}));
 app.use(express.json());
 app.use((req, _res, next) => {
   console.log(`[afs-api] ${req.method} ${req.url}`);
@@ -14,8 +80,7 @@ app.use((req, _res, next) => {
 // Health
 // ────────────────────────────────────────────────────────────
 app.get('/api/health', async (_req, res) => {
-  const db = await pingDb();
-  res.json({ status: 'ok', service: 'platinum-afs-api', db });
+  res.json({ status: 'ok', service: 'platinum-afs-api', db: { ok: !(await isDbDown()) } });
 });
 
 // ────────────────────────────────────────────────────────────
@@ -55,6 +120,7 @@ app.get('/api/notifications/unread-count', (_req, res) => {
 // Financial Years — real data
 // ────────────────────────────────────────────────────────────
 app.get('/api/admin/financial-years', async (_req, res, next) => {
+  if (await isDbDown()) return res.json(demoFinancialYears);
   try {
     const rows = await query<any>(
       `SELECT id, label, status, "isCurrent", "startDate", "endDate", "isLocked"
@@ -73,6 +139,10 @@ app.get('/api/admin/financial-years', async (_req, res, next) => {
       }))
     );
   } catch (e) {
+    if (isDbUnavailable(e)) {
+      console.warn('[afs-api] DB unavailable, returning demo financial years');
+      return res.json(demoFinancialYears);
+    }
     next(e);
   }
 });
@@ -95,6 +165,7 @@ function periodToMonths(period?: string): number | null {
 // Dashboard aggregation
 // ────────────────────────────────────────────────────────────
 app.get('/api/reports/dashboard', async (req, res, next) => {
+  if (await isDbDown()) return res.json(demoDashboard);
   try {
     const period = String(req.query.period || 'full_year');
     void periodToMonths(period); // reserved for GL period filtering
@@ -145,6 +216,7 @@ app.get('/api/reports/dashboard', async (req, res, next) => {
       bvaRows,
       glRowsRes,
       actRows,
+      itemTypeRows,
     ] = await Promise.all([
       query<{ status: string; n: number; avgc: number | null }>(
       `SELECT COALESCE(LOWER(status), 'unknown') AS status,
@@ -253,6 +325,17 @@ app.get('/api/reports/dashboard', async (req, res, next) => {
          ORDER BY date DESC NULLS LAST
          LIMIT 10`
       ).catch(() => []),
+      // TB closing balances classified by mSCOA item type (first 2 chars of scoaItemCode):
+      //   IA=Assets, IL=Liabilities, LN=Net Assets, IR=Revenue, IE=Expenditure, IZ=Gains/Losses
+      query<{ itemtype: string; net: string; n: number }>(
+        `SELECT LEFT("scoaItemCode", 2) AS itemtype,
+                COALESCE(SUM(COALESCE("debitCloseBalance",0) - COALESCE("creditCloseBalance",0)), 0)::text AS net,
+                COUNT(*)::int AS n
+           FROM public.trial_balance_entries
+          WHERE ($1::text IS NULL OR "financialYearId" = $1::text)
+          GROUP BY LEFT("scoaItemCode", 2)`,
+        [fyIdText]
+      ).catch(() => []),
     ]);
 
     const compilationsByStatus: Record<string, number> = {};
@@ -305,6 +388,18 @@ app.get('/api/reports/dashboard', async (req, res, next) => {
 
     const tbDebit = Number(tbSumRows[0]?.debit || 0);
     const tbCredit = Number(tbSumRows[0]?.credit || 0);
+
+    // Classify TB closing balances by mSCOA item type for the Financial Position cards.
+    // Credit-normal categories (Revenue, Liabilities, Net Assets) are shown as positive.
+    const itByType: Record<string, number> = {};
+    for (const r of (itemTypeRows || [])) itByType[(r.itemtype || '').toUpperCase()] = Number(r.net || 0);
+    const totalAssets      = itByType['IA'] || 0;
+    const totalLiabilities = Math.abs(itByType['IL'] || 0);
+    const netAssets        = Math.abs(itByType['LN'] || 0);
+    const totalRevenue     = Math.abs(itByType['IR'] || 0);
+    const totalExpenditure = itByType['IE'] || 0;
+    const gainsLosses      = itByType['IZ'] || 0;
+    const surplus          = totalRevenue - totalExpenditure + gainsLosses;
 
     const tbCategoryBreakdown = tbCatRows.map((r: any) => ({
       category: r.category,
@@ -384,6 +479,15 @@ app.get('/api/reports/dashboard', async (req, res, next) => {
         credit: tbCredit,
         net: tbDebit - tbCredit,
         rows: tbEntryCount,
+        // Financial Position figures expected by the dashboard cards
+        totalEntries: tbEntryCount,
+        totalAssets,
+        totalLiabilities,
+        netAssets,
+        totalRevenue,
+        totalExpenditure,
+        gainsLosses,
+        surplus,
       },
       tbCategoryBreakdown,
       budgetVsActual,
@@ -392,6 +496,10 @@ app.get('/api/reports/dashboard', async (req, res, next) => {
       glSummary,
     });
   } catch (e) {
+    if (isDbUnavailable(e)) {
+      console.warn('[afs-api] DB unavailable, returning demo dashboard');
+      return res.json(demoDashboard);
+    }
     next(e);
   }
 });
@@ -400,6 +508,7 @@ app.get('/api/reports/dashboard', async (req, res, next) => {
 // Compilations list (used by several screens)
 // ────────────────────────────────────────────────────────────
 app.get('/api/compilations', async (_req, res, next) => {
+  if (await isDbDown()) return res.json(demoCompilations);
   try {
     const rows = await query<any>(
       `SELECT id, name, status, "financialYearId", "completenessPercentage",
@@ -410,9 +519,202 @@ app.get('/api/compilations', async (_req, res, next) => {
     );
     res.json(rows);
   } catch (e) {
+    if (isDbUnavailable(e)) {
+      console.warn('[afs-api] DB unavailable, returning demo compilations');
+      return res.json(demoCompilations);
+    }
     next(e);
   }
 });
+
+// ────────────────────────────────────────────────────────────
+// Financial Ratios (ratios.ts) — TB baseline + optional EMS enrichment via ART.
+// Mirrors source reports.controller.ts @Get('ratios/:financialYearId').
+// ────────────────────────────────────────────────────────────
+app.get('/api/reports/ratios/:financialYearId', async (req, res, next) => {
+  try {
+    const data = await calculateRatios(String(req.params.financialYearId));
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ────────────────────────────────────────────────────────────
+// Demo-only sub-dashboard endpoints (returned when DB is unreachable)
+// ────────────────────────────────────────────────────────────
+app.get('/api/reports/findings-dashboard', (_req, res) => res.json(demoFindingsDashboard));
+app.get('/api/reports/findings-extended', (_req, res) => res.json(demoFindingsDashboard));
+app.get('/api/reports/rfi-dashboard', (_req, res) => res.json(demoRfiDashboard));
+app.get('/api/reports/rfi-register', (_req, res) => res.json(demoRfiDashboard));
+app.get('/api/reports/mfma-commentary', (_req, res) => res.json(demoMfmaCommentary));
+app.get('/api/reports/mfma-commentary/:fyId', (_req, res) => res.json(demoMfmaCommentary));
+app.get('/api/reports/mfma-submissions', (_req, res) => res.json(demoMfmaSubmissions));
+app.get('/api/reports/mfma-submissions/:fyId', (_req, res) => res.json(demoMfmaSubmissions));
+app.get('/api/reports/mfma-report/:fyId', (_req, res) => res.json(demoMfmaReport));
+app.get('/api/reports/exception-register', (_req, res) => res.json(demoExceptionRegister));
+app.get('/api/reports/evidence-heatmap', (_req, res) => res.json(demoEvidenceHeatmap));
+app.get('/api/reports/mapping-audit', (_req, res) => res.json(demoMappingAudit));
+app.get('/api/reports/adjustments-register', (_req, res) => res.json(demoAdjustmentsRegister));
+app.get('/api/reports/integrity-checks', (_req, res) => res.json(demoIntegrityChecks));
+// Working Papers — real CRUD against the AFS DB (ports server working-papers.service.ts).
+app.get('/api/working-papers', async (req, res, next) => {
+  if (await isDbDown()) return res.json([]);
+  try {
+    const conds: string[] = [];
+    const params: any[] = [];
+    if (req.query.compilationId) { params.push(String(req.query.compilationId)); conds.push(`"compilationId" = $${params.length}`); }
+    if (req.query.status) { params.push(String(req.query.status)); conds.push(`status = $${params.length}`); }
+    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+    const rows = await query(`SELECT * FROM public.working_papers ${where} ORDER BY reference ASC`, params);
+    res.json(rows);
+  } catch (e) { next(e); }
+});
+
+app.post('/api/working-papers', async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const compilationId = b.compilationId;
+    if (!compilationId) return res.status(400).json({ message: 'compilationId is required' });
+    // Derive tenant from the compilation (no auth context in the monorepo API).
+    const comp = await query<any>(`SELECT "tenantId" FROM public.compilations WHERE id::text = $1 LIMIT 1`, [String(compilationId)]);
+    const tenantId = comp[0]?.tenantId;
+    if (!tenantId) return res.status(400).json({ message: 'Compilation not found' });
+    // Auto-generate reference: WP-001, WP-002, … per compilation (matches source service).
+    const cnt = await query<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM public.working_papers WHERE "compilationId" = $1 AND "tenantId" = $2`,
+      [String(compilationId), tenantId]
+    );
+    const reference = b.reference || `WP-${String((cnt[0]?.n || 0) + 1).padStart(3, '0')}`;
+    const rows = await query<any>(
+      `INSERT INTO public.working_papers
+         ("tenantId","compilationId","reference","title","description","sectionId","status")
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       RETURNING *`,
+      [tenantId, String(compilationId), reference, b.title || 'Untitled',
+       b.description ?? null, b.section ?? b.sectionId ?? null, b.status || 'not_started']
+    );
+    res.status(201).json(rows[0]);
+  } catch (e) { next(e); }
+});
+// Adjustments — real CRUD against the AFS DB (ports server adjustments.service.ts).
+// SCOA/PPID lookups are autocompletes; return [] here (codes can be typed manually).
+app.get('/api/adjustments/lookup/scoa', (_req, res) => res.json([]));
+app.get('/api/adjustments/lookup/ppid', (_req, res) => res.json([]));
+
+app.get('/api/adjustments', async (req, res, next) => {
+  try {
+    const compilationId = req.query.compilationId as string | undefined;
+    const rows = compilationId
+      ? await query<any>(`SELECT * FROM public.adjustments WHERE "compilationId" = $1 ORDER BY "createdAt" DESC`, [String(compilationId)])
+      : await query<any>(`SELECT * FROM public.adjustments ORDER BY "createdAt" DESC`);
+    res.json(rows);
+  } catch (e) { next(e); }
+});
+
+app.post('/api/adjustments', async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const compilationId = b.compilationId;
+    if (!compilationId) return res.status(400).json({ message: 'compilationId is required' });
+    // Derive tenant from the compilation (no auth context in the monorepo API).
+    const comp = await query<any>(`SELECT "tenantId" FROM public.compilations WHERE id::text = $1 LIMIT 1`, [String(compilationId)]);
+    const tenantId = comp[0]?.tenantId;
+    if (!tenantId) return res.status(400).json({ message: 'Compilation not found' });
+
+    const lines = Array.isArray(b.lines) ? b.lines.filter((l: any) => l && l.glAccountCode) : [];
+    let totalDebit = 0, totalCredit = 0;
+    for (const l of lines) { totalDebit += Number(l.debitAmount || 0); totalCredit += Number(l.creditAmount || 0); }
+    const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01;
+
+    const cnt = await query<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM public.adjustments WHERE "compilationId" = $1 AND "tenantId" = $2`,
+      [String(compilationId), tenantId]
+    );
+    const reference = b.reference || `ADJ-${String((cnt[0]?.n || 0) + 1).padStart(4, '0')}`;
+
+    const adjRows = await query<any>(
+      `INSERT INTO public.adjustments
+         (id,"tenantId","compilationId","reference","description","adjustmentType","impactType","status",
+          "effectiveDate","reason","totalDebit","totalCredit","isBalanced","preparedBy","createdAt","updatedAt")
+       VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,'draft',$7,$8,$9,$10,$11,$12,NOW(),NOW())
+       RETURNING *`,
+      [tenantId, String(compilationId), reference, b.description || '', b.adjustmentType || 'audit',
+       b.impactType || 'presentation_only', b.effectiveDate ? new Date(b.effectiveDate) : new Date(),
+       b.reason ?? null, totalDebit, totalCredit, isBalanced, b.preparedBy || 'system']
+    );
+    const adj = adjRows[0];
+
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      await query(
+        `INSERT INTO public.adjustment_lines
+           (id,"adjustmentId","glAccountCode","glAccountName","lineItemId","debitAmount","creditAmount","description",
+            "mscoaSegment","scoaItemCode","scoaFunctionCode","scoaFundCode","scoaProjectCode","scoaRegionCode","scoaCostingCode","ppid","sortOrder","createdAt")
+         VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW())`,
+        [adj.id, l.glAccountCode, l.glAccountName ?? null, l.lineItemId ?? null,
+         Number(l.debitAmount || 0), Number(l.creditAmount || 0), l.description ?? null,
+         l.mscoaSegment ?? l.scoaSegment ?? null, l.scoaItemCode ?? null, l.scoaFunctionCode ?? null,
+         l.scoaFundCode ?? null, l.scoaProjectCode ?? null, l.scoaRegionCode ?? null, l.scoaCostingCode ?? null,
+         l.ppid ?? null, i]
+      );
+    }
+    res.status(201).json(adj);
+  } catch (e) { next(e); }
+});
+
+app.get('/api/adjustments/:id', async (req, res, next) => {
+  try {
+    const rows = await query<any>(`SELECT * FROM public.adjustments WHERE id::text = $1 LIMIT 1`, [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ message: 'Adjustment not found' });
+    const lines = await query<any>(`SELECT * FROM public.adjustment_lines WHERE "adjustmentId"::text = $1 ORDER BY "sortOrder"`, [req.params.id]);
+    res.json({ ...rows[0], lines });
+  } catch (e) { next(e); }
+});
+
+app.get('/api/adjustments/:id/impact', (_req, res) =>
+  res.json({ available: false, message: 'Impact preview is not computed in this environment.', lines: [] }));
+
+// Workflow transitions
+async function setAdjStatus(id: string, sets: Record<string, any>): Promise<any> {
+  const cols = Object.keys(sets);
+  const setSql = cols.map((c, i) => `"${c}" = $${i + 2}`).join(', ');
+  const rows = await query<any>(
+    `UPDATE public.adjustments SET ${setSql}, "updatedAt" = NOW() WHERE id::text = $1 RETURNING *`,
+    [id, ...cols.map(c => sets[c])]
+  );
+  return rows[0];
+}
+app.post('/api/adjustments/:id/submit', async (req, res, next) => {
+  try { res.json(await setAdjStatus(req.params.id, { status: 'pending_review' })); } catch (e) { next(e); }
+});
+app.post('/api/adjustments/:id/approve', async (req, res, next) => {
+  try { res.json(await setAdjStatus(req.params.id, { status: 'approved', approvedAt: new Date() })); } catch (e) { next(e); }
+});
+app.post('/api/adjustments/:id/reject', async (req, res, next) => {
+  try { res.json(await setAdjStatus(req.params.id, { status: 'rejected', rejectedAt: new Date(), rejectionReason: req.body?.reason ?? null })); } catch (e) { next(e); }
+});
+app.post('/api/adjustments/:id/post', async (req, res, next) => {
+  try { res.json(await setAdjStatus(req.params.id, { status: 'posted', postedAt: new Date() })); } catch (e) { next(e); }
+});
+
+app.get('/api/validation-rules/results', (_req, res) => res.json({ results: [], total: 0 }));
+app.post('/api/validation-rules/run', (_req, res) => res.json({ status: 'ok', runId: 'demo-' + Date.now() }));
+app.get('/api/ems-data/status', (_req, res) => res.json({ status: 'idle', lastSync: null }));
+app.post('/api/ems-data/sync', (_req, res) => res.json({ status: 'started', jobId: 'demo-' + Date.now() }));
+app.get('/api/ems-data/sync/progress', (_req, res) => res.json({ status: 'idle', progress: 0 }));
+app.get('/api/platinum/sync/status', (_req, res) => res.json({ status: 'idle', lastSync: null }));
+app.post('/api/platinum/sync/general-ledger', (_req, res) => res.json({ status: 'started' }));
+app.post('/api/platinum/sync/trial-balance', (_req, res) => res.json({ status: 'started' }));
+app.post('/api/platinum/sync/cancel', (_req, res) => res.json({ status: 'cancelled' }));
+
+// ────────────────────────────────────────────────────────────
+// ART (source-system) proxy  → /api/art/*   (art.ts, reads ART_API_URL/USER/PASS)
+// Platinum core financials proxy → /api/platinum/*  (platinum.ts, reads AFS_PLATINUM_API_URL)
+// The /api/platinum/sync/* stubs above remain (mutation endpoints are not proxied).
+// ────────────────────────────────────────────────────────────
+app.use('/api/art', artRouter);
+app.use('/api/platinum', platinumRouter);
 
 // ────────────────────────────────────────────────────────────
 // Centralised error handler

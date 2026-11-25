@@ -12,6 +12,7 @@ import { PaginationComponent } from '../../../shared/components/pagination/pagin
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, PaginationComponent],
   templateUrl: './pay-points.component.html',
+  host: { 'data-accent': 'payroll' },
   styleUrl: './pay-points.component.css'
 })
 export class PayPointsComponent implements OnInit {

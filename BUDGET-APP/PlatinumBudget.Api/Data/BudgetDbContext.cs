@@ -36,10 +36,13 @@ public class BudgetDbContext : DbContext
     public DbSet<VirementPolicyRule> VirementPolicyRules => Set<VirementPolicyRule>();
     public DbSet<ProjectBudgetLine> ProjectBudgetLines => Set<ProjectBudgetLine>();
 
+    public DbSet<CouncilBudgetApproval> CouncilBudgetApprovals => Set<CouncilBudgetApproval>();
+
     public DbSet<ServiceCategory> ServiceCategories => Set<ServiceCategory>();
     public DbSet<Tariff> Tariffs => Set<Tariff>();
     public DbSet<TariffScenario> TariffScenarios => Set<TariffScenario>();
     public DbSet<TariffScenarioLine> TariffScenarioLines => Set<TariffScenarioLine>();
+    public DbSet<TariffScenarioServiceIncrease> TariffScenarioServiceIncreases => Set<TariffScenarioServiceIncrease>();
     public DbSet<ConsumerCategory> ConsumerCategories => Set<ConsumerCategory>();
     public DbSet<ConsumerCategoryService> ConsumerCategoryServices => Set<ConsumerCategoryService>();
     public DbSet<RevenueProjection> RevenueProjections => Set<RevenueProjection>();
@@ -60,6 +63,7 @@ public class BudgetDbContext : DbContext
     public DbSet<CreditorsBudgetApproval> CreditorsBudgetApprovals => Set<CreditorsBudgetApproval>();
 
     public DbSet<PostEstablishment> PostEstablishments => Set<PostEstablishment>();
+    public DbSet<ProjectImportBatch> ProjectImportBatches => Set<ProjectImportBatch>();
     public DbSet<SalaryStructure> SalaryStructures => Set<SalaryStructure>();
     public DbSet<SalaryIncrease> SalaryIncreases => Set<SalaryIncrease>();
     public DbSet<TemporaryContract> TemporaryContracts => Set<TemporaryContract>();
@@ -142,6 +146,7 @@ public class BudgetDbContext : DbContext
     public DbSet<Const_SCOA_Project_Structure> Const_SCOA_Project_Structure => Set<Const_SCOA_Project_Structure>();
     public DbSet<Const_SCOA_Regional_Structure> Const_SCOA_Regional_Structure => Set<Const_SCOA_Regional_Structure>();
     public DbSet<Const_SCOA_Structure> Const_SCOA_Structure => Set<Const_SCOA_Structure>();
+    public DbSet<Const_ProjectItem> Const_ProjectItem => Set<Const_ProjectItem>();
 
       // EMS Plan Tables (from EMS_GeorgeUAT schema)
       public DbSet<Plan_Activity> Plan_Activity => Set<Plan_Activity>();
@@ -214,15 +219,17 @@ public class BudgetDbContext : DbContext
     public DbSet<Plan_Project_Beneficiaries> Plan_Project_Beneficiaries => Set<Plan_Project_Beneficiaries>();
     public DbSet<Plan_Project_CashFlow> Plan_Project_CashFlow => Set<Plan_Project_CashFlow>();
     public DbSet<Plan_ProjectDivisions> Plan_ProjectDivisions => Set<Plan_ProjectDivisions>();
-    public DbSet<Plan_ProjectFunctions> Plan_ProjectFunctions => Set<Plan_ProjectFunctions>();
-    public DbSet<Plan_ProjectFund> Plan_ProjectFund => Set<Plan_ProjectFund>();
-    public DbSet<Plan_ProjectFundYear> Plan_ProjectFundYear => Set<Plan_ProjectFundYear>();
+
+    public DbSet<Plan_ProjectScoaFunds> Plan_ProjectScoaFunds => Set<Plan_ProjectScoaFunds>();
+    public DbSet<Plan_ProjectScoaRegions> Plan_ProjectScoaRegions => Set<Plan_ProjectScoaRegions>();
+    public DbSet<Plan_ProjectScoaItem> Plan_ProjectScoaItem => Set<Plan_ProjectScoaItem>();
     public DbSet<Plan_ProjectIDP> Plan_ProjectIDP => Set<Plan_ProjectIDP>();
     public DbSet<Plan_ProjectItem> Plan_ProjectItem => Set<Plan_ProjectItem>();
+    public DbSet<Section71_NTMapping> Section71_NTMapping => Set<Section71_NTMapping>();
+    public DbSet<Const_Section71_ScoaVersion_Sys> Const_Section71_ScoaVersion_Sys => Set<Const_Section71_ScoaVersion_Sys>();
     public DbSet<Plan_ProjectItemDocs> Plan_ProjectItemDocs => Set<Plan_ProjectItemDocs>();
     public DbSet<Plan_ProjectItemMonth> Plan_ProjectItemMonth => Set<Plan_ProjectItemMonth>();
     public DbSet<Plan_ProjectJustification> Plan_ProjectJustification => Set<Plan_ProjectJustification>();
-    public DbSet<Plan_ProjectRegions> Plan_ProjectRegions => Set<Plan_ProjectRegions>();
     public DbSet<Plan_SupplementaryAdjustment> Plan_SupplementaryAdjustment => Set<Plan_SupplementaryAdjustment>();
     public DbSet<Plan_TrackChanges> Plan_TrackChanges => Set<Plan_TrackChanges>();
     public DbSet<Plan_TrackChangesVirement> Plan_TrackChangesVirement => Set<Plan_TrackChangesVirement>();
@@ -234,6 +241,11 @@ public class BudgetDbContext : DbContext
     public DbSet<Plan_VirementPolicyVersion> Plan_VirementPolicyVersion => Set<Plan_VirementPolicyVersion>();
     public DbSet<Plan_VirementPolicyVersionDetail> Plan_VirementPolicyVersionDetail => Set<Plan_VirementPolicyVersionDetail>();
     public DbSet<Plan_Virements> Plan_Virements => Set<Plan_Virements>();
+    // Monorepo-only: used by ProjectFundingController.cs (not present in the standalone — do not remove on future syncs)
+    public DbSet<Plan_ProjectFunctions> Plan_ProjectFunctions => Set<Plan_ProjectFunctions>();
+    public DbSet<Plan_ProjectFund> Plan_ProjectFund => Set<Plan_ProjectFund>();
+    public DbSet<Plan_ProjectFundYear> Plan_ProjectFundYear => Set<Plan_ProjectFundYear>();
+    public DbSet<Plan_ProjectRegions> Plan_ProjectRegions => Set<Plan_ProjectRegions>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -304,8 +316,6 @@ public class BudgetDbContext : DbContext
         modelBuilder.Entity<BudgetApproval>(e =>
         {
             e.HasOne(x => x.BudgetVersion).WithMany(v => v.Approvals).HasForeignKey(x => x.BudgetVersionId);
-            e.Property(x => x.EntityType).HasConversion<string>().HasMaxLength(30);
-            e.Property(x => x.Decision).HasConversion<string>().HasMaxLength(20);
         });
 
         modelBuilder.Entity<Models.ValidationResult>(e =>
@@ -427,6 +437,14 @@ public class BudgetDbContext : DbContext
             e.Property(x => x.ProjectedRevenue).HasPrecision(18, 2);
             e.Property(x => x.VarianceAmount).HasPrecision(18, 2);
             e.Property(x => x.VariancePercent).HasPrecision(8, 2);
+        });
+
+        modelBuilder.Entity<TariffScenarioServiceIncrease>(e =>
+        {
+            e.HasOne(x => x.Scenario).WithMany(s => s.ServiceIncreases).HasForeignKey(x => x.TariffScenarioId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(x => x.ServiceType).HasMaxLength(50);
+            e.Property(x => x.ConsumerType).HasMaxLength(50);
+            e.Property(x => x.IncreasePercentage).HasPrecision(5, 2);
         });
 
         modelBuilder.Entity<ConsumerCategory>(e =>

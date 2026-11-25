@@ -2,6 +2,7 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { firstValueFrom, Observable, of } from 'rxjs';
+import { MsAuthService } from './ms-auth.service';
 
 /**
  * User shape matches POS-API session payload (the system-wide auth source of truth).
@@ -19,6 +20,12 @@ export interface AuthUser {
   finYear: string;
   /** Convenience aliases used by some legacy components */
   role?: string;
+  /**
+   * Effective side-nav module codes the user may access (e.g. ['dashboard',
+   * 'assets']). Delivered by POS-API in the login/session payload. superUsers
+   * ignore this list and see everything (see canAccessModule).
+   */
+  modules?: string[];
 }
 
 export interface SiteInfo {
@@ -39,6 +46,21 @@ export interface LoginResponse {
 const STORAGE_USER = 'platinum_user';
 const STORAGE_SITE = 'platinum_site';
 const STORAGE_TOKEN = 'platinum_token';
+/**
+ * Set when the user explicitly signs out, so the auto-admin session is NOT
+ * silently recreated on the next page load. Cleared on any successful login
+ * (including the "Continue as Administrator" path on the login page).
+ */
+const STORAGE_LOGGED_OUT = 'platinum_logged_out';
+
+/**
+ * Stamped on the instant client-side-only session setLocalSession() applies
+ * before its background real-login upgrade resolves. NOT a real signed JWT —
+ * getGlobalToken() must never hand this to a module that verifies
+ * signatures, or it gets a guaranteed, confusing 401 instead of simply
+ * omitting the header while the real token is still in flight.
+ */
+const PLACEHOLDER_LOCAL_TOKEN = 'local-session-token';
 
 /**
  * The base path that proxies to POS-API (the identity provider).
@@ -50,6 +72,7 @@ const POS_AUTH_BASE = '/pos-app/api';
 export class AuthService {
   private http = inject(HttpClient);
   private router = inject(Router);
+  private msAuth = inject(MsAuthService);
 
   private _user = signal<AuthUser | null>(null);
   private _site = signal<SiteInfo | null>(null);
@@ -67,6 +90,33 @@ export class AuthService {
     return u.superUser ? ['admin', 'super'] : ['user'];
   });
 
+  /**
+   * Effective side-nav module codes for the current user. superUsers implicitly
+   * have every module (empty vs full distinction lives in canAccessModule).
+   */
+  allowedModules = computed<string[]>(() => this._user()?.modules ?? []);
+
+  /**
+   * True if the user may access the given side-nav module code. superUsers see
+   * everything; everyone else is gated by their granted module list. Dashboard
+   * is always open so a base user with no grants still has a landing page.
+   *
+   * Access is only enforced once the server has resolved an explicit module
+   * list (an array — possibly empty). When it is unresolved (module access is
+   * unavailable: the feature/EMS is not configured, the lookup failed, or a
+   * cached session predates this feature) we fail OPEN, matching the pre-feature
+   * behaviour, so a real user is never locked out of everything. loadMyModules()
+   * hydrates the authoritative list shortly after.
+   */
+  canAccessModule(code: string): boolean {
+    const u = this._user();
+    if (!u) return false;
+    if (u.superUser) return true;
+    if (code === 'dashboard') return true;
+    if (!Array.isArray(u.modules)) return true; // unresolved → fail open
+    return u.modules.includes(code);
+  }
+
   constructor() {
     // Login screen is disabled — every visitor gets an instant local admin
     // session so the shell + all modules are immediately reachable.
@@ -78,14 +128,56 @@ export class AuthService {
       if (s) this._site.set(JSON.parse(s));
       if (t) this._token.set(t);
     } catch {}
-    if (!this._user()) {
+    let loggedOut = false;
+    try { loggedOut = localStorage.getItem(STORAGE_LOGGED_OUT) === '1'; } catch {}
+    if (!this._user() && !loggedOut) {
       this.setLocalSession('admin');
     }
     this._checked.set(true);
+    // Self-heal module access for a restored (non-super) session whose cached
+    // payload predates this feature.
+    const restored = this._user();
+    if (restored && !restored.superUser && restored.modules === undefined) {
+      this.loadMyModules();
+    }
+  }
+
+  /**
+   * Refreshes the effective module list from POS-API and merges it into the
+   * current user. No-op for superUsers (they already see everything); errors
+   * are swallowed so a transient failure never blocks the shell.
+   */
+  loadMyModules(): void {
+    const u = this._user();
+    if (!u || u.superUser) return;
+    this.http.get<{ modules: string[] }>(`${POS_AUTH_BASE}/auth/my-modules`, { withCredentials: true })
+      .subscribe({
+        next: (resp) => {
+          if (resp && Array.isArray(resp.modules)) {
+            const next = { ...this._user()!, modules: resp.modules };
+            this._user.set(next);
+            try { localStorage.setItem(STORAGE_USER, JSON.stringify(next)); } catch {}
+          }
+        },
+        error: () => { /* non-fatal */ },
+      });
   }
 
   /** Read-only token (used by SCM Azure backend bearer requests). */
   getToken(): string | null { return this._token(); }
+
+  /**
+   * The global identity JWT POS-API mints at login (ems-jwt.ts,
+   * `issueGlobalToken()`), stored in the same `_token`/`platinum_token` slot
+   * `login()`/`loginAzure()` already populate from the response's `token`
+   * field — this is just a clearer name for modules migrating onto it (see
+   * GLOBAL_JWT_PREFIXES in auth.interceptor.ts) so callers don't have to know
+   * that "the token" and "the global auth JWT" are the same value.
+   */
+  getGlobalToken(): string | null {
+    const t = this._token();
+    return t && t !== PLACEHOLDER_LOCAL_TOKEN ? t : null;
+  }
 
   /**
    * Verifies the current session against POS-API. Call from APP_INITIALIZER or
@@ -133,13 +225,56 @@ export class AuthService {
     });
   }
 
+  /**
+   * Azure-AD (MSAL) login. After the front end completes the Microsoft popup,
+   * the resulting claims are posted to POS-API, which looks up / creates the
+   * matching EMS user and starts a cookie session.
+   */
+  loginAzure(
+    claims: { azureUid: string; email: string; username: string },
+    siteId: string = 'george'
+  ): Observable<LoginResponse> {
+    return new Observable<LoginResponse>(sub => {
+      this.http.post<LoginResponse>(
+        `${POS_AUTH_BASE}/auth/createTokenAzure`,
+        { ...claims, siteId },
+        { withCredentials: true }
+      ).subscribe({
+        next: (resp) => {
+          if (resp?.success && resp.user) {
+            this.applySession(resp.user, resp.site, resp.token);
+          }
+          sub.next(resp);
+          sub.complete();
+        },
+        error: (err: HttpErrorResponse) => {
+          sub.next({ success: false, error: err.error?.error || err.message || 'Microsoft sign-in failed' });
+          sub.complete();
+        }
+      });
+    });
+  }
+
   /** Convenience used by login.component when the API returns the legacy shape. */
   handleLoginSuccess(response: { token?: string; user: AuthUser; site?: SiteInfo }) {
     this.applySession(response.user, response.site, response.token);
     this.router.navigate(['/dashboard']);
   }
 
-  /** Compatibility shim: legacy quick-admin path used as offline fallback. */
+  /**
+   * Compatibility shim: legacy quick-admin path used as offline fallback (and,
+   * per the constructor, the default session for every visitor since login is
+   * disabled). Applies an instant, purely client-side session synchronously
+   * (zero perceived latency, works even with POS-API unreachable) stamped
+   * with a placeholder token — NOT a real signed JWT, so it must never be
+   * sent to a module that verifies signatures (Performance, Payroll,
+   * Overtime, SCM's fallback path). In the background, tries a real POS-API
+   * demo login (admin/admin123, POS-API's DEMO_ACCOUNTS fast-path) to obtain
+   * a genuine global JWT and upgrade the session with it — mirrors the same
+   * "instant then upgrade" pattern POS-API's own demo-mode login uses. Errors
+   * are swallowed: an unreachable POS-API just means the fabricated session
+   * persists, exactly like before this upgrade existed.
+   */
   setLocalSession(username: string) {
     const user: AuthUser = {
       user_ID: 1, userName: username, firstName: 'System', lastName: 'Admin',
@@ -147,7 +282,34 @@ export class AuthService {
       cashFloat: 0, finYear: '2025', role: 'admin',
     };
     const site: SiteInfo = { id: 'george', name: 'George Municipality' };
-    this.applySession(user, site, 'local-session-token');
+    this.applySession(user, site, PLACEHOLDER_LOCAL_TOKEN);
+
+    if (username === 'admin') {
+      // Deferred to a macrotask, not called synchronously: when
+      // setLocalSession() runs from this class's own constructor (the normal
+      // case — see below), an inline http.post() here would re-enter
+      // authInterceptor's `inject(AuthService)` on the same instance before
+      // its constructor has returned, which Angular rejects as a circular
+      // dependency (NG0200). Deferring runs it after construction completes.
+      setTimeout(() => {
+        this.http.post<LoginResponse>(
+          `${POS_AUTH_BASE}/auth/login`,
+          { username: 'admin', password: 'admin123', siteId: site.id },
+          { withCredentials: true }
+        ).subscribe({
+          next: (resp) => {
+            if (resp?.success && resp.token) {
+              // Merge the real token into the already-applied session without
+              // touching user/site (avoids clobbering anything the caller or
+              // a subsequent checkAuth() already set in the meantime).
+              this._token.set(resp.token);
+              try { localStorage.setItem(STORAGE_TOKEN, resp.token); } catch {}
+            }
+          },
+          error: () => { /* POS-API unreachable — keep the placeholder session */ },
+        });
+      });
+    }
   }
 
   /** Loads the list of sites from POS-API for the login dropdown. */
@@ -155,13 +317,26 @@ export class AuthService {
     return this.http.get<SiteInfo[]>(`${POS_AUTH_BASE}/sites`, { withCredentials: true });
   }
 
-  async logout(): Promise<void> {
+  /**
+   * Signs the user out.
+   * @param persist When true (explicit "Sign Out"), remembers the logged-out
+   *   state so the auto-admin session is NOT silently recreated on reload.
+   *   The interceptor's 401 teardown passes false so expected upstream 401s
+   *   (e.g. the SCM Azure API) don't lock the user out permanently.
+   */
+  async logout(persist = true): Promise<void> {
     try {
       await firstValueFrom(
         this.http.post(`${POS_AUTH_BASE}/auth/logout`, {}, { withCredentials: true })
       );
     } catch {}
     this.clearSession();
+    // Also drop any Microsoft account so the login page doesn't bounce the
+    // user straight back to the dashboard via msAuth.isSignedIn().
+    try { await this.msAuth.clearLocalSession(); } catch {}
+    if (persist) {
+      try { localStorage.setItem(STORAGE_LOGGED_OUT, '1'); } catch {}
+    }
     this.router.navigate(['/login']);
   }
 
@@ -177,6 +352,8 @@ export class AuthService {
     this._site.set(site || null);
     if (token) this._token.set(token);
     try {
+      // A fresh session means the user is no longer explicitly signed out.
+      localStorage.removeItem(STORAGE_LOGGED_OUT);
       localStorage.setItem(STORAGE_USER, JSON.stringify(user));
       if (site) localStorage.setItem(STORAGE_SITE, JSON.stringify(site));
       if (token) localStorage.setItem(STORAGE_TOKEN, token);

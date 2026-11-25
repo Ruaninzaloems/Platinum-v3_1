@@ -41,7 +41,7 @@ public class AssetFairValueApprovalController : ControllerBase
         await conn.OpenAsync();
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Asset_FairValueApproval"" (""RegistrationItemFairValue_Id"", ""ApprovalDate"", ""ApprovedByID"", ""Status"", ""Comments"", ""DateCaptured"", ""CapturerID"")
-            VALUES (@AssetFairValue_ID, @ApprovalDate, @ApprovedByID, @Status, @Comments, GETDATE(), @CapturerID)
+            VALUES (@AssetFairValue_ID, @ApprovalDate, @ApprovedByID, @Status, @Comments, NOW(), @CapturerID)
             RETURNING ""Asset_FairValueApproval_ID""", model);
         model.FairValueApproval_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);

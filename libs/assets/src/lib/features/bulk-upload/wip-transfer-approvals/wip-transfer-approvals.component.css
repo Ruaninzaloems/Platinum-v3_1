@@ -134,3 +134,11 @@
 }
 .already-processed p { margin: 8px 0 0; }
 .already-processed strong { color: #1e293b; }
+
+.approve-error-alert {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 12px 16px; margin: 12px 16px 0;
+  background: #fef2f2; color: #991b1b; border: 1px solid #fecaca;
+  border-radius: 6px; font-size: 13px; line-height: 1.5; word-break: break-word;
+}
+.approve-error-alert mat-icon { font-size: 18px; width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; }

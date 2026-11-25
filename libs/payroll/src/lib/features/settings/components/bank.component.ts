@@ -10,6 +10,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent],
   templateUrl: './bank.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './bank.component.css'
 })
 export class BankComponent implements OnInit {

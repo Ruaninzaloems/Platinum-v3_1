@@ -2,12 +2,14 @@ import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { ApiService } from '../../../core/api.service';
+import { BulkValidationErrorsDialogComponent } from './bulk-validation-errors-dialog.component';
 
 @Component({
   selector: 'app-bulk-transactions',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatIconModule],
+  imports: [CommonModule, FormsModule, MatIconModule, MatDialogModule],
   template: `
     <div class="section-card">
       <div class="section-title">Bulk Transactions — Upload &amp; Validate</div>
@@ -22,6 +24,8 @@ import { ApiService } from '../../../core/api.service';
             <option value="ImpairmentReversal">Impairment Reversal</option>
             <option value="Disposal">Disposal</option>
             <option value="Refurbishment">Refurbishment</option>
+            <option value="AssetTransfer">Asset Transfer</option>
+            <option value="RULAdjustment">RUL Adjustment</option>
           </select>
         </div>
         <div style="display:flex; align-items:flex-end; gap:10px;">
@@ -54,31 +58,6 @@ import { ApiService } from '../../../core/api.service';
         </div>
       }
 
-      @if (validationErrors().length > 0) {
-        <div style="margin-top:16px;">
-          <div class="alert alert-danger">
-            <mat-icon>error</mat-icon> Validation failed — {{ validationErrors().length }} issue(s) found:
-          </div>
-          <table class="data-table" style="margin-top:8px;">
-            <thead>
-              <tr><th>Row</th><th>Error(s)</th></tr>
-            </thead>
-            <tbody>
-              @for (ve of validationErrors(); track ve.row) {
-                <tr>
-                  <td>{{ ve.row === 0 ? 'General' : ve.row }}</td>
-                  <td>
-                    @for (e of ve.errors; track e) {
-                      <div>{{ e }}</div>
-                    }
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      }
-
       @if (uploadSuccess()) {
         <div class="alert alert-success" style="margin-top:16px;">
           <mat-icon>check_circle</mat-icon> Successfully uploaded {{ uploadResult().totalRows }} {{ uploadResult().transactionType }} records (Job #{{ uploadResult().jobId }}). Go to "Bulk Transaction Approvals" to approve.
@@ -107,11 +86,19 @@ import { ApiService } from '../../../core/api.service';
           </tr>
           <tr>
             <td><strong>Disposal</strong></td>
-            <td>AssetRegisterItem_ID, DisposalDate, Method, DisposalProceeds, Reason</td>
+            <td>AssetRegisterItem_ID, DisposalDate, Method (Sale / Donation / Scrapping / Trade-in / Theft/Loss), DisposalProceeds, Reason</td>
           </tr>
           <tr>
             <td><strong>Refurbishment</strong></td>
             <td>AssetRegisterItem_ID, RefurbDate, Refurb_DT, Refurb_CT, Refurb_Depreciation, Refurb_Revaluation, Refurb_Impairment, DebitPlanProjectItemId, CreditPlanProjectItemId</td>
+          </tr>
+          <tr>
+            <td><strong>Asset Transfer</strong></td>
+            <td>AssetRegisterItem_ID, TransferDate, FinYear (required), NewAssetTypeId, NewAssetCategoryId, NewAssetSubCategoryId, NewAssetClassId, NewMeasurementTypeId, NewAssetStatusId, NewDepartment, NewDivision, IsInfrastructure, DebitCostPPI, CreditCostPPI, DebitAccDepPPI, CreditAccDepPPI, DebitAccImpPPI, CreditAccImpPPI, DebitRevalPPI, CreditRevalPPI, DebitDepOffsetPPI, CreditDepOffsetPPI</td>
+          </tr>
+          <tr>
+            <td><strong>RUL Adjustment</strong></td>
+            <td>AssetRegisterItem_ID, FinancieleJaar (required), TransactionDate, AdjUsefulLifeMonths, AdjRemainingUsefulLifeYears, AdjRemainingUsefulLifeMonths, RULAdjustmentIndicator</td>
           </tr>
         </tbody>
       </table>
@@ -150,9 +137,8 @@ export class BulkTransactionsComponent {
   uploadError = signal('');
   uploadSuccess = signal(false);
   uploadResult = signal<any>({});
-  validationErrors = signal<any[]>([]);
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private dialog: MatDialog) {}
 
   downloadTemplate() {
     if (!this.transactionType) return;
@@ -171,7 +157,6 @@ export class BulkTransactionsComponent {
     this.uploading.set(true);
     this.uploadError.set('');
     this.uploadSuccess.set(false);
-    this.validationErrors.set([]);
     this.uploadResult.set({});
 
     var self = this;
@@ -184,9 +169,16 @@ export class BulkTransactionsComponent {
       error: function(err: any) {
         self.uploading.set(false);
         var errData = err?.error;
-        if (errData && errData.validationErrors) {
-          self.validationErrors.set(errData.validationErrors);
+        if (errData && errData.validationErrors && errData.validationErrors.length > 0) {
           self.uploadError.set(errData.error || 'Validation failed');
+          self.dialog.open(BulkValidationErrorsDialogComponent, {
+            data: {
+              errorCount: errData.errorCount ?? errData.validationErrors.length,
+              validationErrors: errData.validationErrors
+            },
+            maxWidth: '900px',
+            width: '90vw'
+          });
         } else {
           self.uploadError.set(errData?.error || err?.message || 'Upload failed');
         }

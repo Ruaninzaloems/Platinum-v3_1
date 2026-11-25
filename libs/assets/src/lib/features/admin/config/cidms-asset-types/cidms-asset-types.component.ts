@@ -49,19 +49,21 @@ export class CidmsAssetTypesComponent implements OnInit {
     return '';
   }
 
-  openAdd(): void { this.formData = { assetCIDMSAssetTypeDesc: '', assetCIDMSGroupTypeID: null }; this.editingId.set(null); this.showForm.set(true); }
+  openAdd(): void { this.formData = { assetCIDMSAssetTypeDesc: '', assetCIDMSGroupTypeID: null, enabled: 1 }; this.editingId.set(null); this.showForm.set(true); }
 
   openEdit(item: any): void {
-    this.formData = { assetCIDMSAssetTypeDesc: item.assetCIDMSAssetTypeDesc, assetCIDMSGroupTypeID: item.assetCIDMSGroupTypeID };
+    this.formData = { assetCIDMSAssetTypeDesc: item.assetCIDMSAssetTypeDesc, assetCIDMSGroupTypeID: item.assetCIDMSGroupTypeID, enabled: item.enabled ?? 1 };
     this.editingId.set(item.assetCIDMSAssetTypeID);
     this.showForm.set(true);
   }
 
   cancelForm(): void { this.showForm.set(false); this.editingId.set(null); }
 
+  onEnabledChange(event: Event): void { this.formData.enabled = (event.target as HTMLInputElement).checked ? 1 : 0; }
+
   save(): void {
     const id = this.editingId();
-    const payload = { assetCIDMSAssetTypeDesc: this.formData.assetCIDMSAssetTypeDesc, assetCIDMSGroupTypeID: this.formData.assetCIDMSGroupTypeID ? Number(this.formData.assetCIDMSGroupTypeID) : null };
+    const payload = { assetCIDMSAssetTypeDesc: this.formData.assetCIDMSAssetTypeDesc, assetCIDMSGroupTypeID: this.formData.assetCIDMSGroupTypeID ? Number(this.formData.assetCIDMSGroupTypeID) : null, enabled: this.formData.enabled };
     const obs = id ? this.api.updateCidmsAssetType(id, payload) : this.api.createCidmsAssetType(payload);
     obs.subscribe({
       next: function(this: CidmsAssetTypesComponent) { this.showForm.set(false); this.loadData(); this.snackBar.open(id ? 'Updated' : 'Created', 'OK', { duration: 3000 }); }.bind(this),
@@ -95,6 +97,12 @@ export class CidmsAssetTypesComponent implements OnInit {
   downloadTemplate(): void {
     this.api.downloadCidmsAssetTypeTemplate().subscribe({
       next: function(blob: Blob) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'cidms_asset_types_template.xlsx'; a.click(); URL.revokeObjectURL(url); }
+    });
+  }
+
+  exportToExcel(): void {
+    this.api.exportCidmsAssetTypes().subscribe({
+      next: (blob: Blob) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'cidms_asset_types_export.xlsx'; a.click(); URL.revokeObjectURL(url); }
     });
   }
 }

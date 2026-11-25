@@ -9,7 +9,7 @@ import type { UpdateCycleInputStatus } from "./updateCycleInputStatus";
 
 export interface UpdateCycleInput {
   financialYearLabel?: string;
-  startDate?: Date;
-  endDate?: Date;
+  startDate?: string;
+  endDate?: string;
   status?: UpdateCycleInputStatus;
 }

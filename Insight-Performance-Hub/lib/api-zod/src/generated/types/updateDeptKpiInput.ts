@@ -5,6 +5,7 @@
  * Organisational Performance Management API
  * OpenAPI spec version: 0.1.0
  */
+import type { UpdateDeptKpiInputCustomFields } from "./updateDeptKpiInputCustomFields";
 
 export interface UpdateDeptKpiInput {
   kpiNumber?: string;
@@ -18,4 +19,5 @@ export interface UpdateDeptKpiInput {
   weighting?: number;
   unitOfMeasureId?: number;
   isCumulative?: boolean;
+  customFields?: UpdateDeptKpiInputCustomFields;
 }

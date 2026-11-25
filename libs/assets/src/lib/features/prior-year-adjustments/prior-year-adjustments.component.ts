@@ -6,11 +6,12 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService } from '../../core/api.service';
+import { AssetDocumentPanelComponent } from '../../shared/asset-document-panel/asset-document-panel.component';
 
 @Component({
   selector: 'app-prior-year-adjustments',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatIconModule, MatProgressSpinnerModule, MatSnackBarModule, MatTooltipModule],
+  imports: [CommonModule, FormsModule, MatIconModule, MatProgressSpinnerModule, MatSnackBarModule, MatTooltipModule, AssetDocumentPanelComponent],
   templateUrl: './prior-year-adjustments.component.html',
   styleUrls: ['./prior-year-adjustments.component.css']
 })
@@ -79,6 +80,9 @@ export class PriorYearAdjustmentsComponent implements OnInit {
   // Step 4 — preview
   calculating = false;
   submitting = false;
+  submitSuccess = false;
+  lastSubmittedId: number | null = null;
+  lastSubmittedPyaAssetId: number = 0;
   calcResult: any = null;
   calcError: string = '';
 
@@ -111,6 +115,12 @@ export class PriorYearAdjustmentsComponent implements OnInit {
   reviewDocUploading = false;
   reviewDocError: string = '';
   reviewDocFile: File | null = null;
+
+  pyaDocCount = signal(0);
+
+  onPyaDocumentsChanged(docs: any[]) {
+    this.pyaDocCount.set((docs || []).length);
+  }
 
   constructor(private api: ApiService, private snackBar: MatSnackBar) {}
 
@@ -311,25 +321,27 @@ export class PriorYearAdjustmentsComponent implements OnInit {
     this.api.submitPriorYearAdjustment(body).subscribe({
       next: function(res: any) {
         var submittedId: number = res.id;
+        self.lastSubmittedId = submittedId;
+        self.lastSubmittedPyaAssetId = Number(self.selectedAsset?.assetRegisterItem_ID || self.selectedAsset?.assetId) || 0;
         if (self.captureDocFile) {
           self.api.uploadPriorYearDocument(submittedId, self.captureDocFile).subscribe({
             next: function() {
               self.submitting = false;
+              self.submitSuccess = true;
               self.snackBar.open('Adjustment submitted (ID: ' + submittedId + ') with supporting document. Awaiting approval.', 'OK', { duration: 7000 });
-              self.resetCapture();
               self.loadReviewList();
             },
             error: function() {
               self.submitting = false;
-              self.snackBar.open('Adjustment submitted (ID: ' + submittedId + ') but document upload failed. Upload via Review tab.', 'Close', { duration: 8000 });
-              self.resetCapture();
+              self.submitSuccess = true;
+              self.snackBar.open('Adjustment submitted (ID: ' + submittedId + ') but document upload failed. Attach via the panel below.', 'Close', { duration: 8000 });
               self.loadReviewList();
             }
           });
         } else {
           self.submitting = false;
+          self.submitSuccess = true;
           self.snackBar.open('Prior year adjustment submitted (ID: ' + submittedId + '). Awaiting approval.', 'OK', { duration: 6000 });
-          self.resetCapture();
           self.loadReviewList();
         }
       },
@@ -389,6 +401,9 @@ export class PriorYearAdjustmentsComponent implements OnInit {
   }
 
   resetCapture(): void {
+    this.submitSuccess = false;
+    this.lastSubmittedId = null;
+    this.lastSubmittedPyaAssetId = 0;
     this.captureStep = 1;
     this.searchId = '';
     this.searchDesc = '';
@@ -554,5 +569,9 @@ export class PriorYearAdjustmentsComponent implements OnInit {
     var n = parseFloat(v);
     if (isNaN(n) || n === 0) return '';
     return n > 0 ? 'delta-pos' : 'delta-neg';
+  }
+
+  getPyaAssetId(): number {
+    return Number(this.selectedAsset?.assetRegisterItem_ID || this.selectedAsset?.assetId) || 0;
   }
 }

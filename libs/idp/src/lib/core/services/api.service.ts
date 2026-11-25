@@ -89,6 +89,12 @@ export class ApiService {
     return this.http.patch<void>(`${this.baseUrl}/milestones/${id}/status`, { status });
   }
 
+  uploadMilestoneEvidence(milestoneId: number, file: File): Observable<{ evidenceUrl: string; fileName: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<{ evidenceUrl: string; fileName: string }>(`${this.baseUrl}/milestones/${milestoneId}/upload-evidence`, formData);
+  }
+
   getObjectives(cycleId: number): Observable<IdpStrategicObjective[]> {
     return this.http.get<IdpStrategicObjective[]>(`${this.baseUrl}/objectives/cycle/${cycleId}`);
   }

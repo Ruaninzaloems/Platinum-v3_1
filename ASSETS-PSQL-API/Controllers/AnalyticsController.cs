@@ -273,6 +273,45 @@ public class AnalyticsController : ControllerBase
         return Ok(rows);
     }
 
+    [HttpGet("clearing-balance")]
+    public async Task<IActionResult> GetClearingBalance()
+    {
+        await using var conn = _db.CreateConnection();
+        await conn.OpenAsync();
+
+        var activeFinYearRow = await conn.QueryFirstOrDefaultAsync<dynamic>(@"
+            SELECT ""Financial_Year"" AS fin_year
+            FROM ""Asset_MonthlyApproval""
+            WHERE ""IsApproved"" = TRUE
+            ORDER BY ""Financial_Year"" DESC, ""Financial_Period"" DESC
+            LIMIT 1");
+
+        string finYear = activeFinYearRow != null
+            ? (string)activeFinYearRow.fin_year
+            : (await conn.ExecuteScalarAsync<string>(@"SELECT ""financial_year"" FROM ""Asset_OrganisationSettings"" LIMIT 1") ?? "");
+
+        int[] ids;
+        try
+        {
+            ids = (await conn.QueryAsync<int>(@"
+                SELECT ""PlanProjectItem_ID"" FROM ""Asset_ClearingAccounts""")).ToArray();
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P01") { ids = Array.Empty<int>(); }
+
+        decimal balance = 0;
+        if (ids.Length > 0)
+        {
+            balance = await conn.ExecuteScalarAsync<decimal>(@"
+                SELECT COALESCE(SUM(""Debit""), 0) - COALESCE(SUM(""Credit""), 0)
+                FROM ""Asset_GeneralLedger""
+                WHERE ""PlanProjectItemID"" = ANY(@ids)
+                  AND ""FinYear"" = @finYear",
+                new { ids, finYear });
+        }
+
+        return Ok(new { finYear, balance = Math.Round(balance, 2), itemCount = ids.Length });
+    }
+
     [HttpPatch("insights/{id:int}/dismiss")]
     public async Task<IActionResult> DismissInsight(int id)
     {

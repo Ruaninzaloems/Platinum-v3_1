@@ -8,6 +8,88 @@ const { paginationMiddleware, validateEmployeeMiddleware } = require('../middlew
 const { auditLog } = require('../middleware/auditLog');
 const { query: dbQuery } = require('../config/database');
 const { trackEmployeeChanges } = require('../middleware/historyTracker');
+const { checkPayrollLockdown } = require('../utils/payroll-lockdown');
+
+const VALID_RELATIONSHIPS = ['SELF','SPOUSE','CHILD','OTHER'];
+
+async function validateAndEnrichBanking(body, bankSvc, opts = {}) {
+  const effectiveBankId = opts.effectiveBankId != null ? Number(opts.effectiveBankId) : null;
+  if (body.account_holder_relationship !== undefined && body.account_holder_relationship !== null && body.account_holder_relationship !== '') {
+    if (!VALID_RELATIONSHIPS.includes(body.account_holder_relationship)) {
+      return `account_holder_relationship must be one of ${VALID_RELATIONSHIPS.join(', ')}`;
+    }
+  } else if (body.account_holder_relationship === '') {
+    body.account_holder_relationship = null;
+  }
+
+  if (body.bank_account_number !== undefined && body.bank_account_number !== null && body.bank_account_number !== '') {
+    if (!/^[0-9]{6,16}$/.test(String(body.bank_account_number))) {
+      return 'bank_account_number must be 6-16 digits';
+    }
+  }
+
+  if (body.bank_id !== undefined && body.bank_id !== null && body.bank_id !== '') {
+    const bank = await bankSvc.findBank(body.bank_id).catch(() => null);
+    if (!bank) {
+      const allBanks = await bankSvc.getBanks().catch(() => []);
+      if (allBanks.length > 0) return 'Unknown bank_id';
+    }
+    if (bank) body.bank_name = bank.name || body.bank_name || '';
+  } else if (body.bank_id === '' || body.bank_id === null) {
+    body.bank_id = null;
+  }
+
+  if (body.bank_branch_code_id !== undefined && body.bank_branch_code_id !== null && body.bank_branch_code_id !== '') {
+    const branch = await bankSvc.findBranch(body.bank_branch_code_id).catch(() => null);
+    if (!branch) {
+      const allBranches = await bankSvc.getBranchCodes().catch(() => []);
+      if (allBranches.length > 0) return 'Unknown bank_branch_code_id';
+    }
+    if (branch) {
+      const compareBankId = (body.bank_id !== undefined && body.bank_id !== null && body.bank_id !== '')
+        ? Number(body.bank_id)
+        : effectiveBankId;
+      if (compareBankId && Number(branch.bankId) !== Number(compareBankId)) {
+        return 'bank_branch_code_id does not belong to the selected bank';
+      }
+      body.bank_branch_code = branch.branchCode || body.bank_branch_code || '';
+    }
+  } else if (body.bank_branch_code_id === '' || body.bank_branch_code_id === null) {
+    body.bank_branch_code_id = null;
+  }
+
+  if (body.bank_account_type_id !== undefined && body.bank_account_type_id !== null && body.bank_account_type_id !== '') {
+    const at = await bankSvc.findAccountType(body.bank_account_type_id).catch(() => null);
+    if (!at) {
+      const allTypes = await bankSvc.getAccountTypes().catch(() => []);
+      if (allTypes.length > 0) return 'Unknown bank_account_type_id';
+    }
+    if (at) body.bank_account_type = at.name || body.bank_account_type || '';
+  } else if (body.bank_account_type_id === '' || body.bank_account_type_id === null) {
+    body.bank_account_type_id = null;
+  }
+
+  const hasAnyBanking =
+    (body.bank_id != null && body.bank_id !== '') ||
+    (body.bank_branch_code_id != null && body.bank_branch_code_id !== '') ||
+    (body.bank_account_type_id != null && body.bank_account_type_id !== '') ||
+    (body.bank_account_number != null && body.bank_account_number !== '') ||
+    (body.bank_account_holder != null && String(body.bank_account_holder).trim() !== '') ||
+    (body.account_holder_relationship != null && body.account_holder_relationship !== '');
+
+  if (hasAnyBanking) {
+    const holder = body.bank_account_holder != null ? String(body.bank_account_holder).trim() : '';
+    if (!holder) {
+      return 'bank_account_holder (account holder name) is required when banking details are provided';
+    }
+    const acctNum = body.bank_account_number != null ? String(body.bank_account_number) : '';
+    if (!acctNum) {
+      return 'bank_account_number is required when banking details are provided';
+    }
+  }
+
+  return null;
+}
 
 const photoStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -324,11 +406,13 @@ router.get('/', authenticate, paginationMiddleware, async (req, res, next) => {
       const isNumeric = /^\d+$/.test(search.trim());
       if (isNumeric) {
         const numVal = parseInt(search.trim(), 10);
-        whereClause += ` AND (e.id = $${pi} OR e.employee_code ILIKE $${pi + 1} OR e.id_number ILIKE $${pi + 1} OR e.first_name ILIKE $${pi + 1} OR e.surname ILIKE $${pi + 1})`;
-        searchOrderClause = `CASE WHEN e.id = ${numVal} THEN 0 ELSE 1 END, `;
+        const searchTrim = search.trim();
+        whereClause += ` AND (e.id = $${pi} OR e.employee_code = $${pi + 1} OR e.employee_code ILIKE $${pi + 2})`;
+        searchOrderClause = `CASE WHEN e.id = $${pi} THEN 0 WHEN e.employee_code = $${pi + 1} THEN 1 WHEN e.employee_code ILIKE $${pi + 2} THEN 2 ELSE 3 END, `;
         params.push(numVal);
-        params.push(`%${search}%`);
-        pi += 2;
+        params.push(searchTrim);
+        params.push(`${searchTrim}%`);
+        pi += 3;
       } else {
         whereClause += ` AND (e.first_name ILIKE $${pi} OR e.surname ILIKE $${pi} OR e.employee_code ILIKE $${pi} OR e.id_number ILIKE $${pi} OR CONCAT(e.first_name, ' ', e.surname) ILIKE $${pi})`;
         params.push(`%${search}%`);
@@ -572,6 +656,7 @@ router.get('/lookups/employee-all', authenticate, async (req, res, next) => {
 
 router.get('/vacant-positions', authenticate, async (req, res, next) => {
   try {
+    const { getDepartments, getDivisions } = require('./department.routes');
     const { department_id, division_id } = req.query;
     let sql = `SELECT p.id, p.title, p.position_code, p.department_id, p.division_id,
                p.job_profile_id, p.employee_type_id, p.employee_subtype_id,
@@ -595,8 +680,19 @@ router.get('/vacant-positions', authenticate, async (req, res, next) => {
     if (department_id) { params.push(department_id); sql += ` AND p.department_id = $${params.length}`; }
     if (division_id) { params.push(division_id); sql += ` AND p.division_id = $${params.length}`; }
     sql += ' ORDER BY p.position_code';
-    const result = await dbQuery(sql, params);
-    res.json({ success: true, data: result.rows });
+    const [result, departments, divisions] = await Promise.all([
+      dbQuery(sql, params),
+      getDepartments().catch(() => []),
+      getDivisions().catch(() => [])
+    ]);
+    const deptMap = Object.fromEntries(departments.map(d => [String(d.id), d.name]));
+    const divMap = Object.fromEntries(divisions.map(d => [String(d.id), d.name]));
+    const rows = result.rows.map(p => ({
+      ...p,
+      department_name: p.department_id ? (deptMap[String(p.department_id)] || null) : null,
+      division_name: p.division_id ? (divMap[String(p.division_id)] || null) : null,
+    }));
+    res.json({ success: true, data: rows });
   } catch (err) { next(err); }
 });
 
@@ -641,7 +737,8 @@ router.get('/:id', authenticate, async (req, res, next) => {
               sul.minimum_value AS upper_limit_minimum, sul.midpoint_value AS upper_limit_midpoint, sul.maximum_value AS upper_limit_maximum,
               pp.name AS pay_point_name,
               pcyc.name AS payroll_cycle_name, pcyc.cycle_type AS payroll_cycle_type,
-              (SELECT euls.amount FROM employee_upper_limit_structure euls WHERE euls.employee_id = e.id AND euls.salary_head_id = 1 LIMIT 1) AS upper_limit_basic_salary
+              (SELECT euls.amount FROM employee_upper_limit_structure euls WHERE euls.employee_id = e.id AND euls.salary_head_id = 1 LIMIT 1) AS upper_limit_basic_salary,
+              ls.name AS leave_scheme_name
        FROM employees e
        LEFT JOIN positions p ON e.position_id = p.id
        LEFT JOIN task_grades tg ON e.task_grade_id = tg.id
@@ -653,6 +750,7 @@ router.get('/:id', authenticate, async (req, res, next) => {
        LEFT JOIN salary_upper_limits sul ON jp.upper_limit_id = sul.id
        LEFT JOIN pay_points pp ON e.pay_point_id = pp.id
        LEFT JOIN payroll_cycles pcyc ON e.payroll_cycle_id = pcyc.id
+       LEFT JOIN leave_scheme ls ON e.leave_scheme_id = ls.id
        WHERE e.id = $1`,
       [req.params.id]
     );
@@ -682,6 +780,8 @@ router.post('/', authenticate, auditLog('CREATE', 'employee'), async (req, res, 
       'salary_based_on','wage_rate','working_hours_per_day','working_days_per_week',
       'enable_bonus','bonus_tax_preference','bonus_period','bonus_month','bonus_amount',
       'employee_create_type','pay_point_id','payslip_pref_email','payslip_pref_sms','payslip_pref_print',
+      'bank_name','bank_branch_code','bank_account_number','bank_account_type','bank_account_holder',
+      'bank_id','bank_branch_code_id','bank_account_type_id','account_holder_relationship',
       'physical_address_type','physical_country_id','physical_province_id','physical_town_id','physical_suburb_id',
       'physical_postal_code','physical_unit_number','physical_complex','physical_street_number',
       'physical_address_1','physical_address_2','physical_address_3','physical_address_4','physical_address_5',
@@ -690,6 +790,12 @@ router.post('/', authenticate, auditLog('CREATE', 'employee'), async (req, res, 
       'postal_postal_code','postal_unit_number','postal_complex','postal_street_number',
       'postal_address_1','postal_address_2','postal_address_3','postal_address_4','postal_address_5'
     ];
+
+    const bankSvc = require('../services/bank-lookup.service');
+    const validationErr = await validateAndEnrichBanking(b, bankSvc);
+    if (validationErr) {
+      return res.status(400).json({ success: false, error: { code: 'INVALID_BANKING', message: validationErr } });
+    }
 
     const dateFields = ['date_of_birth','marital_date','joining_date','end_date'];
     const presentFields = fields.filter(f => b[f] !== undefined && b[f] !== '');
@@ -716,12 +822,17 @@ router.post('/', authenticate, auditLog('CREATE', 'employee'), async (req, res, 
 
 router.put('/:id', authenticate, auditLog('UPDATE', 'employee'), async (req, res, next) => {
   try {
+    const empCycleRow = await dbQuery('SELECT payroll_cycle_id FROM employees WHERE id = $1', [req.params.id]);
+    const cycleId = empCycleRow.rows[0]?.payroll_cycle_id ?? null;
+    const lockdown = await checkPayrollLockdown(cycleId);
+    if (lockdown) return res.status(lockdown.status).json(lockdown.body);
     const allowedFields = [
       'title','initials','first_name','full_name','second_name','surname','known_as','nickname',
       'id_number','passport_number','passport_country',
       'date_of_birth','gender','marital_status','marital_date','dependants',
       'nature_of_person_code','home_language','ethnic_group','is_youth','is_foreigner','has_disability',
       'email_address','cell_number','home_number','work_number','income_tax_number',
+      'position_id',
       'employee_type_id','employee_subtype_id','condition_of_service_id',
       'task_grade_id','current_notch','annual_salary','monthly_salary','race','disability_status',
       'payroll_cycle','payroll_cycle_id','tax_method','working_hours_per_month','working_days_per_month','allow_overtime','upper_limit_value_type','exclude_sdl','exclude_uif',
@@ -729,6 +840,7 @@ router.put('/:id', authenticate, auditLog('UPDATE', 'employee'), async (req, res
       'enable_bonus','bonus_tax_preference','bonus_period','bonus_month','bonus_amount',
       'employee_create_type','pay_point_id','payslip_pref_email','payslip_pref_sms','payslip_pref_print',
       'bank_name','bank_branch_code','bank_account_number','bank_account_type','bank_account_holder',
+      'bank_id','bank_branch_code_id','bank_account_type_id','account_holder_relationship',
       'physical_address_type','physical_country_id','physical_province_id','physical_town_id','physical_suburb_id',
       'physical_postal_code','physical_unit_number','physical_complex','physical_street_number',
       'physical_address_1','physical_address_2','physical_address_3','physical_address_4','physical_address_5',
@@ -737,6 +849,18 @@ router.put('/:id', authenticate, auditLog('UPDATE', 'employee'), async (req, res
       'postal_postal_code','postal_unit_number','postal_complex','postal_street_number',
       'postal_address_1','postal_address_2','postal_address_3','postal_address_4','postal_address_5'
     ];
+
+    const bankSvc = require('../services/bank-lookup.service');
+    let effectiveBankId = null;
+    if (req.body.bank_branch_code_id !== undefined && req.body.bank_branch_code_id !== null && req.body.bank_branch_code_id !== ''
+        && (req.body.bank_id === undefined || req.body.bank_id === null || req.body.bank_id === '')) {
+      const cur = await dbQuery(`SELECT bank_id FROM employees WHERE id = $1`, [req.params.id]);
+      effectiveBankId = cur.rows[0]?.bank_id || null;
+    }
+    const validationErr = await validateAndEnrichBanking(req.body, bankSvc, { effectiveBankId });
+    if (validationErr) {
+      return res.status(400).json({ success: false, error: { code: 'INVALID_BANKING', message: validationErr } });
+    }
 
     const dateFields = ['date_of_birth','marital_date','joining_date','end_date'];
     const updates = {};
@@ -749,6 +873,10 @@ router.put('/:id', authenticate, auditLog('UPDATE', 'employee'), async (req, res
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ success: false, error: { code: 'NO_FIELDS', message: 'No valid fields to update' } });
     }
+
+    // Capture old position_id before update so we can sync vacancy status
+    const oldEmpRow = await dbQuery('SELECT position_id FROM employees WHERE id = $1', [req.params.id]);
+    const oldPositionId = oldEmpRow.rows[0]?.position_id ?? null;
 
     const setClauses = [];
     const values = [];
@@ -772,6 +900,26 @@ router.put('/:id', authenticate, auditLog('UPDATE', 'employee'), async (req, res
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Employee not found' } });
     }
+
+    // Sync position vacancy status when position_id changes
+    if (updates.position_id !== undefined) {
+      const newPositionId = updates.position_id || null;
+      // Mark new position as FILLED
+      if (newPositionId) {
+        await dbQuery(`UPDATE positions SET status = 'FILLED' WHERE id = $1`, [newPositionId]);
+      }
+      // Mark old position as VACANT if no other active employee still holds it
+      if (oldPositionId && oldPositionId !== newPositionId) {
+        const still = await dbQuery(
+          `SELECT 1 FROM employees WHERE position_id = $1 AND status = 'ACTIVE' AND id != $2 LIMIT 1`,
+          [oldPositionId, req.params.id]
+        );
+        if (still.rows.length === 0) {
+          await dbQuery(`UPDATE positions SET status = 'VACANT' WHERE id = $1 AND status NOT IN ('FROZEN','ABOLISHED')`, [oldPositionId]);
+        }
+      }
+    }
+
     res.json({ success: true, data: result.rows[0] });
   } catch (err) {
     next(err);
@@ -875,10 +1023,27 @@ router.get('/:id/inherited-salary-transactions', authenticate, async (req, res, 
               sh.code, sh.name, sh.transaction_type, sh.calculation_method,
               sh.irp5_code, sh.taxable, sh.employer_contribution, sh.employee_contribution,
               sh.is_system, sh.priority,
-              ic.description AS irp5_description
+              ic.description AS irp5_description,
+              CASE
+                WHEN sh.transaction_type = 'DEDUCTION' THEN ssd.scoa_code
+                ELSE sse.scoa_code
+              END AS primary_scoa_code,
+              CASE
+                WHEN sh.transaction_type = 'DEDUCTION' THEN ssd.scoa_short_desc
+                ELSE sse.scoa_short_desc
+              END AS primary_scoa_short_desc
        FROM salary_transaction_group_items gi
        JOIN salary_heads sh ON sh.id = gi.salary_head_id
        LEFT JOIN irp5_codes ic ON ic.code = sh.irp5_code
+       LEFT JOIN LATERAL (
+         SELECT scoa_item_id_permanent_staff, vendor_scoa_id
+         FROM payroll_gl_items
+         WHERE salary_head_id = sh.id
+         ORDER BY start_date DESC NULLS LAST
+         LIMIT 1
+       ) pgl ON true
+       LEFT JOIN scoa_structure_sync sse ON sse.scoa_id::text = pgl.scoa_item_id_permanent_staff
+       LEFT JOIN scoa_structure_sync ssd ON ssd.scoa_id::text = pgl.vendor_scoa_id
        WHERE gi.group_id = $1 AND sh.enabled = TRUE
        ORDER BY sh.transaction_type, sh.priority, sh.code`,
       [chain.salary_transaction_group_id]
@@ -903,9 +1068,26 @@ router.get('/:id/salary-transactions', authenticate, async (req, res, next) => {
   try {
     const result = await dbQuery(
       `SELECT est.*, sh.code AS salary_head_code, sh.name AS salary_head_name, sh.transaction_type,
-              sh.irp5_code, sh.taxable, sh.calculation_method, sh.employer_contribution, sh.employee_contribution
+              sh.irp5_code, sh.taxable, sh.calculation_method, sh.employer_contribution, sh.employee_contribution,
+              CASE
+                WHEN sh.transaction_type = 'DEDUCTION' THEN ssd.scoa_code
+                ELSE sse.scoa_code
+              END AS primary_scoa_code,
+              CASE
+                WHEN sh.transaction_type = 'DEDUCTION' THEN ssd.scoa_short_desc
+                ELSE sse.scoa_short_desc
+              END AS primary_scoa_short_desc
        FROM employee_salary_transactions est
        JOIN salary_heads sh ON est.salary_head_id = sh.id
+       LEFT JOIN LATERAL (
+         SELECT scoa_item_id_permanent_staff, vendor_scoa_id
+         FROM payroll_gl_items
+         WHERE salary_head_id = sh.id
+         ORDER BY start_date DESC NULLS LAST
+         LIMIT 1
+       ) pgl ON true
+       LEFT JOIN scoa_structure_sync sse ON sse.scoa_id::text = pgl.scoa_item_id_permanent_staff
+       LEFT JOIN scoa_structure_sync ssd ON ssd.scoa_id::text = pgl.vendor_scoa_id
        WHERE est.employee_id = $1 AND est.enabled = TRUE
        ORDER BY sh.transaction_type, sh.priority`,
       [req.params.id]
@@ -925,8 +1107,9 @@ router.post('/:id/salary-transactions', authenticate, auditLog('CREATE', 'employ
     if (headRes.rows.length === 0) return res.status(400).json({ success: false, error: { message: 'Salary head not found or disabled' } });
     const head = headRes.rows[0];
 
-    if (head.calculation_method === 'SYSTEM_CALCULATE') {
-      return res.status(400).json({ success: false, error: { message: `${head.name} is system-calculated (PAYE, UIF, SDL) and cannot be manually assigned to employees` } });
+    const STATUTORY_AUTO_CODES = ['PAYE', 'PAYE_BONUS', 'PAYE_TAX_OVER', 'UIF_EE', 'UIF_ER', 'SDL'];
+    if (STATUTORY_AUTO_CODES.includes(head.code)) {
+      return res.status(400).json({ success: false, error: { message: `${head.name} is a statutory head (${head.code}) automatically applied by the payroll engine and cannot be manually assigned` } });
     }
 
     const result = await dbQuery(
@@ -1232,6 +1415,58 @@ router.post('/import', authenticate, auditLog('CREATE', 'employee_import'), asyn
       data: results,
       message: `Imported ${results.imported} of ${results.total} employees. ${results.errors.length} errors.`
     });
+  } catch (err) { next(err); }
+});
+
+// === Link employee to leave scheme ===
+router.put('/:id/leave-scheme', authenticate, auditLog('UPDATE', 'employee_leave_scheme'), async (req, res, next) => {
+  try {
+    const empId = parseInt(req.params.id, 10);
+    const { leave_scheme_id, no_leave_entitlement } = req.body;
+    const userId = req.user?.id || null;
+
+    // Fetch current employee
+    const empRes = await dbQuery(
+      `SELECT id, employee_type_id, employee_subtype_id, condition_of_service_id, leave_scheme_id
+       FROM employees WHERE id = $1`, [empId]);
+    if (!empRes.rows.length) {
+      return res.status(404).json({ success: false, error: { message: 'Employee not found' } });
+    }
+    const emp = empRes.rows[0];
+
+    // Validate scheme eligibility if a scheme is provided
+    if (leave_scheme_id) {
+      const schemeRes = await dbQuery(
+        `SELECT id, employee_type_id, employee_subtype_id, condition_of_service_id, deleted_at, enabled
+         FROM leave_scheme WHERE id = $1`, [leave_scheme_id]);
+      if (!schemeRes.rows.length || schemeRes.rows[0].deleted_at) {
+        return res.status(400).json({ success: false, error: { message: 'Leave scheme not found or has been deleted' } });
+      }
+      if (!schemeRes.rows[0].enabled) {
+        return res.status(400).json({ success: false, error: { message: 'Leave scheme is not active' } });
+      }
+      const s = schemeRes.rows[0];
+      if (s.employee_type_id && s.employee_type_id !== emp.employee_type_id) {
+        return res.status(400).json({ success: false, error: { message: 'Leave scheme employee type does not match this employee' } });
+      }
+      if (s.employee_subtype_id && s.employee_subtype_id !== emp.employee_subtype_id) {
+        return res.status(400).json({ success: false, error: { message: 'Leave scheme employee sub-type does not match this employee' } });
+      }
+      if (s.condition_of_service_id && s.condition_of_service_id !== emp.condition_of_service_id) {
+        return res.status(400).json({ success: false, error: { message: 'Leave scheme condition of service does not match this employee' } });
+      }
+    }
+
+    const effectiveSchemeId = no_leave_entitlement ? null : (leave_scheme_id || null);
+    const updRes = await dbQuery(
+      `UPDATE employees SET
+         leave_scheme_id = $1,
+         no_leave_entitlement = $2,
+         updated_by = $3, updated_at = NOW()
+       WHERE id = $4 RETURNING id, leave_scheme_id, no_leave_entitlement`,
+      [effectiveSchemeId, !!no_leave_entitlement, userId, empId]
+    );
+    res.json({ success: true, data: updRes.rows[0] });
   } catch (err) { next(err); }
 });
 

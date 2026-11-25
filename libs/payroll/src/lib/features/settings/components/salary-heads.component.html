@@ -127,8 +127,8 @@
           <button class="btn btn-sm" [disabled]="currentIndex >= items.length - 1" (click)="navigateNext()" title="Next"><app-icon name="chevron-right" [size]="14"></app-icon></button>
         </div>
       }
-      @if (mode === 'view' && !item.is_system) {
-        <button class="btn btn-primary" (click)="enterEdit()"><app-icon name="edit" [size]="14"></app-icon> Edit</button>
+      @if (mode === 'view' && (!item.is_system || (item.is_system && isOvertimeEligible))) {
+        <button class="btn btn-primary" (click)="enterEdit()"><app-icon name="edit" [size]="14"></app-icon> {{ item.is_system ? 'Edit Overtime' : 'Edit' }}</button>
       }
       @if (isEditable) {
         <button class="btn btn-primary" (click)="save()"><app-icon name="check" [size]="14"></app-icon> Submit</button>
@@ -170,7 +170,7 @@
         <div class="form-group">
           <label>TRANSACTION TYPE <span class="required">*</span></label>
           @if (isEditable) {
-            <select class="form-control" [(ngModel)]="item.transaction_type">
+            <select class="form-control" [(ngModel)]="item.transaction_type" (ngModelChange)="onTransactionTypeOrIrp5Change()">
               <option [ngValue]="null">— Select Type —</option>
               @for (t of transactionTypes; track t.id) {
                 <option [ngValue]="t.code">{{ t.description }}</option>
@@ -197,7 +197,7 @@
         <div class="form-group">
           <label>IRP5 CODE</label>
           @if (isEditable) {
-            <select class="form-control" [(ngModel)]="item.irp5_code">
+            <select class="form-control" [(ngModel)]="item.irp5_code" (ngModelChange)="onTransactionTypeOrIrp5Change()">
               <option value="">— None —</option>
               @for (c of irp5Codes; track c.id) {
                 <option [value]="c.code">{{ c.code }} — {{ c.description }}</option>
@@ -226,45 +226,55 @@
       <div class="section-title">Options</div>
       <div class="form-grid">
         <div class="form-group">
-          <label>GROUP ON PAYSLIP BY IRP5 CODE</label>
           @if (isEditable) {
-            <div class="checkbox-row">
-              <label class="checkbox-label"><input type="checkbox" [(ngModel)]="item.group_on_payslip_by_irp5"></label>
-            </div>
+            <label class="checkbox-inline-label"><input type="checkbox" [(ngModel)]="item.group_on_payslip_by_irp5"> GROUP ON PAYSLIP BY IRP5 CODE</label>
           } @else {
+            <label>GROUP ON PAYSLIP BY IRP5 CODE</label>
             <div class="field-value"><span class="tag" [class]="item.group_on_payslip_by_irp5 ? 'tag-yes' : 'tag-no'">{{ item.group_on_payslip_by_irp5 ? 'Yes' : 'No' }}</span></div>
           }
         </div>
         <div class="form-group">
-          <label>RETIREMENT FUNDING INCOME</label>
           @if (isEditable) {
-            <div class="checkbox-row">
-              <label class="checkbox-label"><input type="checkbox" [(ngModel)]="item.retirement_funding_income"></label>
-            </div>
+            <label class="checkbox-inline-label"><input type="checkbox" [(ngModel)]="item.retirement_funding_income"> RETIREMENT FUNDING INCOME</label>
           } @else {
+            <label>RETIREMENT FUNDING INCOME</label>
             <div class="field-value"><span class="tag" [class]="item.retirement_funding_income ? 'tag-yes' : 'tag-no'">{{ item.retirement_funding_income ? 'Yes' : 'No' }}</span></div>
           }
         </div>
         <div class="form-group">
-          <label>PRO-RATED TRANSACTION</label>
           @if (isEditable) {
-            <div class="checkbox-row">
-              <label class="checkbox-label"><input type="checkbox" [(ngModel)]="item.pro_rated"></label>
-            </div>
+            <label class="checkbox-inline-label"><input type="checkbox" [(ngModel)]="item.pro_rated"> PRO-RATED TRANSACTION</label>
           } @else {
+            <label>PRO-RATED TRANSACTION</label>
             <div class="field-value"><span class="tag" [class]="item.pro_rated ? 'tag-yes' : 'tag-no'">{{ item.pro_rated ? 'Yes' : 'No' }}</span></div>
           }
         </div>
         <div class="form-group">
-          <label>ENABLED</label>
           @if (isEditable) {
-            <div class="checkbox-row">
-              <label class="checkbox-label"><input type="checkbox" [(ngModel)]="item.enabled"></label>
-            </div>
+            <label class="checkbox-inline-label"><input type="checkbox" [(ngModel)]="item.enabled"> ENABLED</label>
           } @else {
+            <label>ENABLED</label>
             <div class="field-value"><span class="tag" [class]="item.enabled ? 'tag-yes' : 'tag-no'">{{ item.enabled ? 'Yes' : 'No' }}</span></div>
           }
         </div>
+        @if (isOvertimeEligible) {
+          <div class="form-group">
+            @if (isEditable || isSystemOvertimeEdit) {
+              <label class="checkbox-inline-label"><input type="checkbox" [(ngModel)]="item.is_overtime"> OVERTIME TRANSACTION</label>
+            } @else {
+              <label>OVERTIME TRANSACTION</label>
+              <div class="field-value"><span class="tag" [class]="item.is_overtime ? 'tag-yes' : 'tag-no'">{{ item.is_overtime ? 'Yes' : 'No' }}</span></div>
+            }
+          </div>
+          <div class="form-group">
+            <label>OVERTIME MULTIPLIER RATE</label>
+            @if (isEditable || isSystemOvertimeEdit) {
+              <input class="form-control" type="number" [(ngModel)]="item.overtime_multiplier_rate" step="0.01" min="0.01" placeholder="e.g. 1.5" [disabled]="!item.is_overtime">
+            } @else {
+              <div class="field-value">{{ item.overtime_multiplier_rate != null ? item.overtime_multiplier_rate : '—' }}</div>
+            }
+          </div>
+        }
       </div>
     </div>
   }
@@ -434,7 +444,7 @@
               <select class="form-control" [(ngModel)]="testEmployeeId">
                 <option [ngValue]="null">— Use sample data —</option>
                 @for (e of testEmployees; track e.id) {
-                  <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option>
+                  <option [ngValue]="e.id">{{ e.id }} | {{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option>
                 }
               </select>
             </div>

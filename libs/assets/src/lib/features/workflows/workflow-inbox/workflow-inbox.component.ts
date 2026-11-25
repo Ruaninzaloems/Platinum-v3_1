@@ -8,6 +8,8 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
 import { ApiService } from '../../../core/api.service';
+import { OrgSettingsService } from '../../../core/org-settings.service';
+import * as XLSX from 'xlsx';
 
 @Component({
   selector: 'app-workflow-inbox',
@@ -48,11 +50,17 @@ export class WorkflowInboxComponent implements OnInit {
   depPostStep = signal<number>(0);
   depRebuildProgress = signal<{done: number, total: number}>({done: 0, total: 0});
   private depRebuildPollInterval: any = null;
+  private depApprovalPollInterval: any = null;
   glValidationErrors = signal<any[]>([]);
   glValidationVisible = signal(false);
   glValidationTxnType = signal('');
   rejectingScheduleId = signal<number>(0);
   rejectConfirmScheduleId = signal<number>(0);
+  approvingItemId = signal<number>(0);
+  approveAllQueue = signal<number[]>([]);
+  approveAllIndex = signal<number>(0);
+  approveAllScheduleId = signal<number>(0);
+  approveAllComplete = signal<boolean>(false);
 
   settingsData = signal<any>(null);
   approvalMethod = signal<string>('Manual');
@@ -65,9 +73,10 @@ export class WorkflowInboxComponent implements OnInit {
   txVerifyImp = signal(false);
   txVerifyReversal = signal(false);
   txVerifyDisposal = signal(false);
+  txVerifyCalcs = signal(false);
   txVerifySubmitting = signal(false);
   txVerifyError = signal('');
-  monthlyApprovalMap = signal<Record<string, boolean>>({});
+  verifiedScheduleIds = signal<Set<number>>(new Set());
 
   depSectionExpanded = signal(false);
   revalSectionExpanded = signal(false);
@@ -105,7 +114,12 @@ export class WorkflowInboxComponent implements OnInit {
       (this.assetApprovalSectionExpanded() ? this.pendingAssetApprovals().length : this.assetApprovalPendingCount());
   });
 
-  constructor(private api: ApiService, private snackBar: MatSnackBar) {}
+  isCostModel = computed(() => {
+    var model = this.orgSettings.settings()?.measurement_model;
+    return !!model && model.toLowerCase() === 'cost model';
+  });
+
+  constructor(private api: ApiService, private snackBar: MatSnackBar, public orgSettings: OrgSettingsService) {}
 
   ngOnInit() {
     this.loadData();
@@ -189,7 +203,7 @@ export class WorkflowInboxComponent implements OnInit {
       next: function(this: WorkflowInboxComponent, items: any[]) {
         var pending: any[] = [];
         for (var i = 0; i < items.length; i++) {
-          var s = (items[i].status || '').toLowerCase();
+          var s = (items[i].status || items[i].Status || '').toLowerCase();
           if (s === 'pending' || s === 'submitted') pending.push(items[i]);
         }
         this.pendingDisposals.set(pending);
@@ -223,7 +237,6 @@ export class WorkflowInboxComponent implements OnInit {
       }.bind(this),
       error: function() {}
     });
-    this.loadMonthlyApprovals();
   }
 
   onTabChange(event: any) {
@@ -581,21 +594,6 @@ export class WorkflowInboxComponent implements OnInit {
     });
   }
 
-  loadMonthlyApprovals() {
-    this.api.getMonthlyApprovals().subscribe({
-      next: function(this: WorkflowInboxComponent, rows: any[]) {
-        var map: Record<string, boolean> = {};
-        for (var i = 0; i < rows.length; i++) {
-          var r = rows[i];
-          var key = (r.financial_Year || r.Financial_Year || '') + '|' + (r.financial_Period || r.Financial_Period || 0);
-          map[key] = true;
-        }
-        this.monthlyApprovalMap.set(map);
-      }.bind(this),
-      error: function() {}
-    });
-  }
-
   getSchedulePeriod(sch: any): number {
     if (sch.financialPeriod) return Number(sch.financialPeriod);
     var scheduledDate = sch.scheduledDate ? new Date(sch.scheduledDate) : (sch.runDate ? new Date(sch.runDate) : new Date());
@@ -604,26 +602,333 @@ export class WorkflowInboxComponent implements OnInit {
   }
 
   isApprovalVerified(sch: any): boolean {
-    var finYear = sch.finYear || '';
-    var period = this.getSchedulePeriod(sch);
-    var key = finYear + '|' + period;
-    return this.monthlyApprovalMap()[key] === true;
+    return this.verifiedScheduleIds().has(sch.depreciationScheduleId);
   }
 
   approveVerifiedDepSchedule(sch: any) {
-    this.approveDepSchedule(sch.depreciationSchedule_ID);
+    this.startSequentialApproveAll(sch);
+  }
+
+  startSequentialApproveAll(sch: any) {
+    var scheduleId = sch.depreciationScheduleId;
+    this.approveError.set('');
+    this.glValidationErrors.set([]);
+    this.glValidationVisible.set(false);
+    this.depPosting.set(true);
+    var self = this;
+    this.api.validateDepreciationScheduleGl({ scheduleId: scheduleId }).subscribe({
+      next: function(valResult: any) {
+        if (!valResult.valid) {
+          self.depPosting.set(false);
+          self.glValidationTxnType.set('Depreciation');
+          self.glValidationErrors.set(valResult.results || []);
+          self.glValidationVisible.set(true);
+          return;
+        }
+        // If items are not yet loaded for this schedule, fetch them first
+        if (self.depDetailScheduleId() !== scheduleId || self.depScheduleItems().length === 0) {
+          self.api.getDepreciationScheduleById(scheduleId).subscribe({
+            next: function(resp: any) {
+              var allItems = resp.items || [];
+              var pending: any[] = [];
+              for (var j = 0; j < allItems.length; j++) {
+                var it = allItems[j];
+                var sid = it['StatusID'] !== undefined ? it['StatusID'] : (it['statusID'] !== undefined ? it['statusID'] : -1);
+                var tot = it['TotalAssets'] !== undefined ? it['TotalAssets'] : it['totalAssets'];
+                if (tot !== null && tot !== undefined && Number(tot) > 0 && sid !== 13) {
+                  pending.push(it);
+                }
+              }
+              var loaded = pending.length > 0 ? pending : allItems;
+              self.depDetailScheduleId.set(scheduleId);
+              self.depScheduleItems.set(loaded);
+              self.buildAndRunApproveAllQueue(scheduleId, loaded);
+            },
+            error: function(err: any) {
+              self.depPosting.set(false);
+              self.approveError.set('Could not load schedule items: ' + (err?.error?.error || err?.message || 'Please try again.'));
+            }
+          });
+        } else {
+          self.buildAndRunApproveAllQueue(scheduleId, self.depScheduleItems());
+        }
+      },
+      error: function(err: any) {
+        self.depPosting.set(false);
+        self.approveError.set('GL validation failed: ' + (err?.error?.error || err?.message || 'Please try again.'));
+      }
+    });
+  }
+
+  buildAndRunApproveAllQueue(scheduleId: number, items: any[]) {
+    var queue: number[] = [];
+    for (var i = 0; i < items.length; i++) {
+      if (!this.isItemApproved(items[i])) queue.push(this.getItemId(items[i]));
+    }
+    if (queue.length === 0) { this.depPosting.set(false); return; }
+    this.approveAllComplete.set(false);
+    this.approveAllQueue.set(queue);
+    this.approveAllIndex.set(0);
+    this.approveAllScheduleId.set(scheduleId);
+    this.processNextDepItem(queue, 0, scheduleId);
+  }
+
+  processNextDepItem(queue: number[], index: number, scheduleId: number) {
+    if (index >= queue.length) {
+      var self = this;
+      this.approveAllComplete.set(true);
+      setTimeout(function() {
+        self.approveAllComplete.set(false);
+        self.approveAllQueue.set([]);
+        self.approveAllIndex.set(0);
+        self.approveAllScheduleId.set(0);
+        self.approvingItemId.set(0);
+        self.depPosting.set(false);
+        self.depRebuildProgress.set({done: 0, total: 0});
+        self.api.markDepWorkflowComplete(scheduleId).subscribe({next: function() {}, error: function() {}});
+        self.loadPendingItems();
+        self.loadData();
+      }, 400);
+      return;
+    }
+    var itemId = queue[index];
+    this.approveAllIndex.set(index);
+    this.approvingItemId.set(itemId);
+    this.depRebuildProgress.set({done: 0, total: 0});
+    var self = this;
+    this.api.approveDepreciationScheduleItem(itemId).subscribe({
+      next: function(result: any) {
+        if (self.depApprovalPollInterval) { clearInterval(self.depApprovalPollInterval); }
+        self.depApprovalPollInterval = setInterval(function() {
+          self.api.getDepApprovalProgress(itemId).subscribe({
+            next: function(ap: any) {
+              if (ap.complete === true) {
+                if (!self.depApprovalPollInterval) { return; }
+                clearInterval(self.depApprovalPollInterval);
+                self.depApprovalPollInterval = null;
+                if (!ap.ok) {
+                  self.approveAllQueue.set([]);
+                  self.approveAllIndex.set(0);
+                  self.approveAllScheduleId.set(0);
+                  self.approvingItemId.set(0);
+                  self.depPosting.set(false);
+                  self.approveError.set('Approval failed for group ' + itemId + ': ' + (ap.error || 'Unknown error'));
+                  return;
+                }
+                var assetIds = ap.assetIdsToRebuild || [];
+                var finYear = ap.finYear || '';
+                var rebuildPeriod = ap.rebuildPeriod || 1;
+                var approvedPeriod = ap.approvedPeriod || rebuildPeriod;
+                var progressKey = ap.progressKey || ('item_' + itemId);
+                var total = assetIds.length;
+                self.depScheduleItems.set(self.depScheduleItems().map(function(item: any) {
+                  return self.getItemId(item) === itemId
+                    ? Object.assign({}, item, { StatusID: 1, StatusName: 'Approved' })
+                    : item;
+                }));
+                self.depRebuildProgress.set({done: 0, total: total});
+                if (self.depRebuildPollInterval) { clearInterval(self.depRebuildPollInterval); }
+                self.depRebuildPollInterval = setInterval(function() {
+                  self.api.getDepRebuildProgress(progressKey).subscribe({
+                    next: function(p: any) {
+                      self.depRebuildProgress.set({done: p.done || 0, total: p.total || total});
+                      if (p.complete === true) {
+                        if (self.depRebuildPollInterval) {
+                          clearInterval(self.depRebuildPollInterval);
+                          self.depRebuildPollInterval = null;
+                          self.depRebuildProgress.set({done: total, total: total});
+                          if (p.reconciliation && p.reconciliation.mismatched > 0) {
+                            self.snackBar.open('Reconciliation: ' + p.reconciliation.autoCorrected + ' asset(s) auto-corrected after rebuild.', 'OK', { duration: 5000, horizontalPosition: 'end', verticalPosition: 'top' });
+                          }
+                          setTimeout(function() {
+                            self.processNextDepItem(queue, index + 1, scheduleId);
+                          }, 900);
+                        }
+                      }
+                    },
+                    error: function() {}
+                  });
+                }, 600);
+                self.api.rebuildDepSummaries({
+                  assetIds: assetIds,
+                  finYear: finYear,
+                  rebuildPeriod: rebuildPeriod,
+                  period: approvedPeriod,
+                  progressKey: progressKey
+                }).subscribe({
+                  next: function() {},
+                  error: function(err: any) {
+                    if (self.depRebuildPollInterval) { clearInterval(self.depRebuildPollInterval); self.depRebuildPollInterval = null; }
+                    self.approveAllQueue.set([]);
+                    self.approveAllIndex.set(0);
+                    self.approveAllScheduleId.set(0);
+                    self.approvingItemId.set(0);
+                    self.depPosting.set(false);
+                    self.approveError.set('Rebuild failed for group ' + itemId + ': ' + (err?.error?.error || err?.message || 'Unknown error'));
+                  }
+                });
+              }
+            },
+            error: function() {}
+          });
+        }, 600);
+      },
+      error: function(err: any) {
+        if (self.depApprovalPollInterval) { clearInterval(self.depApprovalPollInterval); self.depApprovalPollInterval = null; }
+        self.approveAllQueue.set([]);
+        self.approveAllIndex.set(0);
+        self.approveAllScheduleId.set(0);
+        self.approvingItemId.set(0);
+        self.depPosting.set(false);
+        self.approveError.set('Approval failed for group ' + itemId + ': ' + (err?.error?.error || err?.message || 'Unknown error'));
+      }
+    });
+  }
+
+  isItemApproved(si: any): boolean {
+    var s = this.getScheduleItemVal(si, 'StatusID');
+    return s === 1 || s === '1' || Number(s) === 1;
+  }
+
+  getApprovingItemData(): any {
+    var id = this.approvingItemId();
+    if (!id) return null;
+    var items = this.depScheduleItems();
+    for (var i = 0; i < items.length; i++) {
+      if (this.getItemId(items[i]) === id) return items[i];
+    }
+    return null;
+  }
+
+  depApprovalAssetPct(): number {
+    if (this.approveAllComplete()) return 100;
+    var items = this.depScheduleItems();
+    if (!items || items.length === 0) return 0;
+    var queue = this.approveAllQueue();
+    var index = this.approveAllIndex();
+    var queueSet: { [id: number]: number } = {};
+    for (var i = 0; i < queue.length; i++) queueSet[queue[i]] = i;
+    var total = 0; var done = 0;
+    for (var j = 0; j < items.length; j++) {
+      var raw = items[j]['TotalAssets'] !== undefined ? items[j]['TotalAssets'] : items[j]['totalAssets'];
+      var ta = Number(raw || 0);
+      if (!Number.isFinite(ta) || ta < 0) ta = 0;
+      total += ta;
+      var itemId = this.getItemId(items[j]);
+      if (!(itemId in queueSet) || queueSet[itemId] < index) done += ta;
+    }
+    if (total === 0) return 0;
+    return Math.min(100, Math.max(0, Math.floor(done / total * 100)));
+  }
+
+  isScheduleVerified(scheduleId: number): boolean {
+    var scheds = this.pendingSchedules();
+    for (var i = 0; i < scheds.length; i++) {
+      if (scheds[i].depreciationScheduleId === scheduleId) {
+        return this.isApprovalVerified(scheds[i]);
+      }
+    }
+    return false;
+  }
+
+  approveScheduleItem(itemId: number) {
+    this.approvingItemId.set(itemId);
+    this.depRebuildProgress.set({done: 0, total: 0});
+    this.approveError.set('');
+    var self = this;
+    this.api.approveDepreciationScheduleItem(itemId).subscribe({
+      next: function() {
+        if (self.depApprovalPollInterval) { clearInterval(self.depApprovalPollInterval); }
+        self.depApprovalPollInterval = setInterval(function() {
+          self.api.getDepApprovalProgress(itemId).subscribe({
+            next: function(ap: any) {
+              if (ap.complete === true) {
+                if (!self.depApprovalPollInterval) { return; }
+                clearInterval(self.depApprovalPollInterval);
+                self.depApprovalPollInterval = null;
+                if (!ap.ok) {
+                  self.approvingItemId.set(0);
+                  self.approveError.set('Item approval failed: ' + (ap.error || 'Unknown error'));
+                  return;
+                }
+                var assetIds = ap.assetIdsToRebuild || [];
+                var finYear = ap.finYear || '';
+                var rebuildPeriod = ap.rebuildPeriod || 1;
+                var approvedPeriod = ap.approvedPeriod || rebuildPeriod;
+                var progressKey = ap.progressKey || ('item_' + itemId);
+                var scheduleComplete = ap.scheduleComplete === true;
+                var total = assetIds.length;
+                self.depScheduleItems.set(self.depScheduleItems().map(function(item: any) {
+                  return self.getItemId(item) === itemId
+                    ? Object.assign({}, item, { StatusID: 1, StatusName: 'Approved' })
+                    : item;
+                }));
+                self.depRebuildProgress.set({done: 0, total: total});
+                if (self.depRebuildPollInterval) { clearInterval(self.depRebuildPollInterval); }
+                self.depRebuildPollInterval = setInterval(function() {
+                  self.api.getDepRebuildProgress(progressKey).subscribe({
+                    next: function(p: any) {
+                      self.depRebuildProgress.set({done: p.done || 0, total: p.total || total});
+                      if (p.complete === true) {
+                        if (self.depRebuildPollInterval) {
+                          clearInterval(self.depRebuildPollInterval);
+                          self.depRebuildPollInterval = null;
+                          self.depRebuildProgress.set({done: total, total: total});
+                          if (p.reconciliation && p.reconciliation.mismatched > 0) {
+                            self.snackBar.open('Reconciliation: ' + p.reconciliation.autoCorrected + ' asset(s) auto-corrected after rebuild.', 'OK', { duration: 5000, horizontalPosition: 'end', verticalPosition: 'top' });
+                          }
+                          if (scheduleComplete) {
+                            var schedId = ap.scheduleId || 0;
+                            self.api.markDepWorkflowComplete(schedId).subscribe({next: function() {}, error: function() {}});
+                          }
+                          self.approvingItemId.set(0);
+                          self.loadPendingItems();
+                          self.loadData();
+                        }
+                      }
+                    },
+                    error: function() {}
+                  });
+                }, 600);
+                self.api.rebuildDepSummaries({
+                  assetIds: assetIds,
+                  finYear: finYear,
+                  rebuildPeriod: rebuildPeriod,
+                  period: approvedPeriod,
+                  progressKey: progressKey
+                }).subscribe({
+                  next: function() {},
+                  error: function(err: any) {
+                    if (self.depRebuildPollInterval) { clearInterval(self.depRebuildPollInterval); self.depRebuildPollInterval = null; }
+                    self.approvingItemId.set(0);
+                    self.approveError.set('Rebuild failed: ' + (err?.error?.error || err?.message || 'Unknown error'));
+                  }
+                });
+              }
+            },
+            error: function() {}
+          });
+        }, 600);
+      },
+      error: function(err: any) {
+        if (self.depApprovalPollInterval) { clearInterval(self.depApprovalPollInterval); self.depApprovalPollInterval = null; }
+        self.approvingItemId.set(0);
+        self.approveError.set('Item approval failed: ' + (err?.error?.error || err?.message || 'Unknown error'));
+      }
+    });
   }
 
   openTxVerifyModal(sch: any) {
     var finYear = sch.finYear || this.getCurrentFinYear();
     var period = this.getSchedulePeriod(sch);
-    this.txVerifyScheduleId.set(sch.depreciationSchedule_ID);
+    this.txVerifyScheduleId.set(sch.depreciationScheduleId);
     this.txVerifyFinYear.set(finYear);
     this.txVerifyPeriod.set(period);
     this.txVerifyReval.set(false);
     this.txVerifyImp.set(false);
     this.txVerifyReversal.set(false);
     this.txVerifyDisposal.set(false);
+    this.txVerifyCalcs.set(false);
     this.txVerifyError.set('');
     this.txVerifyOpen.set(true);
   }
@@ -632,14 +937,16 @@ export class WorkflowInboxComponent implements OnInit {
   setTxVerifyImp(e: Event) { this.txVerifyImp.set((e.target as HTMLInputElement).checked); }
   setTxVerifyReversal(e: Event) { this.txVerifyReversal.set((e.target as HTMLInputElement).checked); }
   setTxVerifyDisposal(e: Event) { this.txVerifyDisposal.set((e.target as HTMLInputElement).checked); }
+  setTxVerifyCalcs(e: Event) { this.txVerifyCalcs.set((e.target as HTMLInputElement).checked); }
 
   txVerifyAllChecked() {
-    return this.txVerifyReval() && this.txVerifyImp() && this.txVerifyReversal() && this.txVerifyDisposal();
+    return this.txVerifyReval() && this.txVerifyImp() && this.txVerifyReversal() && this.txVerifyDisposal() && this.txVerifyCalcs();
   }
 
   closeTxVerify() {
     this.txVerifyOpen.set(false);
     this.txVerifyError.set('');
+    this.txVerifyCalcs.set(false);
   }
 
   submitTxVerify() {
@@ -647,8 +954,8 @@ export class WorkflowInboxComponent implements OnInit {
     this.txVerifyError.set('');
     var scheduleId = this.txVerifyScheduleId();
     this.api.createMonthlyApproval({
-      financialYear: this.txVerifyFinYear(),
-      financialPeriod: this.txVerifyPeriod(),
+      finYear: this.txVerifyFinYear(),
+      period: this.txVerifyPeriod(),
       userId: 1,
       verifiedRevaluation: true,
       verifiedImpairment: true,
@@ -656,9 +963,12 @@ export class WorkflowInboxComponent implements OnInit {
       verifiedDisposal: true
     }).subscribe({
       next: function(this: WorkflowInboxComponent) {
+        var schedId = this.txVerifyScheduleId();
         this.txVerifySubmitting.set(false);
         this.txVerifyOpen.set(false);
-        this.approveDepSchedule(scheduleId);
+        var ids = new Set(this.verifiedScheduleIds());
+        ids.add(schedId);
+        this.verifiedScheduleIds.set(ids);
       }.bind(this),
       error: function(this: WorkflowInboxComponent, err: any) {
         this.txVerifySubmitting.set(false);
@@ -678,7 +988,7 @@ export class WorkflowInboxComponent implements OnInit {
     var schedFy = '';
     var scheds = this.pendingSchedules();
     for (var si = 0; si < scheds.length; si++) {
-      if (scheds[si].depreciationSchedule_ID === scheduleId) {
+      if (scheds[si].depreciationScheduleId === scheduleId) {
         schedFy = scheds[si].finYear || '';
         break;
       }
@@ -710,6 +1020,7 @@ export class WorkflowInboxComponent implements OnInit {
             var assetIds = result.assetIdsToRebuild || [];
             var finYear = result.finYear || schedFy;
             var rebuildPeriod = result.rebuildPeriod || 1;
+            var approvedPeriod = result.approvedPeriod || rebuildPeriod;
             var progressKey = result.progressKey || String(scheduleId);
             var total = assetIds.length;
             self3.depRebuildProgress.set({done: 0, total: total});
@@ -723,6 +1034,10 @@ export class WorkflowInboxComponent implements OnInit {
                     if (p.complete === true) {
                       if (self3.depRebuildPollInterval) { clearInterval(self3.depRebuildPollInterval); self3.depRebuildPollInterval = null; }
                       self3.depRebuildProgress.set({done: total, total: total});
+                      if (p.reconciliation && p.reconciliation.mismatched > 0) {
+                        self3.snackBar.open('Reconciliation: ' + p.reconciliation.autoCorrected + ' asset(s) auto-corrected after rebuild.', 'OK', { duration: 5000, horizontalPosition: 'end', verticalPosition: 'top' });
+                      }
+                      self3.api.markDepWorkflowComplete(scheduleId).subscribe({next: function() {}, error: function() {}});
                       self3.approvingId.set(0);
                       self3.loadPendingItems();
                       self3.loadData();
@@ -744,6 +1059,7 @@ export class WorkflowInboxComponent implements OnInit {
                 assetIds: assetIds,
                 finYear: finYear,
                 rebuildPeriod: rebuildPeriod,
+                period: approvedPeriod,
                 progressKey: progressKey
               }).subscribe({
                 next: function() {},
@@ -851,7 +1167,7 @@ export class WorkflowInboxComponent implements OnInit {
   }
 
   approveImpairment(item: any) {
-    var id = item.assetImpairment_ID || item.AssetImpairment_ID || item.id;
+    var id = item.assetImpairment_ID || item.AssetImpairment_ID || item.impairmentId || item.id;
     this.approvingId.set(id);
     this.approveError.set('');
     this.api.approveImpairment(id, 1).subscribe({
@@ -868,7 +1184,7 @@ export class WorkflowInboxComponent implements OnInit {
   }
 
   rejectImpairment(item: any) {
-    var id = item.assetImpairment_ID || item.AssetImpairment_ID || item.id;
+    var id = item.assetImpairment_ID || item.AssetImpairment_ID || item.impairmentId || item.id;
     this.approvingId.set(id);
     this.api.rejectImpairment(id).subscribe({
       next: function(this: WorkflowInboxComponent) {
@@ -961,7 +1277,7 @@ export class WorkflowInboxComponent implements OnInit {
   }
 
   approveImpairmentReversal(item: any) {
-    var id = item.assetImpairment_ID || item.AssetImpairment_ID || item.id;
+    var id = item.assetImpairment_ID || item.AssetImpairment_ID || item.impairmentId || item.id;
     this.approvingId.set(id);
     this.approveError.set('');
     this.api.approveImpairmentReversal(id, 1).subscribe({
@@ -978,7 +1294,7 @@ export class WorkflowInboxComponent implements OnInit {
   }
 
   rejectImpairmentReversal(item: any) {
-    var id = item.assetImpairment_ID || item.AssetImpairment_ID || item.id;
+    var id = item.assetImpairment_ID || item.AssetImpairment_ID || item.impairmentId || item.id;
     this.approvingId.set(id);
     this.api.rejectImpairmentReversal(id).subscribe({
       next: function(this: WorkflowInboxComponent) {
@@ -1139,8 +1455,53 @@ export class WorkflowInboxComponent implements OnInit {
   }
 
   exportScheduleDetail(scheduleId: number, itemId?: number) {
-    var url = this.api.exportDepreciationScheduleDetails(scheduleId, itemId);
-    window.open(url, '_blank');
+    this.api.exportDepreciationScheduleDetails(scheduleId, itemId).subscribe({
+      next: (data: any[]) => {
+        if (!data || data.length === 0) {
+          this.snackBar.open('No data to export', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+          return;
+        }
+        var cols = [
+          'AssetRegisterItemId', 'Description', 'InServiceDate', 'UsefulLifeMonths',
+          'RemainingUsefulLifeMonths', 'DaysFromLastRun', 'CostPurchaseAmount', 'ResidualValue',
+          'DepreciationForPeriod', 'AccumulatedDepreciation', 'CarryingAmount',
+          'AccumulatedRevaluationReserveClosingBalance', 'DepreciationOffsetOpeningBalance',
+          'DepreciationOffset', 'DepreciationOffsetClosingBalance'
+        ];
+        var headers = [
+          'Asset ID', 'Description', 'In Service Date', 'UL (Mths)', 'RUL (Mths)', 'Days',
+          'Cost', 'Residual', 'Dep. Period', 'Accum. Dep.', 'Carrying Amt',
+          'Reval Reserve', 'Dep Offset Open', 'Dep Offset', 'Dep Offset Close'
+        ];
+        var wsData: any[][] = [headers];
+        for (var i = 0; i < data.length; i++) {
+          var row = data[i];
+          var r: any[] = [];
+          for (var j = 0; j < cols.length; j++) {
+            var val = row[cols[j]] !== undefined ? row[cols[j]] : (row[cols[j].charAt(0).toLowerCase() + cols[j].slice(1)] !== undefined ? row[cols[j].charAt(0).toLowerCase() + cols[j].slice(1)] : '');
+            val = val !== null && val !== undefined ? val : '';
+            if (j >= 3 && val !== '') {
+              var n = parseFloat(val);
+              if (!isNaN(n)) val = n;
+            }
+            r.push(val);
+          }
+          wsData.push(r);
+        }
+        var ws = XLSX.utils.aoa_to_sheet(wsData);
+        var colWidths: any[] = [];
+        for (var wi = 0; wi < headers.length; wi++) { colWidths.push({ wch: 20 }); }
+        ws['!cols'] = colWidths;
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Schedule Detail');
+        var fileName = 'depreciation_schedule_' + scheduleId + '_' + new Date().toISOString().split('T')[0] + '.xlsx';
+        XLSX.writeFile(wb, fileName);
+        this.snackBar.open('Exported ' + data.length + ' records to Excel', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+      },
+      error: () => {
+        this.snackBar.open('Failed to export schedule detail', 'OK', { duration: 4000, horizontalPosition: 'end', verticalPosition: 'top' });
+      }
+    });
   }
 
   dismissGlValidation() {
@@ -1161,11 +1522,13 @@ export class WorkflowInboxComponent implements OnInit {
   detailItem = signal<any>(null);
   detailItemType = signal<string>('');
   detailLoading = signal(false);
+  detailDocs = signal<any[]>([]);
+  detailDocsLoading = signal(false);
 
   openDetail(item: any, type: string) {
     var id: number = 0;
     if (type === 'impairment' || type === 'reversal') {
-      id = item.assetImpairment_ID || item.AssetImpairment_ID || 0;
+      id = item.assetImpairment_ID || item.AssetImpairment_ID || item.impairmentId || 0;
     } else if (type === 'disposal') {
       id = item.assetDisposal_ID || item.AssetDisposal_ID || 0;
     } else if (type === 'revaluation') {
@@ -1175,6 +1538,8 @@ export class WorkflowInboxComponent implements OnInit {
     this.detailItem.set(null);
     this.detailItemType.set(type);
     this.detailLoading.set(true);
+    this.detailDocs.set([]);
+    this.detailDocsLoading.set(true);
     var obs: any;
     if (type === 'impairment' || type === 'reversal') {
       obs = this.api.getImpairmentDetail(id);
@@ -1193,11 +1558,45 @@ export class WorkflowInboxComponent implements OnInit {
         this.snackBar.open('Could not load transaction detail', 'OK', { duration: 3000 });
       }.bind(this)
     });
+    var assetId = Number(item.assetRegisterItem_ID || item.asset_ItemID || item.assetRegisterItemId || 0);
+    var docTransactionType = type === 'impairment' ? 'Impairment'
+      : type === 'reversal' ? 'Impairment Reversal'
+      : type === 'disposal' ? 'Disposal'
+      : 'Revaluation';
+    this.api.getDocumentsByAsset(assetId).subscribe({
+      next: function(this: WorkflowInboxComponent, docs: any[]) {
+        var filtered: any[] = [];
+        var all = docs || [];
+        for (var i = 0; i < all.length; i++) {
+          var tt = all[i].transaction_type || all[i].TransactionType || '';
+          if (tt === docTransactionType) filtered.push(all[i]);
+        }
+        this.detailDocs.set(filtered);
+        this.detailDocsLoading.set(false);
+      }.bind(this),
+      error: function(this: WorkflowInboxComponent) {
+        this.detailDocs.set([]);
+        this.detailDocsLoading.set(false);
+      }.bind(this)
+    });
   }
 
   closeDetail() {
     this.detailItem.set(null);
     this.detailItemType.set('');
+    this.detailDocs.set([]);
+    this.detailDocsLoading.set(false);
+  }
+
+  formatFileSize(bytes: number | null | undefined): string {
+    if (!bytes) return '0 KB';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  downloadDetailDoc(doc: any) {
+    this.api.downloadDocument(doc.id);
   }
 
   detailField(path: string): any {
@@ -1217,5 +1616,10 @@ export class WorkflowInboxComponent implements OnInit {
 
   detailCurrency(path: string): string {
     return this.formatCurrency(this.detailField(path));
+  }
+
+  isDetailApproved(): boolean {
+    var s = (this.detailField('transaction.status') || this.detailField('transaction.Status') || '').trim().toLowerCase();
+    return s === 'approved';
   }
 }

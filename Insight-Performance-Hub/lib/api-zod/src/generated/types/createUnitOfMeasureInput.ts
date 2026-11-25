@@ -8,7 +8,8 @@
 
 export interface CreateUnitOfMeasureInput {
   name: string;
-  abbreviation: string;
+  abbreviation?: string;
+  dataTypeId?: number | null;
   cycleId: number;
   isActive?: boolean;
 }

@@ -4,12 +4,14 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
 import { UiService } from '../../../core/services/ui.service';
 import { ScoaDrilldownComponent } from '../../../shared/components/scoa-drilldown/scoa-drilldown.component';
+import { SearchablePickerComponent } from '../../../shared/components/searchable-picker/searchable-picker.component';
 
 @Component({
   selector: 'app-gl-integration',
   standalone: true,
-  imports: [CommonModule, FormsModule, ScoaDrilldownComponent],
+  imports: [CommonModule, FormsModule, ScoaDrilldownComponent, SearchablePickerComponent],
   templateUrl: './gl-integration.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './gl-integration.component.css'
 })
 export class GlIntegrationComponent implements OnInit {
@@ -47,10 +49,36 @@ export class GlIntegrationComponent implements OnInit {
   revenuePlanProjectItemsLoading = false;
   revenueItemDetails = { project: '', department: '', division: '', function: '', region: '', fund: '' };
 
+  planProjectItemPrimary = (item: any): string => {
+    if (!item) return '';
+    const desc = item.projectDesc || '';
+    const id = item.planProjectItemId != null ? item.planProjectItemId : '';
+    return desc && id ? `${desc} - ${id}` : (desc || String(id));
+  };
+
+  planProjectItemSecondary = (item: any): string => {
+    if (!item) return '';
+    return [item.fund, item.scoaFunction, item.region, item.cost]
+      .filter(v => v != null && v !== '')
+      .join(' | ');
+  };
+
+  planProjectItemSearchFields = ['planProjectItemId', 'projectDesc', 'fund', 'scoaFunction', 'region', 'cost'];
+
   currentPage = 1;
   pageSize = 20;
 
   financialYears: string[] = [];
+
+  scoaSyncStatus: any = { total: 0, last_synced: null };
+  scoaSyncItems: any[] = [];
+  scoaSyncLoading = false;
+  scoaSyncing = false;
+  scoaSearch = '';
+  scoaPage = 1;
+  scoaPageSize = 50;
+  scoaTotalPages = 0;
+  scoaTotal = 0;
 
   constructor(private api: ApiService, private ui: UiService, private cdr: ChangeDetectorRef) {
     const currentYear = new Date().getFullYear();
@@ -578,5 +606,70 @@ export class GlIntegrationComponent implements OnInit {
     const month = d.getMonth();
     if (month >= 6) return `${year}/${year + 1}`;
     return `${year - 1}/${year}`;
+  }
+
+  loadScoaSyncStatus(): void {
+    this.api.getRaw<any>('/gl/scoa-structure/status').subscribe({
+      next: (res: any) => {
+        this.scoaSyncStatus = res.data || { total: 0, last_synced: null };
+        this.cdr.detectChanges();
+      },
+      error: () => { this.cdr.detectChanges(); }
+    });
+  }
+
+  loadScoaSyncItems(): void {
+    this.scoaSyncLoading = true;
+    this.cdr.detectChanges();
+    const params: any = { page: this.scoaPage, limit: this.scoaPageSize };
+    if (this.scoaSearch) params.search = this.scoaSearch;
+    this.api.getRaw<any>('/gl/scoa-structure/items', params).subscribe({
+      next: (res: any) => {
+        this.scoaSyncItems = res.data || [];
+        this.scoaTotal = res.meta?.total || 0;
+        this.scoaTotalPages = res.meta?.totalPages || 0;
+        this.scoaSyncLoading = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.scoaSyncItems = [];
+        this.scoaSyncLoading = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  syncScoaStructure(): void {
+    this.scoaSyncing = true;
+    this.cdr.detectChanges();
+    this.api.post<any>('/gl/scoa-structure/sync', {}).subscribe({
+      next: (res: any) => {
+        this.scoaSyncing = false;
+        this.ui.toast('success', 'Sync Complete', `${res?.synced || 0} SCOA items synced successfully`);
+        this.loadScoaSyncStatus();
+        this.loadScoaSyncItems();
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => {
+        this.scoaSyncing = false;
+        this.ui.toast('error', 'Sync Failed', err?.error?.message || 'Failed to sync SCOA structure');
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  onScoaSearch(): void {
+    this.scoaPage = 1;
+    this.loadScoaSyncItems();
+  }
+
+  scoaPageChange(page: number): void {
+    this.scoaPage = page;
+    this.loadScoaSyncItems();
+  }
+
+  onScoaTabActivated(): void {
+    this.loadScoaSyncStatus();
+    this.loadScoaSyncItems();
   }
 }

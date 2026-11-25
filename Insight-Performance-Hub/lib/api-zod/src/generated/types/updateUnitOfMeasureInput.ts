@@ -9,5 +9,6 @@
 export interface UpdateUnitOfMeasureInput {
   name?: string;
   abbreviation?: string;
+  dataTypeId?: number | null;
   isActive?: boolean;
 }

@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, from, forkJoin, of, catchError, map } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
+import { AfsSharePointService, SpAfsDoc, AfsSpVariant } from '../../core/services/afs-sharepoint.service';
 
 export interface DmsDocument {
   id: string;
@@ -119,9 +120,110 @@ export interface UploadMetadata {
   storageProvider?: string;
 }
 
+/** Document Type (upload dialog) → the Working-Papers SharePoint library it is stored in. */
+const TYPE_VARIANT: Record<string, AfsSpVariant> = {
+  working_paper: 'workingPaper',
+  rfi_attachment: 'rfi',
+  finding_attachment: 'finding',
+  adjustment_support: 'adjustmentSupport',
+  afs_draft: 'afsDraft',
+  afs_final: 'afsFinal',
+  export: 'export',
+  template: 'template',
+  mapping_snapshot: 'mappingSnapshot',
+  scoa_version: 'scoaVersion',
+  evidence: 'evidence',
+};
+const VARIANT_TYPE: Partial<Record<AfsSpVariant, string>> =
+  Object.fromEntries(Object.entries(TYPE_VARIANT).map(([t, v]) => [v, t]));
+
 @Injectable({ providedIn: 'root' })
 export class DocumentManagementService {
   private api = inject(ApiService);
+  private afsSp = inject(AfsSharePointService);
+
+  /** The AFS entity id a document is linked to (working paper / compilation / finding / …).
+   *  The RFI, working-paper and finding libraries link by the RFI / working-paper / finding id itself. */
+  private contextId(m: UploadMetadata, variant: AfsSpVariant): string {
+    const any = (m.workingPaperId || m.compilationId || m.findingId || m.rfiId || m.adjustmentId || '') as string;
+    if (variant === 'rfi') return (m.rfiId || any) as string;
+    if (variant === 'workingPaper') return (m.workingPaperId || any) as string;
+    if (variant === 'finding') return (m.findingId || any) as string;
+    if (variant === 'adjustmentSupport') return (m.adjustmentId || any) as string;
+    return any;
+  }
+
+  /** Adjustment documents go to the Working-Papers adjustment support library when its toggle is
+   *  on, otherwise the separate Adjustments library; RFI attachments, finding
+   *  attachments, SCOA version documents, mapping snapshots, exports, templates, evidence, AFS drafts, final AFS
+   *  documents and working papers to their Working-Papers libraries
+   *  (when those toggles are on); everything else to the AFS library. */
+  private variantForUpload(m: UploadMetadata): AfsSpVariant {
+    if (m.adjustmentId) return this.afsSp.isEnabled('adjustmentSupport') ? 'adjustmentSupport' : 'adjustments';
+    // The chosen Document Type picks its library when that library is active (Admin → AFS) …
+    const typed = m.documentType ? TYPE_VARIANT[m.documentType] : undefined;
+    if (typed && this.afsSp.isEnabled(typed)) return typed;
+    // … otherwise the library of the entity the upload came from.
+    if (m.rfiId && this.afsSp.isEnabled('rfi')) return 'rfi';
+    if (m.findingId && this.afsSp.isEnabled('finding')) return 'finding';
+    if (m.workingPaperId && this.afsSp.isEnabled('workingPaper')) return 'workingPaper';
+    return 'afs';
+  }
+  private variantForContext(contextType: string): AfsSpVariant {
+    if (contextType === 'adjustment') return 'adjustments';
+    if (contextType === 'rfi' && this.afsSp.isEnabled('rfi')) return 'rfi';
+    if (contextType === 'finding' && this.afsSp.isEnabled('finding')) return 'finding';
+    if (contextType === 'working_paper' && this.afsSp.isEnabled('workingPaper')) return 'workingPaper';
+    return 'afs';
+  }
+
+  /** The library that holds working papers: the Working-Papers library when its toggle is on,
+   *  otherwise the general AFS library. */
+  workingPaperVariant(): AfsSpVariant {
+    return this.afsSp.isEnabled('workingPaper') ? 'workingPaper' : 'afs';
+  }
+
+  /**
+   * Should this document use SharePoint storage? True when the variant's own toggle is on, OR
+   * (for adjustment documents) when the working-paper SharePoint toggle is on — adjustment docs
+   * always belong in the Adjustments library, so any active AFS SharePoint routes them there
+   * (using the Adjustments library's defaults) rather than the local AFS API.
+   */
+  private useSharePoint(variant: AfsSpVariant): boolean {
+    if (this.afsSp.isEnabled(variant)) return true;
+    return variant === 'adjustments' && this.afsSp.isEnabled('afs');
+  }
+
+  /** Turn a code like "adjustment_support" / "internal" into a readable label
+   *  ("Adjustment Support" / "Internal") for the SharePoint DocumentType/AccessLevel columns. */
+  private prettify(s?: string): string | undefined {
+    if (!s) return undefined;
+    return s.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  /** Map a SharePoint doc to the DMS document shape the UI consumes. */
+  private spToDms(d: SpAfsDoc): DmsDocument {
+    return {
+      id: d.id,
+      fileName: d.fileName,
+      originalName: d.fileName,
+      mimeType: d.mimeType,
+      fileSize: d.fileSize,
+      sha256Hash: '',
+      category: d.category || undefined,
+      description: d.description || undefined,
+      tags: d.tags,
+      uploadedBy: '',
+      documentType: VARIANT_TYPE[d.__variant] || 'working_paper',
+      classificationLabel: d.classificationLabel || undefined,
+      accessLevel: undefined,
+      storageProvider: 'sharepoint',
+      externalRef: d.id,
+      createdAt: d.createdAt,
+      __spItem: d.__item,
+      __spVariant: d.__variant,
+    } as unknown as DmsDocument;
+  }
 
   search(params: DmsSearchParams): Observable<DmsSearchResult> {
     const query: Record<string, any> = {};
@@ -154,7 +256,53 @@ export class DocumentManagementService {
   }
 
   upload(file: File, metadata: UploadMetadata): Observable<DmsDocument> {
+    // When AFS SharePoint storage is active (Admin → AFS), upload to the configured
+    // library, tagged with AFSID (link to the entity) + description/Classification/
+    // Category/Tags. Adjustment documents use the separate Adjustments library
+    // (UatAFSAdjustments) when that toggle is on. Otherwise use the AFS API's local storage.
+    const variant = this.variantForUpload(metadata);
+    if (this.useSharePoint(variant)) {
+      return from(this.afsSp.uploadAfsDocument(this.contextId(metadata, variant), file, {
+        description: metadata.description,
+        classification: metadata.classificationLabel || metadata.classificationCode,
+        category: metadata.category,
+        tags: metadata.tags,
+        documentType: this.prettify(metadata.documentType),
+        accessLevel: this.prettify(metadata.accessLevel),
+      }, variant).then(d => this.spToDms(d)));
+    }
     return this.api.upload<DmsDocument>('/documents/upload', file, metadata as any);
+  }
+
+  /** True when AFS SharePoint storage is active for the given library variant. */
+  isSharePointActive(variant: AfsSpVariant = 'afs'): boolean {
+    return this.afsSp.isEnabled(variant);
+  }
+
+  /** Download a SharePoint-stored document (as shaped by spToDms) via Graph. */
+  downloadSpDocument(doc: DmsDocument): Promise<void> {
+    return this.afsSp.downloadAfsDocument((doc as any).__spItem, (doc as any).__spVariant || 'afs');
+  }
+
+  /** List every document in a SharePoint library (e.g. all UatAFS working papers). */
+  listAllSpDocuments(variant: AfsSpVariant = 'afs'): Observable<DmsDocument[]> {
+    return from(this.afsSp.listAllAfsDocuments(variant).then(docs => docs.map(d => this.spToDms(d))));
+  }
+
+  /** Copy a SharePoint document into the adjustment's library (the Working-Papers adjustment
+   *  support library when its toggle is on, otherwise Adjustments), linked to the adjustment. */
+  copySpToAdjustment(doc: DmsDocument, adjustmentId: string): Observable<DmsDocument> {
+    const item = (doc as any).__spItem;
+    const sourceVariant: AfsSpVariant = (doc as any).__spVariant || 'afs';
+    const target: AfsSpVariant = this.afsSp.isEnabled('adjustmentSupport') ? 'adjustmentSupport' : 'adjustments';
+    return from(this.afsSp.copyDocument(item, sourceVariant, target, adjustmentId, {
+      description: doc.description,
+      classification: doc.classificationLabel,
+      category: doc.category,
+      tags: (doc.tags || []).join(', '),
+      documentType: this.prettify(doc.documentType),
+      accessLevel: this.prettify(doc.accessLevel),
+    }).then(d => this.spToDms(d)));
   }
 
   download(id: string): Observable<Blob> {
@@ -197,7 +345,46 @@ export class DocumentManagementService {
   }
 
   getByContext(contextType: string, contextId: string): Observable<DmsDocument[]> {
-    return this.api.get<DmsDocument[]>(`/documents/by-context/${contextType}/${contextId}`);
+    // When AFS SharePoint storage is active, list the entity's documents from the
+    // configured library (filtered by AFSID = contextId). Adjustments read from the
+    // separate Adjustments library when that toggle is on.
+    const variant = this.variantForContext(contextType);
+    const list$ = this.useSharePoint(variant)
+      ? from(this.afsSp.listAfsDocuments(contextId, variant).then(docs => docs.map(d => this.spToDms(d))))
+      : this.api.get<DmsDocument[]>(`/documents/by-context/${contextType}/${contextId}`);
+    // A compilation's AFS drafts / final AFS documents live in their Working-Papers libraries when
+    // those toggles are on; list them alongside the compilation's other documents.
+    // An adjustment's support documents go to the Working-Papers adjustment support library when
+    // its toggle is on; keep listing the ones already in the Adjustments library too.
+    if (contextType === 'adjustment' && this.afsSp.isEnabled('adjustmentSupport')) {
+      const support$ = from(this.afsSp.listAfsDocuments(contextId, 'adjustmentSupport').then(docs => docs.map(d => this.spToDms(d))));
+      return forkJoin([support$, list$.pipe(catchError(() => of([] as DmsDocument[])))]).pipe(
+        map(lists => lists.flatMap(l => l || [])),
+      );
+    }
+    if (contextType === 'working_paper' || contextType === 'rfi' || contextType === 'finding') {
+      const extra = [...new Set(Object.values(TYPE_VARIANT))]
+        .filter(v => v !== variant && this.afsSp.isEnabled(v))
+        .map(v => from(this.afsSp.listAfsDocuments(contextId, v).then(docs => docs.map(d => this.spToDms(d))))
+          .pipe(catchError(() => of([] as DmsDocument[]))));
+      if (extra.length) {
+        return forkJoin([list$.pipe(catchError(() => of([] as DmsDocument[]))), ...extra]).pipe(
+          map(lists => lists.flatMap(l => l || [])),
+        );
+      }
+    }
+    if (contextType === 'compilation') {
+      const extra = ([['afsDraft', 'afs_draft'], ['afsFinal', 'afs_final']] as [AfsSpVariant, string][])
+        .filter(([v]) => this.afsSp.isEnabled(v))
+        .map(([v, type]) => from(this.afsSp.listAfsDocuments(contextId, v)
+          .then(docs => docs.map(d => ({ ...this.spToDms(d), documentType: type }) as DmsDocument))));
+      if (extra.length) {
+        return forkJoin([...extra, list$.pipe(catchError(() => of([] as DmsDocument[])))]).pipe(
+          map(lists => lists.flatMap(l => l || [])),
+        );
+      }
+    }
+    return list$;
   }
 
   getSourceDocuments(documentNumber: string, finYear?: string): Observable<SourceDocumentChain> {

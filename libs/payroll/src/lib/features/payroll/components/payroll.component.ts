@@ -748,7 +748,7 @@ export class PayrollComponent implements OnInit, OnDestroy {
   }
 
   downloadEft(batchId: number): void {
-    window.open(`/api/v1/payroll/payment-batches/${batchId}/eft-file`, '_blank');
+    window.open(`/payroll-app/api/payroll/payment-batches/${batchId}/eft-file`, '_blank');
   }
 
   loadCouncillors(): void {

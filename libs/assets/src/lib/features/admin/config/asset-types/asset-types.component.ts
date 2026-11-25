@@ -6,12 +6,13 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDialogModule } from '@angular/material/dialog';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService } from '../../../../core/api.service';
 
 @Component({
   selector: 'app-asset-types',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule, MatSnackBarModule, MatDialogModule],
+  imports: [CommonModule, FormsModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule, MatSnackBarModule, MatDialogModule, MatTooltipModule],
   templateUrl: './asset-types.component.html',
   styleUrls: ['./asset-types.component.css']
 })
@@ -20,7 +21,7 @@ export class AssetTypesComponent implements OnInit {
   loading = signal(true);
   showForm = signal(false);
   editingId = signal<number | null>(null);
-  formData = { assetTypeDesc: '' };
+  formData = { assetTypeDesc: '', enabled: 1, noUsefulLife: 0, requireStatus: 0 };
   showImport = signal(false);
   importFile = signal<File | null>(null);
   importing = signal(false);
@@ -42,21 +43,26 @@ export class AssetTypesComponent implements OnInit {
   }
 
   openAdd(): void {
-    this.formData = { assetTypeDesc: '' };
+    this.formData = { assetTypeDesc: '', enabled: 1, noUsefulLife: 0, requireStatus: 0 };
     this.editingId.set(null);
     this.showForm.set(true);
   }
 
   openEdit(item: any): void {
-    this.formData = { assetTypeDesc: item.assetTypeDesc };
-    this.editingId.set(item.assetType_ID);
+    this.formData = { assetTypeDesc: item.assetTypeDesc, enabled: item.enabled ?? 1, noUsefulLife: item.noUsefulLife ?? 0, requireStatus: item.requireStatus ?? 0 };
+    this.editingId.set(item.assetTypeId);
     this.showForm.set(true);
   }
 
   cancelForm(): void {
+
     this.showForm.set(false);
     this.editingId.set(null);
   }
+
+  onEnabledChange(event: Event): void { this.formData.enabled = (event.target as HTMLInputElement).checked ? 1 : 0; }
+  onNoUsefulLifeChange(event: Event): void { this.formData.noUsefulLife = (event.target as HTMLInputElement).checked ? 1 : 0; }
+  onRequireStatusChange(event: Event): void { this.formData.requireStatus = (event.target as HTMLInputElement).checked ? 1 : 0; }
 
   save(): void {
     const id = this.editingId();
@@ -75,7 +81,7 @@ export class AssetTypesComponent implements OnInit {
 
   confirmDelete(item: any): void {
     if (confirm('Are you sure you want to delete "' + item.assetTypeDesc + '"?')) {
-      this.api.deleteAssetType(item.assetType_ID).subscribe({
+      this.api.deleteAssetType(item.assetTypeId).subscribe({
         next: function(this: AssetTypesComponent) { this.loadData(); this.snackBar.open('Asset type deleted', 'OK', { duration: 3000 }); }.bind(this),
         error: function(this: AssetTypesComponent, err: any) { this.snackBar.open(err.error?.error || 'Delete failed', 'OK', { duration: 4000 }); }.bind(this)
       });
@@ -132,6 +138,19 @@ export class AssetTypesComponent implements OnInit {
         const a = document.createElement('a');
         a.href = url;
         a.download = 'asset_types_template.xlsx';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    });
+  }
+
+  exportToExcel(): void {
+    this.api.exportAssetTypes().subscribe({
+      next: function(blob: Blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'asset_types_export.xlsx';
         a.click();
         URL.revokeObjectURL(url);
       }

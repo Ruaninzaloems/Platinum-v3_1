@@ -42,8 +42,8 @@ export class MappingWorkbenchService {
     return this.http.post(`${this.baseUrl}/runs/${runId}/execute`, {});
   }
 
-  submitForReview(runId: string): Observable<any> {
-    return this.http.post(`${this.baseUrl}/runs/${runId}/submit`, {});
+  submitForReview(runId: string, options?: { adminOverride?: boolean }): Observable<any> {
+    return this.http.post(`${this.baseUrl}/runs/${runId}/submit`, options || {});
   }
 
   approve(runId: string, acknowledgments?: {
@@ -53,6 +53,7 @@ export class MappingWorkbenchService {
     rc11Reason?: string;
     sfpHighRiskAcknowledged?: boolean;
     sfpMaterialExceptionAcknowledged?: boolean;
+    adminOverride?: boolean;
   }): Observable<any> {
     return this.http.post(`${this.baseUrl}/runs/${runId}/approve`, acknowledgments || {});
   }
@@ -168,6 +169,14 @@ export class MappingWorkbenchService {
     highRiskAcknowledged?: boolean;
   }): Observable<any> {
     return this.http.post(`${this.baseUrl}/runs/${runId}/sfp-validation/override`, override);
+  }
+
+  getFindingDrilldown(runId: string, findingCode: string): Observable<any> {
+    return this.http.get(`${this.baseUrl}/runs/${runId}/sfp-validation/finding-drilldown/${findingCode}`);
+  }
+
+  getFindingDrilldownCsvUrl(runId: string, findingCode: string): string {
+    return `${this.baseUrl}/runs/${runId}/sfp-validation/finding-drilldown/${findingCode}/csv`;
   }
 
   revokeSfpOverride(runId: string, findingCode: string, revokedReason: string): Observable<any> {

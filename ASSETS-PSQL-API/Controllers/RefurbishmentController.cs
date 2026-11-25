@@ -15,13 +15,15 @@ public class RefurbishmentController : ControllerBase
     private readonly TransactionService _txnService;
     private readonly LookupService _lookupService;
     private readonly InternalApiClient _internalApi;
+    private readonly EmailService _emailService;
 
-    public RefurbishmentController(DbConnectionFactory db, TransactionService txnService, LookupService lookupService, InternalApiClient internalApi)
+    public RefurbishmentController(DbConnectionFactory db, TransactionService txnService, LookupService lookupService, InternalApiClient internalApi, EmailService emailService)
     {
         _db = db;
         _txnService = txnService;
         _lookupService = lookupService;
         _internalApi = internalApi;
+        _emailService = emailService;
     }
 
     [HttpGet]
@@ -623,6 +625,39 @@ public class RefurbishmentController : ControllerBase
                 WHERE ""entity_type"" = 'refurbishment' AND ""mssql_reference_id"" = @refId AND ""status"" IN ('pending', 'in_progress')",
                 new { refId = id.ToString() });
 
+            var refurbTokens = await _emailService.BuildAssetBaseTokensAsync(conn, assetRegId);
+            refurbTokens["RefurbishmentDate"]      = refurbDate.ToString("dd MMM yyyy");
+            refurbTokens["RefurbishmentDebit"]     = refurbDT.ToString("N2");
+            refurbTokens["RefurbishmentCredit"]    = refurbCT.ToString("N2");
+            refurbTokens["DepreciationAdjustment"] = refurbDepreciation.ToString("N2");
+            refurbTokens["RevaluationAdjustment"]  = refurbRevaluation.ToString("N2");
+            refurbTokens["ImpairmentAdjustment"]   = refurbImpairment.ToString("N2");
+            refurbTokens["DebitProject"]  = effDebitPPIId?.ToString() ?? "";
+            refurbTokens["CreditProject"] = effCreditPPIId?.ToString() ?? "";
+            var debitScoaDesc = "";
+            var creditScoaDesc = "";
+            try
+            {
+                if (effDebitScoaItemId.HasValue)
+                {
+                    var sRow = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                        @"SELECT COALESCE(""ScoaShortDesc"", '') AS desc FROM ""Const_SCOA_Structure"" WHERE ""ScoaID"" = @sId",
+                        new { sId = effDebitScoaItemId.Value });
+                    debitScoaDesc = (string?)(sRow?.desc) ?? "";
+                }
+                if (effCreditScoaItemId.HasValue)
+                {
+                    var sRow = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                        @"SELECT COALESCE(""ScoaShortDesc"", '') AS desc FROM ""Const_SCOA_Structure"" WHERE ""ScoaID"" = @sId",
+                        new { sId = effCreditScoaItemId.Value });
+                    creditScoaDesc = (string?)(sRow?.desc) ?? "";
+                }
+            }
+            catch { }
+            refurbTokens["DebitScoaItem"]  = debitScoaDesc;
+            refurbTokens["CreditScoaItem"] = creditScoaDesc;
+            refurbTokens["FinancialYear"]          = finYear;
+            _ = _emailService.SendTransactionEmailsAsync("Refurbishment", refurbTokens);
             return Ok(new { success = 1, transactionId, catchUpDepreciation });
         }
         catch (Exception ex)

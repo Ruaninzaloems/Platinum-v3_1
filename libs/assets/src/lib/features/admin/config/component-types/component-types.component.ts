@@ -42,21 +42,24 @@ import { Component, OnInit, signal } from '@angular/core';
     }
 
     openAdd(): void {
-      this.formData = { asset_Component_Description: '' };
+      this.formData = { asset_Component_Description: '', enabled: 1 };
       this.editingId.set(null);
       this.showForm.set(true);
     }
 
     openEdit(item: any): void {
-      this.formData = { asset_Component_Description: item.asset_Component_Description };
+      this.formData = { asset_Component_Description: item.asset_Component_Description, enabled: item.enabled ?? 1 };
       this.editingId.set(item.asset_Component_ID);
       this.showForm.set(true);
     }
 
     cancelForm(): void {
+
       this.showForm.set(false);
       this.editingId.set(null);
     }
+
+  onEnabledChange(event: Event): void { this.formData.enabled = (event.target as HTMLInputElement).checked ? 1 : 0; }
 
     save(): void {
       const id = this.editingId();
@@ -132,6 +135,19 @@ import { Component, OnInit, signal } from '@angular/core';
           const a = document.createElement('a');
           a.href = url;
           a.download = 'component_types_template.xlsx';
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+      });
+    }
+
+    exportToExcel(): void {
+      this.api.exportComponentTypes().subscribe({
+        next: function(blob: Blob) {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'component_types_export.xlsx';
           a.click();
           URL.revokeObjectURL(url);
         }

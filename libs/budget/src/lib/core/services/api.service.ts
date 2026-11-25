@@ -187,11 +187,13 @@ export class ApiService {
     return this.http.get<MtrefSummary[]>(`${this.base}/dashboard/mtref-summary/${versionId}`);
   }
 
-  getProjects(departmentId?: number, type?: string): Observable<ProjectItem[]> {
+  getProjects(departmentId?: number, type?: string, finYear?: string, skip = 0, take = 500): Observable<{ items: ProjectItem[], total: number }> {
     let params = new HttpParams();
     if (departmentId) params = params.set('departmentId', departmentId);
     if (type) params = params.set('type', type);
-    return this.http.get<ProjectItem[]>(`${this.base}/projects`, { params });
+    if (finYear) params = params.set('finYear', finYear);
+    params = params.set('skip', skip).set('take', take);
+    return this.http.get<{ items: ProjectItem[], total: number }>(`${this.base}/projects`, { params });
   }
 
   getProject(id: number): Observable<ProjectItem> {
@@ -208,6 +210,71 @@ export class ApiService {
 
   getProjectBudgetLines(projectId: number): Observable<ProjectBudgetLine[]> {
     return this.http.get<ProjectBudgetLine[]>(`${this.base}/projects/${projectId}/budget-lines`);
+  }
+
+  uploadProjectImport(formData: FormData): Observable<any> {
+    return this.http.post(`${this.base}/project-import/upload`, formData);
+  }
+
+  getProjectImportResults(id: number): Observable<any> {
+    return this.http.get(`${this.base}/project-import/${id}/results`);
+  }
+
+  registerProjectImport(id: number, versionNumber: string, versionName: string, comments: string): Observable<any> {
+    return this.http.post(`${this.base}/project-import/${id}/register`, { versionNumber, versionName, comments });
+  }
+
+  downloadProjectImport(id: number): string {
+    return `${this.base}/project-import/${id}/download`;
+  }
+
+  approveDraftBudget(formData: FormData): Observable<any> {
+    return this.http.post(`${this.base}/budget-approval/approve-draft`, formData);
+  }
+
+  approveFinalBudget(formData: FormData): Observable<any> {
+    return this.http.post(`${this.base}/budget-approval/approve-final`, formData);
+  }
+
+  getVirementApprovals(financialYearId?: number, scoaProjectId?: number): Observable<any[]> {
+    let params = new HttpParams();
+    if (financialYearId) params = params.set('financialYearId', financialYearId);
+    if (scoaProjectId) params = params.set('scoaProjectId', scoaProjectId);
+    return this.http.get<any[]>(`${this.base}/virement-approvals`, { params });
+  }
+
+  getVirementApprovalProjects(financialYearId?: number): Observable<any[]> {
+    let params = new HttpParams();
+    if (financialYearId) params = params.set('financialYearId', financialYearId);
+    return this.http.get<any[]>(`${this.base}/virement-approvals/projects`, { params });
+  }
+
+  submitVirementApprovals(decisions: any[]): Observable<any> {
+    return this.http.post(`${this.base}/virement-approvals/submit`, decisions);
+  }
+
+  getImportBatches(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/project-import/batches`);
+  }
+
+  registerBatches(batchIds: number[]): Observable<any> {
+    return this.http.post(`${this.base}/project-import/batches/register`, { batchIds });
+  }
+
+  uploadZeroBudgetImport(formData: FormData): Observable<any> {
+    return this.http.post(`${this.base}/zero-budget-import/upload`, formData);
+  }
+
+  downloadZeroBudgetImport(id: number): string {
+    return `${this.base}/zero-budget-import/${id}/download`;
+  }
+
+  zeroBudgetTemplate(): string {
+    return `${this.base}/zero-budget-import/template`;
+  }
+
+  zeroBudgetTemplateSample(): string {
+    return `${this.base}/zero-budget-import/template-sample`;
   }
 
   addProjectBudgetLine(projectId: number, data: any): Observable<any> {
@@ -242,6 +309,14 @@ export class ApiService {
     let params = new HttpParams();
     if (versionId) params = params.set('versionId', versionId);
     return this.http.get<any[]>(`${this.base}/reports/mscoa-strings`, { params });
+  }
+
+  getMscoaStrings(financialYearId: number, stringType: string, format: string): Observable<Blob> {
+    let params = new HttpParams()
+      .set('financialYearId', financialYearId)
+      .set('stringType', stringType)
+      .set('format', format);
+    return this.http.get(`${this.base}/reports/mscoa-strings/export`, { params, responseType: 'blob' });
   }
 
   getVirementRegister(versionId?: number, status?: string): Observable<any[]> {
@@ -301,8 +376,48 @@ export class ApiService {
     return this.http.post(`${this.base}/virement-policies/${id}/unlock`, {});
   }
 
+  getVirementPolicyVersions(fyCode: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/virement-policy-v2/versions?fyCode=${encodeURIComponent(fyCode)}`);
+  }
+
+  getVirementPolicyVersionDetails(versionId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/virement-policy-v2/versions/${versionId}/details`);
+  }
+
+  getVirementSysRules(fyCode: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/virement-policy-v2/sys-rules?fyCode=${encodeURIComponent(fyCode)}`);
+  }
+
+  getVirementNextVersionNumber(fyCode: string): Observable<any> {
+    return this.http.get<any>(`${this.base}/virement-policy-v2/next-version-number?fyCode=${encodeURIComponent(fyCode)}`);
+  }
+
+  lockVirementPolicyVersion(formData: FormData): Observable<any> {
+    return this.http.post(`${this.base}/virement-policy-v2/lock`, formData);
+  }
+
+  unlockVirementPolicyVersion(id: number): Observable<any> {
+    return this.http.post(`${this.base}/virement-policy-v2/versions/${id}/unlock`, {});
+  }
+
+  relockVirementPolicyVersion(id: number): Observable<any> {
+    return this.http.post(`${this.base}/virement-policy-v2/versions/${id}/relock`, {});
+  }
+
+  updateVirementSysRuleOption(id: number, option: boolean): Observable<any> {
+    return this.http.patch(`${this.base}/virement-policy-v2/sys-rules/${id}/option`, { option });
+  }
+
+  updateVirementDetailOption(id: number, option: boolean): Observable<any> {
+    return this.http.patch(`${this.base}/virement-policy-v2/details/${id}/option`, { option });
+  }
+
   validateVirement(data: any): Observable<any> {
     return this.http.post(`${this.base}/virements/validate`, data);
+  }
+
+  checkVirementPreflight(finYear: string): Observable<{ budgetApproved: boolean; idpApproved: boolean; passed: boolean; message: string | null }> {
+    return this.http.get<any>(`${this.base}/virements/preflight`, { params: { finYear } });
   }
 
   getServiceCategories(): Observable<ServiceCategory[]> {
@@ -339,6 +454,26 @@ export class ApiService {
     return this.http.get<TariffScenario>(`${this.base}/billing/tariff-scenarios/${id}`);
   }
 
+  getWaterProjectBudget(scenarioId: number): Observable<any> {
+    return this.http.get<any>(`${this.base}/billing/tariff-scenarios/${scenarioId}/water-project-budget`);
+  }
+
+  getElectricityProjectBudget(scenarioId: number): Observable<any> {
+    return this.http.get<any>(`${this.base}/billing/tariff-scenarios/${scenarioId}/electricity-project-budget`);
+  }
+
+  getSanitationProjectBudget(scenarioId: number): Observable<any> {
+    return this.http.get<any>(`${this.base}/billing/tariff-scenarios/${scenarioId}/sanitation-project-budget`);
+  }
+
+  getRefuseProjectBudget(scenarioId: number): Observable<any> {
+    return this.http.get<any>(`${this.base}/billing/tariff-scenarios/${scenarioId}/refuse-project-budget`);
+  }
+
+  getPropertyRatesProjectBudget(scenarioId: number): Observable<any> {
+    return this.http.get<any>(`${this.base}/billing/tariff-scenarios/${scenarioId}/property-rates-project-budget`);
+  }
+
   calculateScenario(id: number): Observable<any> {
     return this.http.post(`${this.base}/billing/tariff-scenarios/${id}/calculate`, {});
   }
@@ -353,6 +488,26 @@ export class ApiService {
 
   compareScenarios(ids: number[]): Observable<ScenarioComparison> {
     return this.http.get<ScenarioComparison>(`${this.base}/billing/tariff-scenarios/compare?ids=${ids.join(',')}`);
+  }
+
+  updateScenario(id: number, data: any): Observable<any> {
+    return this.http.put(`${this.base}/billing/tariff-scenarios/${id}`, data);
+  }
+
+  deleteScenario(id: number): Observable<any> {
+    return this.http.delete(`${this.base}/billing/tariff-scenarios/${id}`);
+  }
+
+  archiveScenario(id: number): Observable<any> {
+    return this.http.patch(`${this.base}/billing/tariff-scenarios/${id}/archive`, {});
+  }
+
+  unarchiveScenario(id: number): Observable<any> {
+    return this.http.patch(`${this.base}/billing/tariff-scenarios/${id}/unarchive`, {});
+  }
+
+  pushScenarioToDraft(id: number): Observable<any> {
+    return this.http.post(`${this.base}/billing/tariff-scenarios/${id}/push-to-draft`, {});
   }
 
   getConsumerCategories(): Observable<ConsumerCategory[]> {
@@ -928,5 +1083,37 @@ export class ApiService {
 
   amendPaymentPercentages(data: any): Observable<any> {
     return this.http.post(`${this.base}/hr-payroll/amend-payment-percentages`, data);
+  }
+
+  // ── Virement Approval Levels ──────────────────────────────────────────────
+  getVirementApprovalHeader(): Observable<any> {
+    return this.http.get<any>(`${this.base}/virement-approval-levels/header`);
+  }
+  toggleVirementApprovalLock(isLocked: boolean, userId: number): Observable<any> {
+    return this.http.post(`${this.base}/virement-approval-levels/header/lock`, { isLocked, userId });
+  }
+  getVirementApprovalLevelCount(): Observable<any> {
+    return this.http.get<any>(`${this.base}/virement-approval-levels/level-count`);
+  }
+  getVirementApprovalRanges(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/virement-approval-levels/ranges`);
+  }
+  addVirementApprovalRange(data: any): Observable<any> {
+    return this.http.post(`${this.base}/virement-approval-levels/ranges`, data);
+  }
+  updateVirementApprovalRange(id: number, data: any): Observable<any> {
+    return this.http.put(`${this.base}/virement-approval-levels/ranges/${id}`, data);
+  }
+  deleteVirementApprovalRange(id: number): Observable<any> {
+    return this.http.delete(`${this.base}/virement-approval-levels/ranges/${id}`);
+  }
+  addVirementApprovalApprover(rangeId: number, data: any): Observable<any> {
+    return this.http.post(`${this.base}/virement-approval-levels/ranges/${rangeId}/approvers`, data);
+  }
+  deleteVirementApprovalApprover(approverId: number): Observable<any> {
+    return this.http.delete(`${this.base}/virement-approval-levels/approvers/${approverId}`);
+  }
+  getVirementApproverUsers(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/virement-approval-levels/approver-users`);
   }
 }

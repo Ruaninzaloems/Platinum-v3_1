@@ -651,15 +651,28 @@ public class DbConnectionFactory
         if (databaseUrl.StartsWith("postgresql://") || databaseUrl.StartsWith("postgres://"))
         {
             var uri = new Uri(databaseUrl);
-            var userInfo = uri.UserInfo.Split(':');
+            var userInfo = uri.UserInfo.Split(':', 2);
+            var qs = System.Web.HttpUtility.ParseQueryString(uri.Query);
+            // Azure PostgreSQL Flexible Server: VerifyFull requires the DigiCert root CA
+            // to be explicitly trusted by Npgsql. Use Require (encrypted, no cert chain
+            // validation) which is sufficient for Azure managed services.
+            var sslMode = (qs["sslmode"] ?? "prefer") switch
+            {
+                "disable"     => SslMode.Disable,
+                "require"     => SslMode.Require,
+                "prefer"      => SslMode.Prefer,
+                "verify-full" => SslMode.Require,   // Azure: use Require, not VerifyFull
+                "verify-ca"   => SslMode.Require,
+                _             => SslMode.Prefer
+            };
             var builder = new NpgsqlConnectionStringBuilder
             {
                 Host = uri.Host,
                 Port = uri.Port > 0 ? uri.Port : 5432,
                 Database = uri.AbsolutePath.TrimStart('/'),
-                Username = userInfo[0],
-                Password = userInfo.Length > 1 ? userInfo[1] : "",
-                SslMode = SslMode.Prefer,
+                Username = Uri.UnescapeDataString(userInfo[0]),
+                Password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "",
+                SslMode = sslMode,
                 CommandTimeout = 600
             };
             return builder.ConnectionString;

@@ -1422,3 +1422,51 @@ public class Const_SCOA_Structure
 
     public string? NTGFSCode { get; set; }
 }
+
+[Table("Const_ProjectItem")]
+public class Const_ProjectItem
+{
+    [Key]
+    public int ProjectItem_ID { get; set; }
+
+    public string? Code { get; set; }
+
+    public string? Description { get; set; }
+
+    public string? FinYear { get; set; }
+
+    public bool Enabled { get; set; } = true;
+
+    public DateTime DateCaptured { get; set; } = DateTime.UtcNow;
+
+    public int? CapturerID { get; set; }
+
+    public DateTime? DateModified { get; set; }
+
+    public int? ModifierID { get; set; }
+}
+
+public class Section71_NTMapping
+{
+    [System.ComponentModel.DataAnnotations.Key]
+    public int A1ScheduleID { get; set; }
+    public string? A1ScheduleSheet { get; set; }
+    public string? A1ScheduleCode { get; set; }
+    public string? A1ScheduleCodeDescription { get; set; }
+    public string? AccountNumberLongCode { get; set; }
+    public string? AccountName { get; set; }
+    public string? ScoaVersion { get; set; }
+    public string? LevelName { get; set; }
+    public string? PostingAllowed { get; set; }
+}
+
+public class Const_Section71_ScoaVersion_Sys
+{
+    [System.ComponentModel.DataAnnotations.Key]
+    public int ScoaVersion_ID { get; set; }
+    public string? ScoaVersionDesc { get; set; }
+    public bool ScoaVersionEnabled { get; set; }
+    public string? ScoaVersionYearStart { get; set; }
+    public string? ScoaVersionYearEnd { get; set; }
+    public DateTime? DateCaptured { get; set; }
+}

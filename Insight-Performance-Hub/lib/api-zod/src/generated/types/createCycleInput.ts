@@ -9,7 +9,7 @@ import type { CreateCycleInputStatus } from "./createCycleInputStatus";
 
 export interface CreateCycleInput {
   financialYearLabel: string;
-  startDate: Date;
-  endDate: Date;
+  startDate: string;
+  endDate: string;
   status?: CreateCycleInputStatus;
 }

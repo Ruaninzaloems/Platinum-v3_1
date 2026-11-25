@@ -1,5 +1,41 @@
 :host { display: block; }
 
+.data-grid {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid var(--section-accent, #8b5cf6);
+  border-radius: 12px;
+  padding: 0;
+  margin-bottom: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.data-grid > table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.data-grid table thead th {
+  background: #f8fafc;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f2b46;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+.data-grid table tbody td {
+  padding: 12px 16px;
+  font-size: 13px;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+}
+.data-grid table tbody tr:last-child td {
+  border-bottom: none;
+}
+
 .tab-bar {
   display: flex;
   gap: 0;

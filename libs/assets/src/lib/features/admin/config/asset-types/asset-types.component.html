@@ -5,6 +5,9 @@
       <p class="page-subtitle">Manage asset type classifications</p>
     </div>
     <div class="header-actions">
+      <button mat-stroked-button (click)="exportToExcel()">
+        <mat-icon>download</mat-icon> Export to Excel
+      </button>
       <button mat-stroked-button (click)="openImport()">
         <mat-icon>upload_file</mat-icon> Import from Excel
       </button>
@@ -21,6 +24,23 @@
         <div class="form-field">
           <label>Asset Type *</label>
           <input type="text" class="form-input" [(ngModel)]="formData.assetTypeDesc" placeholder="Enter asset type description">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label class="checkbox-label">
+            <input type="checkbox" [checked]="formData.enabled === 1" (change)="onEnabledChange($event)"> Active
+          </label>
+        </div>
+        <div class="form-field">
+          <label class="checkbox-label">
+            <input type="checkbox" [checked]="formData.noUsefulLife === 1" (change)="onNoUsefulLifeChange($event)"> No Useful Life
+          </label>
+        </div>
+        <div class="form-field">
+          <label class="checkbox-label">
+            <input type="checkbox" [checked]="formData.requireStatus === 1" (change)="onRequireStatusChange($event)"> Require Status
+          </label>
         </div>
       </div>
       <div class="form-actions">
@@ -42,16 +62,28 @@
             <th>ID</th>
             <th>Asset Type Description</th>
             <th>Status</th>
+            <th class="flag-col">No Useful Life</th>
+            <th class="flag-col">Require Status</th>
             <th>Date Captured</th>
             <th class="actions-col">Actions</th>
           </tr>
         </thead>
         <tbody>
-          @for (item of items(); track item.assetType_ID) {
+          @for (item of items(); track item.assetTypeId) {
             <tr>
-              <td class="id-cell">{{item.assetType_ID}}</td>
+              <td class="id-cell">{{item.assetTypeId}}</td>
               <td class="desc-cell">{{item.assetTypeDesc}}</td>
               <td><span class="status-badge" [class.active]="item.enabled === 1">{{item.enabled === 1 ? 'Active' : 'Inactive'}}</span></td>
+              <td class="flag-cell">
+                <mat-icon class="flag-icon" [class.flag-on]="item.noUsefulLife === 1" [matTooltip]="item.noUsefulLife === 1 ? 'No Useful Life' : 'Has Useful Life'">
+                  {{item.noUsefulLife === 1 ? 'check_circle' : 'remove_circle_outline'}}
+                </mat-icon>
+              </td>
+              <td class="flag-cell">
+                <mat-icon class="flag-icon" [class.flag-on]="item.requireStatus === 1" [matTooltip]="item.requireStatus === 1 ? 'Require Status' : 'Status Not Required'">
+                  {{item.requireStatus === 1 ? 'check_circle' : 'remove_circle_outline'}}
+                </mat-icon>
+              </td>
               <td class="date-cell">{{item.dateCaptured | date:'mediumDate'}}</td>
               <td class="actions-cell">
                 <button mat-icon-button (click)="openEdit(item)" matTooltip="Edit">

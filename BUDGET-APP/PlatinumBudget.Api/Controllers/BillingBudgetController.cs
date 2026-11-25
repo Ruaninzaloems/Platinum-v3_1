@@ -100,11 +100,60 @@ public class BillingBudgetController : ControllerBase
         var query = _db.TariffScenarios.Include(s => s.Lines).Include(s => s.FinancialYear).AsQueryable();
         if (financialYearId.HasValue) query = query.Where(s => s.FinancialYearId == financialYearId);
 
-        var scenarios = await query.OrderByDescending(s => s.CreatedOn)
-            .Select(s => new TariffScenarioSummaryDto(s.Id, s.Name, s.Status.ToString(), s.BaseIncreasePercentage,
-                s.Lines.Sum(l => l.CurrentRevenue), s.Lines.Sum(l => l.ProjectedRevenue),
-                s.Lines.Sum(l => l.VarianceAmount), s.Lines.Count, s.CreatedOn))
-            .ToListAsync();
+        var rawScenarios = await query.OrderByDescending(s => s.CreatedOn).ToListAsync();
+
+        // Pre-compute project budget Year1 totals per unique financial year text
+        // using the same A4 SCOA chain as the detail tiles
+        var a4Codes = new[] { "0300", "0400", "0500", "0600", "1800" };
+        var uniqueFyTexts = rawScenarios.Select(s => s.FinancialYear.YearCode).Distinct().ToList();
+        var fyBudgetMap = new Dictionary<string, decimal>();
+
+        foreach (var fyText in uniqueFyTexts)
+        {
+            var startYear = fyText.Split('/')[0].Trim();
+            var versionRow = await _db.Const_Section71_ScoaVersion_Sys
+                .Where(v => v.ScoaVersionEnabled && v.ScoaVersionYearStart == startYear)
+                .FirstOrDefaultAsync();
+            if (versionRow == null) { fyBudgetMap[fyText] = 0; continue; }
+
+            var scoaVersion = versionRow.ScoaVersionDesc!;
+            var longCodes = await _db.Section71_NTMapping
+                .Where(m => m.A1ScheduleSheet == "A4" && a4Codes.Contains(m.A1ScheduleCode) && m.ScoaVersion == scoaVersion)
+                .Select(m => m.AccountNumberLongCode)
+                .Distinct()
+                .ToListAsync();
+
+            if (!longCodes.Any()) { fyBudgetMap[fyText] = 0; continue; }
+
+            var scoaIds = await _db.ConstScoaStructureConsolidated
+                .Where(s => s.FinYearText == fyText && longCodes.Contains(s.ScoaCode))
+                .Select(s => s.ScoaID)
+                .Distinct()
+                .ToListAsync();
+
+            if (!scoaIds.Any()) { fyBudgetMap[fyText] = 0; continue; }
+
+            var year1Total = await (
+                from pi in _db.Plan_ProjectItem
+                let effectiveId = _db.Plan_ProjectScoaItem
+                    .Where(psi => psi.ProjectID == pi.ProjectID)
+                    .Select(psi => (int?)psi.ScoaItemID)
+                    .FirstOrDefault() ?? pi.SCOAItemID
+                where scoaIds.Contains(effectiveId)
+                select (decimal?)(pi.BudgetAmount ?? 0)
+            ).SumAsync() ?? 0;
+
+            fyBudgetMap[fyText] = Math.Abs(year1Total);
+        }
+
+        var scenarios = rawScenarios.Select(s =>
+        {
+            var currentRevenue = fyBudgetMap.GetValueOrDefault(s.FinancialYear.YearCode, 0);
+            var projectedRevenue = currentRevenue * (1 + s.BaseIncreasePercentage / 100);
+            var variance = projectedRevenue - currentRevenue;
+            return new TariffScenarioSummaryDto(s.Id, s.Name, s.Status.ToString(), s.BaseIncreasePercentage,
+                currentRevenue, projectedRevenue, variance, s.Lines.Count, s.CreatedOn, s.IsArchived);
+        }).ToList();
         return Ok(scenarios);
     }
 
@@ -112,6 +161,18 @@ public class BillingBudgetController : ControllerBase
     public async Task<IActionResult> CreateTariffScenario([FromBody] CreateTariffScenarioDto dto)
     {
         var scenario = await _tariffService.CreateScenarioWithLines(dto.Name, dto.Description, dto.FinancialYearId, dto.BaseIncreasePercentage, dto.Justification, dto.ServiceCategoryIds);
+        if (dto.ServiceIncreases?.Any() == true)
+        {
+            foreach (var si in dto.ServiceIncreases)
+                _db.TariffScenarioServiceIncreases.Add(new TariffScenarioServiceIncrease
+                {
+                    TariffScenarioId = scenario.Id,
+                    ServiceType = si.ServiceType,
+                    ConsumerType = si.ConsumerType,
+                    IncreasePercentage = si.IncreasePercentage
+                });
+            await _db.SaveChangesAsync();
+        }
         return Ok(scenario.Id);
     }
 
@@ -121,12 +182,67 @@ public class BillingBudgetController : ControllerBase
         var s = await _db.TariffScenarios
             .Include(s => s.Lines).ThenInclude(l => l.ServiceCategory)
             .Include(s => s.FinancialYear)
+            .Include(s => s.ServiceIncreases)
             .FirstOrDefaultAsync(s => s.Id == id);
         if (s == null) return NotFound();
 
         var dto = new TariffScenarioDto(s.Id, s.Name, s.Description, s.FinancialYearId, s.FinancialYear.YearCode, s.Status.ToString(), s.BaseIncreasePercentage, s.Justification, s.CreatedBy, s.CreatedOn, s.ApprovedBy, s.ApprovedOn,
-            s.Lines.Select(l => new TariffScenarioLineDto(l.Id, l.ServiceCategoryId, l.ServiceCategory.Name, l.ServiceCategory.Type.ToString(), l.BaseTariffId, l.CurrentUnitRate, l.CurrentBasicCharge, l.ProjectedUnitRate, l.ProjectedBasicCharge, l.IncreasePercent, l.CurrentRevenue, l.ProjectedRevenue, l.VarianceAmount, l.VariancePercent, l.IsMaterialShift)).ToList());
+            s.Lines.Select(l => new TariffScenarioLineDto(l.Id, l.ServiceCategoryId, l.ServiceCategory.Name, l.ServiceCategory.Type.ToString(), l.BaseTariffId, l.CurrentUnitRate, l.CurrentBasicCharge, l.ProjectedUnitRate, l.ProjectedBasicCharge, l.IncreasePercent, l.CurrentRevenue, l.ProjectedRevenue, l.VarianceAmount, l.VariancePercent, l.IsMaterialShift)).ToList(),
+            s.ServiceIncreases.Select(si => new ServiceTypeIncreaseDto(si.ServiceType, si.ConsumerType, si.IncreasePercentage)).ToList());
         return Ok(dto);
+    }
+
+    [HttpPut("tariff-scenarios/{id}")]
+    public async Task<IActionResult> UpdateTariffScenario(int id, [FromBody] UpdateTariffScenarioDto dto)
+    {
+        var scenario = await _db.TariffScenarios.Include(s => s.ServiceIncreases).FirstOrDefaultAsync(s => s.Id == id);
+        if (scenario == null) return NotFound();
+        if (dto.Name != null) scenario.Name = dto.Name;
+        if (dto.Description != null) scenario.Description = dto.Description;
+        if (dto.BaseIncreasePercentage.HasValue) scenario.BaseIncreasePercentage = dto.BaseIncreasePercentage.Value;
+        if (dto.Justification != null) scenario.Justification = dto.Justification;
+        if (dto.ServiceIncreases != null)
+        {
+            _db.TariffScenarioServiceIncreases.RemoveRange(scenario.ServiceIncreases);
+            foreach (var si in dto.ServiceIncreases)
+                _db.TariffScenarioServiceIncreases.Add(new TariffScenarioServiceIncrease { TariffScenarioId = id, ServiceType = si.ServiceType, ConsumerType = si.ConsumerType, IncreasePercentage = si.IncreasePercentage });
+        }
+        await _db.SaveChangesAsync();
+        await _audit.LogAsync("TariffScenario", id, "Updated", "system", $"Scenario '{scenario.Name}' updated");
+        return Ok();
+    }
+
+    [HttpDelete("tariff-scenarios/{id}")]
+    public async Task<IActionResult> DeleteTariffScenario(int id)
+    {
+        var scenario = await _db.TariffScenarios.FindAsync(id);
+        if (scenario == null) return NotFound();
+        _db.TariffScenarios.Remove(scenario);
+        await _db.SaveChangesAsync();
+        await _audit.LogAsync("TariffScenario", id, "Deleted", "system", $"Scenario '{scenario.Name}' permanently deleted");
+        return NoContent();
+    }
+
+    [HttpPatch("tariff-scenarios/{id}/archive")]
+    public async Task<IActionResult> ArchiveTariffScenario(int id)
+    {
+        var scenario = await _db.TariffScenarios.FindAsync(id);
+        if (scenario == null) return NotFound();
+        scenario.IsArchived = true;
+        await _db.SaveChangesAsync();
+        await _audit.LogAsync("TariffScenario", id, "Archived", "system", $"Scenario '{scenario.Name}' archived");
+        return Ok();
+    }
+
+    [HttpPatch("tariff-scenarios/{id}/unarchive")]
+    public async Task<IActionResult> UnarchiveTariffScenario(int id)
+    {
+        var scenario = await _db.TariffScenarios.FindAsync(id);
+        if (scenario == null) return NotFound();
+        scenario.IsArchived = false;
+        await _db.SaveChangesAsync();
+        await _audit.LogAsync("TariffScenario", id, "Unarchived", "system", $"Scenario '{scenario.Name}' unarchived");
+        return Ok();
     }
 
     [HttpPost("tariff-scenarios/{id}/calculate")]
@@ -163,27 +279,161 @@ public class BillingBudgetController : ControllerBase
         return Ok();
     }
 
+    [HttpPost("tariff-scenarios/{id}/push-to-draft")]
+    public async Task<IActionResult> PushToDraft(int id)
+    {
+        var scenario = await _db.TariffScenarios.Include(s => s.FinancialYear).FirstOrDefaultAsync(s => s.Id == id);
+        if (scenario == null) return NotFound();
+
+        var fyText = scenario.FinancialYear.YearCode;
+        var startYear = fyText.Split('/')[0].Trim();
+        var pct = scenario.BaseIncreasePercentage / 100m;
+
+        var versionRow = await _db.Const_Section71_ScoaVersion_Sys
+            .Where(v => v.ScoaVersionEnabled && v.ScoaVersionYearStart == startYear)
+            .FirstOrDefaultAsync();
+        if (versionRow == null) return BadRequest("No SCOA version found for financial year.");
+
+        var scoaVersion = versionRow.ScoaVersionDesc!;
+        var a4Codes = new[] { "0300", "0400", "0500", "0600", "1800" };
+
+        var longCodes = await _db.Section71_NTMapping
+            .Where(m => m.A1ScheduleSheet == "A4" && a4Codes.Contains(m.A1ScheduleCode) && m.ScoaVersion == scoaVersion)
+            .Select(m => m.AccountNumberLongCode)
+            .Distinct()
+            .ToListAsync();
+        if (!longCodes.Any()) return BadRequest("No SCOA long codes found for A4 services.");
+
+        var scoaIds = await _db.ConstScoaStructureConsolidated
+            .Where(s => s.FinYearText == fyText && longCodes.Contains(s.ScoaCode))
+            .Select(s => s.ScoaID)
+            .Distinct()
+            .ToListAsync();
+        if (!scoaIds.Any()) return BadRequest("No SCOA IDs resolved from long codes.");
+
+        // Resolve via Plan_ProjectScoaItem join first, fall back to direct SCOAItemID
+        var scoaItemProjectMap = await _db.Plan_ProjectScoaItem
+            .Where(psi => scoaIds.Contains(psi.ScoaItemID))
+            .Select(psi => psi.ProjectID)
+            .Distinct()
+            .ToListAsync();
+
+        var items = await _db.Plan_ProjectItem
+            .Where(pi => scoaIds.Contains(pi.SCOAItemID) || scoaItemProjectMap.Contains(pi.ProjectID))
+            .ToListAsync();
+
+        if (!items.Any()) return Ok(new { updated = 0, message = "No Plan_ProjectItem records matched." });
+
+        foreach (var item in items)
+        {
+            var newYear1 = (item.BudgetAmount ?? 0) * (1 + pct);
+            var newYear2 = (item.BudgetAmountCurP1 ?? 0) * (1 + pct);
+            var newYear3 = (item.BudgetAmountCurP2 ?? 0) * (1 + pct);
+            var monthly = newYear1 / 12m;
+
+            item.BudgetAmount = newYear1;
+            item.BudgetAmountCurP1 = newYear2;
+            item.BudgetAmountCurP2 = newYear3;
+            item.Month01 = monthly;
+            item.Month02 = monthly;
+            item.Month03 = monthly;
+            item.Month04 = monthly;
+            item.Month05 = monthly;
+            item.Month06 = monthly;
+            item.Month07 = monthly;
+            item.Month08 = monthly;
+            item.Month09 = monthly;
+            item.Month10 = monthly;
+            item.Month11 = monthly;
+            item.Month12 = monthly;
+            item.DateModified = DateTime.UtcNow;
+        }
+
+        await _db.SaveChangesAsync();
+        await _audit.LogAsync("TariffScenario", id, "PushedToDraft", "system",
+            $"Pushed {items.Count} Plan_ProjectItem records with {scenario.BaseIncreasePercentage}% increase");
+        return Ok(new { updated = items.Count });
+    }
+
     [HttpGet("tariff-scenarios/compare")]
     public async Task<IActionResult> CompareScenarios([FromQuery] string ids)
     {
         var idList = ids.Split(',').Select(int.Parse).ToList();
-        var scenarios = await _db.TariffScenarios.Include(s => s.Lines).ThenInclude(l => l.ServiceCategory).Where(s => idList.Contains(s.Id)).ToListAsync();
+        var scenarios = await _db.TariffScenarios.Include(s => s.FinancialYear)
+            .Where(s => idList.Contains(s.Id)).ToListAsync();
 
-        var entries = scenarios.Select(s => new ScenarioComparisonEntry(s.Id, s.Name, s.BaseIncreasePercentage,
-            s.Lines.Sum(l => l.CurrentRevenue), s.Lines.Sum(l => l.ProjectedRevenue), s.Lines.Sum(l => l.VarianceAmount),
-            s.Lines.Sum(l => l.CurrentRevenue) != 0 ? s.Lines.Sum(l => l.VarianceAmount) / s.Lines.Sum(l => l.CurrentRevenue) * 100 : 0)).ToList();
-
-        var allServiceIds = scenarios.SelectMany(s => s.Lines).Select(l => l.ServiceCategoryId).Distinct();
-        var serviceRows = allServiceIds.Select(svcId =>
+        var serviceCodeNames = new (string Code, string Name)[]
         {
-            var svcName = scenarios.SelectMany(s => s.Lines).First(l => l.ServiceCategoryId == svcId).ServiceCategory.Name;
-            var current = scenarios.First().Lines.FirstOrDefault(l => l.ServiceCategoryId == svcId)?.CurrentRevenue ?? 0;
+            ("0300", "Electricity"), ("0400", "Water"), ("0500", "Sanitation"),
+            ("0600", "Refuse"), ("1800", "Property Rates")
+        };
+        var a4Codes = serviceCodeNames.Select(x => x.Code).ToArray();
+
+        // Per-FY, per-A4-code Year1 absolute total from Plan_ProjectItem
+        var uniqueFyTexts = scenarios.Select(s => s.FinancialYear.YearCode).Distinct().ToList();
+        var fyServiceMap = new Dictionary<string, Dictionary<string, decimal>>();
+
+        foreach (var fyText in uniqueFyTexts)
+        {
+            fyServiceMap[fyText] = new Dictionary<string, decimal>();
+            var startYear = fyText.Split('/')[0].Trim();
+            var versionRow = await _db.Const_Section71_ScoaVersion_Sys
+                .Where(v => v.ScoaVersionEnabled && v.ScoaVersionYearStart == startYear)
+                .FirstOrDefaultAsync();
+            if (versionRow == null) { foreach (var c in a4Codes) fyServiceMap[fyText][c] = 0; continue; }
+
+            var scoaVersion = versionRow.ScoaVersionDesc!;
+            foreach (var a4Code in a4Codes)
+            {
+                var longCodes = await _db.Section71_NTMapping
+                    .Where(m => m.A1ScheduleSheet == "A4" && m.A1ScheduleCode == a4Code && m.ScoaVersion == scoaVersion)
+                    .Select(m => m.AccountNumberLongCode).Distinct().ToListAsync();
+
+                if (!longCodes.Any()) { fyServiceMap[fyText][a4Code] = 0; continue; }
+
+                var scoaIds = await _db.ConstScoaStructureConsolidated
+                    .Where(s => s.FinYearText == fyText && longCodes.Contains(s.ScoaCode))
+                    .Select(s => s.ScoaID).Distinct().ToListAsync();
+
+                if (!scoaIds.Any()) { fyServiceMap[fyText][a4Code] = 0; continue; }
+
+                var year1 = await (
+                    from pi in _db.Plan_ProjectItem
+                    let effectiveId = _db.Plan_ProjectScoaItem
+                        .Where(psi => psi.ProjectID == pi.ProjectID)
+                        .Select(psi => (int?)psi.ScoaItemID).FirstOrDefault() ?? pi.SCOAItemID
+                    where scoaIds.Contains(effectiveId)
+                    select (decimal?)(pi.BudgetAmount ?? 0)
+                ).SumAsync() ?? 0;
+
+                fyServiceMap[fyText][a4Code] = Math.Abs(year1);
+            }
+        }
+
+        var entries = scenarios.Select(s =>
+        {
+            var sMap = fyServiceMap.GetValueOrDefault(s.FinancialYear.YearCode, new Dictionary<string, decimal>());
+            var current = sMap.Values.Sum();
+            var projected = current * (1 + s.BaseIncreasePercentage / 100);
+            var variance = projected - current;
+            return new ScenarioComparisonEntry(s.Id, s.Name, s.BaseIncreasePercentage, current, projected, variance,
+                current != 0 ? variance / current * 100 : 0);
+        }).ToList();
+
+        var firstFyMap = fyServiceMap.GetValueOrDefault(scenarios.First().FinancialYear.YearCode, new Dictionary<string, decimal>());
+        var serviceRows = serviceCodeNames.Select((svc, idx) =>
+        {
+            var current = firstFyMap.GetValueOrDefault(svc.Code, 0);
             var scenarioRevenues = scenarios.Select(s =>
             {
-                var line = s.Lines.FirstOrDefault(l => l.ServiceCategoryId == svcId);
-                return new ScenarioRevenueEntry(s.Id, s.Name, line?.ProjectedRevenue ?? 0, line?.VarianceAmount ?? 0, line?.VariancePercent ?? 0);
+                var sMap = fyServiceMap.GetValueOrDefault(s.FinancialYear.YearCode, new Dictionary<string, decimal>());
+                var svcCurrent = sMap.GetValueOrDefault(svc.Code, 0);
+                var projected = svcCurrent * (1 + s.BaseIncreasePercentage / 100);
+                var variance = projected - svcCurrent;
+                return new ScenarioRevenueEntry(s.Id, s.Name, projected, variance,
+                    svcCurrent != 0 ? variance / svcCurrent * 100 : 0);
             }).ToList();
-            return new ServiceComparisonRow(svcId, svcName, current, scenarioRevenues);
+            return new ServiceComparisonRow(idx + 1, svc.Name, current, scenarioRevenues);
         }).ToList();
 
         return Ok(new ScenarioComparisonDto(entries, serviceRows));
@@ -476,6 +726,422 @@ public class BillingBudgetController : ControllerBase
             rebates.Count(r => r.Status != BillingApprovalStatus.Approved),
             strings, strings > 0 ? DateTime.UtcNow : null);
         return Ok(status);
+    }
+
+    [HttpGet("tariff-scenarios/{id}/water-project-budget")]
+    public async Task<IActionResult> GetWaterProjectBudget(int id)
+    {
+        // 1. Get scenario + financial year
+        var scenario = await _db.TariffScenarios
+            .Include(s => s.FinancialYear)
+            .FirstOrDefaultAsync(s => s.Id == id);
+        if (scenario == null) return NotFound();
+
+        var fyText = scenario.FinancialYear.YearCode; // e.g. "2025/2026"
+        var startYear = fyText.Split('/')[0].Trim();   // e.g. "2025"
+
+        // 2. Resolve correct ScoaVersion for this financial year
+        var versionRow = await _db.Const_Section71_ScoaVersion_Sys
+            .Where(v => v.ScoaVersionEnabled && v.ScoaVersionYearStart == startYear)
+            .FirstOrDefaultAsync();
+        if (versionRow == null)
+            return Ok(new WaterProjectBudgetDto(fyText, "N/A", 0, 0, 0, 0, 0, new()));
+
+        var scoaVersion = versionRow.ScoaVersionDesc!;
+
+        // 3. Get AccountNumberLongCodes from Section71_NTMapping (Water = A4/0400)
+        var longCodes = await _db.Section71_NTMapping
+            .Where(m => m.A1ScheduleSheet == "A4" && m.A1ScheduleCode == "0400" && m.ScoaVersion == scoaVersion)
+            .Select(m => m.AccountNumberLongCode)
+            .Distinct()
+            .ToListAsync();
+
+        if (!longCodes.Any())
+            return Ok(new WaterProjectBudgetDto(fyText, scoaVersion, 0, 0, 0, 0, 0, new()));
+
+        // 4. Get ScoaIDs from Const_SCOA_Structure_Consolidated (existing entity: ConstScoaStructureConsolidated)
+        var scoaRows = await _db.ConstScoaStructureConsolidated
+            .Where(s => s.FinYearText == fyText && longCodes.Contains(s.ScoaCode))
+            .Select(s => new { s.ScoaID, s.ScoaCode, s.ScoaDesc })
+            .ToListAsync();
+
+        var scoaIds = scoaRows.Select(s => s.ScoaID).ToList();
+
+        if (!scoaIds.Any())
+            return Ok(new WaterProjectBudgetDto(fyText, scoaVersion, longCodes.Count, 0, 0, 0, 0, new()));
+
+        // 5. Sum budgets from Plan_ProjectItem joined with Plan_Project.
+        // Prefer Plan_ProjectScoaItem.ScoaItemID (grid-editable) over Plan_ProjectItem.SCOAItemID (same logic as ProjectsController).
+        var itemsRaw = await (
+            from pi in _db.Plan_ProjectItem
+            join pp in _db.Plan_Project on pi.ProjectID equals pp.Project_ID
+            let effectiveScoaItemId = _db.Plan_ProjectScoaItem
+                .Where(psi => psi.ProjectID == pi.ProjectID)
+                .Select(psi => (int?)psi.ScoaItemID)
+                .FirstOrDefault() ?? pi.SCOAItemID
+            where scoaIds.Contains(effectiveScoaItemId)
+            select new
+            {
+                pp.ProjectName,
+                EffectiveScoaItemId = effectiveScoaItemId,
+                pi.BudgetAmount,
+                pi.BudgetAmountCurP1,
+                pi.BudgetAmountCurP2
+            }
+        ).ToListAsync();
+
+        var scoaMap = scoaRows.ToDictionary(s => s.ScoaID, s => new { s.ScoaCode, s.ScoaDesc });
+
+        var items = itemsRaw.Select(i =>
+        {
+            var scoa = scoaMap.GetValueOrDefault(i.EffectiveScoaItemId);
+            return new WaterProjectBudgetItemDto(
+                i.ProjectName ?? "",
+                scoa?.ScoaCode ?? "",
+                scoa?.ScoaDesc ?? "",
+                i.BudgetAmount ?? 0,
+                i.BudgetAmountCurP1 ?? 0,
+                i.BudgetAmountCurP2 ?? 0
+            );
+        }).ToList();
+
+        var y1 = items.Sum(i => i.Year1);
+        var y2 = items.Sum(i => i.Year2);
+        var y3 = items.Sum(i => i.Year3);
+
+        return Ok(new WaterProjectBudgetDto(fyText, scoaVersion, scoaIds.Count, items.Count, y1, y2, y3, items));
+    }
+
+    [HttpGet("tariff-scenarios/{id}/electricity-project-budget")]
+    public async Task<IActionResult> GetElectricityProjectBudget(int id)
+    {
+        // 1. Get scenario + financial year
+        var scenario = await _db.TariffScenarios
+            .Include(s => s.FinancialYear)
+            .FirstOrDefaultAsync(s => s.Id == id);
+        if (scenario == null) return NotFound();
+
+        var fyText = scenario.FinancialYear.YearCode;
+        var startYear = fyText.Split('/')[0].Trim();
+
+        // 2. Resolve correct ScoaVersion for this financial year
+        var versionRow = await _db.Const_Section71_ScoaVersion_Sys
+            .Where(v => v.ScoaVersionEnabled && v.ScoaVersionYearStart == startYear)
+            .FirstOrDefaultAsync();
+        if (versionRow == null)
+            return Ok(new ElectricityProjectBudgetDto(fyText, "N/A", 0, 0, 0, 0, 0, new()));
+
+        var scoaVersion = versionRow.ScoaVersionDesc!;
+
+        // 3. Get AccountNumberLongCodes from Section71_NTMapping (Electricity = A4/0300)
+        var longCodes = await _db.Section71_NTMapping
+            .Where(m => m.A1ScheduleSheet == "A4" && m.A1ScheduleCode == "0300" && m.ScoaVersion == scoaVersion)
+            .Select(m => m.AccountNumberLongCode)
+            .Distinct()
+            .ToListAsync();
+
+        if (!longCodes.Any())
+            return Ok(new ElectricityProjectBudgetDto(fyText, scoaVersion, 0, 0, 0, 0, 0, new()));
+
+        // 4. Get ScoaIDs from Const_SCOA_Structure_Consolidated
+        var scoaRows = await _db.ConstScoaStructureConsolidated
+            .Where(s => s.FinYearText == fyText && longCodes.Contains(s.ScoaCode))
+            .Select(s => new { s.ScoaID, s.ScoaCode, s.ScoaDesc })
+            .Distinct()
+            .ToListAsync();
+
+        var scoaIds = scoaRows.Select(s => s.ScoaID).Distinct().ToList();
+
+        if (!scoaIds.Any())
+            return Ok(new ElectricityProjectBudgetDto(fyText, scoaVersion, longCodes.Count, 0, 0, 0, 0, new()));
+
+        // 5. Sum budgets — prefer Plan_ProjectScoaItem.ScoaItemID over Plan_ProjectItem.SCOAItemID
+        var itemsRaw = await (
+            from pi in _db.Plan_ProjectItem
+            join pp in _db.Plan_Project on pi.ProjectID equals pp.Project_ID
+            let effectiveScoaItemId = _db.Plan_ProjectScoaItem
+                .Where(psi => psi.ProjectID == pi.ProjectID)
+                .Select(psi => (int?)psi.ScoaItemID)
+                .FirstOrDefault() ?? pi.SCOAItemID
+            where scoaIds.Contains(effectiveScoaItemId)
+            select new
+            {
+                pp.ProjectName,
+                EffectiveScoaItemId = effectiveScoaItemId,
+                pi.BudgetAmount,
+                pi.BudgetAmountCurP1,
+                pi.BudgetAmountCurP2
+            }
+        ).ToListAsync();
+
+        var scoaMap = scoaRows
+            .GroupBy(s => s.ScoaID)
+            .ToDictionary(g => g.Key, g => new { g.First().ScoaCode, g.First().ScoaDesc });
+
+        var items = itemsRaw.Select(i =>
+        {
+            var scoa = scoaMap.GetValueOrDefault(i.EffectiveScoaItemId);
+            return new ElectricityProjectBudgetItemDto(
+                i.ProjectName ?? "",
+                scoa?.ScoaCode ?? "",
+                scoa?.ScoaDesc ?? "",
+                i.BudgetAmount ?? 0,
+                i.BudgetAmountCurP1 ?? 0,
+                i.BudgetAmountCurP2 ?? 0
+            );
+        }).ToList();
+
+        var y1 = items.Sum(i => i.Year1);
+        var y2 = items.Sum(i => i.Year2);
+        var y3 = items.Sum(i => i.Year3);
+
+        return Ok(new ElectricityProjectBudgetDto(fyText, scoaVersion, scoaIds.Count, items.Count, y1, y2, y3, items));
+    }
+
+    [HttpGet("tariff-scenarios/{id}/sanitation-project-budget")]
+    public async Task<IActionResult> GetSanitationProjectBudget(int id)
+    {
+        var scenario = await _db.TariffScenarios
+            .Include(s => s.FinancialYear)
+            .FirstOrDefaultAsync(s => s.Id == id);
+        if (scenario == null) return NotFound();
+
+        var fyText = scenario.FinancialYear.YearCode;
+        var startYear = fyText.Split('/')[0].Trim();
+
+        var versionRow = await _db.Const_Section71_ScoaVersion_Sys
+            .Where(v => v.ScoaVersionEnabled && v.ScoaVersionYearStart == startYear)
+            .FirstOrDefaultAsync();
+        if (versionRow == null)
+            return Ok(new SanitationProjectBudgetDto(fyText, "N/A", 0, 0, 0, 0, 0, new()));
+
+        var scoaVersion = versionRow.ScoaVersionDesc!;
+
+        // Sanitation = A4/0500
+        var longCodes = await _db.Section71_NTMapping
+            .Where(m => m.A1ScheduleSheet == "A4" && m.A1ScheduleCode == "0500" && m.ScoaVersion == scoaVersion)
+            .Select(m => m.AccountNumberLongCode)
+            .Distinct()
+            .ToListAsync();
+
+        if (!longCodes.Any())
+            return Ok(new SanitationProjectBudgetDto(fyText, scoaVersion, 0, 0, 0, 0, 0, new()));
+
+        var scoaRows = await _db.ConstScoaStructureConsolidated
+            .Where(s => s.FinYearText == fyText && longCodes.Contains(s.ScoaCode))
+            .Select(s => new { s.ScoaID, s.ScoaCode, s.ScoaDesc })
+            .Distinct()
+            .ToListAsync();
+
+        var scoaIds = scoaRows.Select(s => s.ScoaID).Distinct().ToList();
+
+        if (!scoaIds.Any())
+            return Ok(new SanitationProjectBudgetDto(fyText, scoaVersion, longCodes.Count, 0, 0, 0, 0, new()));
+
+        var itemsRaw = await (
+            from pi in _db.Plan_ProjectItem
+            join pp in _db.Plan_Project on pi.ProjectID equals pp.Project_ID
+            let effectiveScoaItemId = _db.Plan_ProjectScoaItem
+                .Where(psi => psi.ProjectID == pi.ProjectID)
+                .Select(psi => (int?)psi.ScoaItemID)
+                .FirstOrDefault() ?? pi.SCOAItemID
+            where scoaIds.Contains(effectiveScoaItemId)
+            select new
+            {
+                pp.ProjectName,
+                EffectiveScoaItemId = effectiveScoaItemId,
+                pi.BudgetAmount,
+                pi.BudgetAmountCurP1,
+                pi.BudgetAmountCurP2
+            }
+        ).ToListAsync();
+
+        var scoaMap = scoaRows
+            .GroupBy(s => s.ScoaID)
+            .ToDictionary(g => g.Key, g => new { g.First().ScoaCode, g.First().ScoaDesc });
+
+        var items = itemsRaw.Select(i =>
+        {
+            var scoa = scoaMap.GetValueOrDefault(i.EffectiveScoaItemId);
+            return new SanitationProjectBudgetItemDto(
+                i.ProjectName ?? "",
+                scoa?.ScoaCode ?? "",
+                scoa?.ScoaDesc ?? "",
+                i.BudgetAmount ?? 0,
+                i.BudgetAmountCurP1 ?? 0,
+                i.BudgetAmountCurP2 ?? 0
+            );
+        }).ToList();
+
+        var y1 = items.Sum(i => i.Year1);
+        var y2 = items.Sum(i => i.Year2);
+        var y3 = items.Sum(i => i.Year3);
+
+        return Ok(new SanitationProjectBudgetDto(fyText, scoaVersion, scoaIds.Count, items.Count, y1, y2, y3, items));
+    }
+
+    [HttpGet("tariff-scenarios/{id}/refuse-project-budget")]
+    public async Task<IActionResult> GetRefuseProjectBudget(int id)
+    {
+        var scenario = await _db.TariffScenarios
+            .Include(s => s.FinancialYear)
+            .FirstOrDefaultAsync(s => s.Id == id);
+        if (scenario == null) return NotFound();
+
+        var fyText = scenario.FinancialYear.YearCode;
+        var startYear = fyText.Split('/')[0].Trim();
+
+        var versionRow = await _db.Const_Section71_ScoaVersion_Sys
+            .Where(v => v.ScoaVersionEnabled && v.ScoaVersionYearStart == startYear)
+            .FirstOrDefaultAsync();
+        if (versionRow == null)
+            return Ok(new RefuseProjectBudgetDto(fyText, "N/A", 0, 0, 0, 0, 0, new()));
+
+        var scoaVersion = versionRow.ScoaVersionDesc!;
+
+        // Refuse = A4/0600
+        var longCodes = await _db.Section71_NTMapping
+            .Where(m => m.A1ScheduleSheet == "A4" && m.A1ScheduleCode == "0600" && m.ScoaVersion == scoaVersion)
+            .Select(m => m.AccountNumberLongCode)
+            .Distinct()
+            .ToListAsync();
+
+        if (!longCodes.Any())
+            return Ok(new RefuseProjectBudgetDto(fyText, scoaVersion, 0, 0, 0, 0, 0, new()));
+
+        var scoaRows = await _db.ConstScoaStructureConsolidated
+            .Where(s => s.FinYearText == fyText && longCodes.Contains(s.ScoaCode))
+            .Select(s => new { s.ScoaID, s.ScoaCode, s.ScoaDesc })
+            .Distinct()
+            .ToListAsync();
+
+        var scoaIds = scoaRows.Select(s => s.ScoaID).Distinct().ToList();
+
+        if (!scoaIds.Any())
+            return Ok(new RefuseProjectBudgetDto(fyText, scoaVersion, longCodes.Count, 0, 0, 0, 0, new()));
+
+        var itemsRaw = await (
+            from pi in _db.Plan_ProjectItem
+            join pp in _db.Plan_Project on pi.ProjectID equals pp.Project_ID
+            let effectiveScoaItemId = _db.Plan_ProjectScoaItem
+                .Where(psi => psi.ProjectID == pi.ProjectID)
+                .Select(psi => (int?)psi.ScoaItemID)
+                .FirstOrDefault() ?? pi.SCOAItemID
+            where scoaIds.Contains(effectiveScoaItemId)
+            select new
+            {
+                pp.ProjectName,
+                EffectiveScoaItemId = effectiveScoaItemId,
+                pi.BudgetAmount,
+                pi.BudgetAmountCurP1,
+                pi.BudgetAmountCurP2
+            }
+        ).ToListAsync();
+
+        var scoaMap = scoaRows
+            .GroupBy(s => s.ScoaID)
+            .ToDictionary(g => g.Key, g => new { g.First().ScoaCode, g.First().ScoaDesc });
+
+        var items = itemsRaw.Select(i =>
+        {
+            var scoa = scoaMap.GetValueOrDefault(i.EffectiveScoaItemId);
+            return new RefuseProjectBudgetItemDto(
+                i.ProjectName ?? "",
+                scoa?.ScoaCode ?? "",
+                scoa?.ScoaDesc ?? "",
+                i.BudgetAmount ?? 0,
+                i.BudgetAmountCurP1 ?? 0,
+                i.BudgetAmountCurP2 ?? 0
+            );
+        }).ToList();
+
+        var y1 = items.Sum(i => i.Year1);
+        var y2 = items.Sum(i => i.Year2);
+        var y3 = items.Sum(i => i.Year3);
+
+        return Ok(new RefuseProjectBudgetDto(fyText, scoaVersion, scoaIds.Count, items.Count, y1, y2, y3, items));
+    }
+
+    [HttpGet("tariff-scenarios/{id}/property-rates-project-budget")]
+    public async Task<IActionResult> GetPropertyRatesProjectBudget(int id)
+    {
+        var scenario = await _db.TariffScenarios
+            .Include(s => s.FinancialYear)
+            .FirstOrDefaultAsync(s => s.Id == id);
+        if (scenario == null) return NotFound();
+
+        var fyText = scenario.FinancialYear.YearCode;
+        var startYear = fyText.Split('/')[0].Trim();
+
+        var versionRow = await _db.Const_Section71_ScoaVersion_Sys
+            .Where(v => v.ScoaVersionEnabled && v.ScoaVersionYearStart == startYear)
+            .FirstOrDefaultAsync();
+        if (versionRow == null)
+            return Ok(new PropertyRatesProjectBudgetDto(fyText, "N/A", 0, 0, 0, 0, 0, new()));
+
+        var scoaVersion = versionRow.ScoaVersionDesc!;
+
+        // Property Rates = A4/1800
+        var longCodes = await _db.Section71_NTMapping
+            .Where(m => m.A1ScheduleSheet == "A4" && m.A1ScheduleCode == "1800" && m.ScoaVersion == scoaVersion)
+            .Select(m => m.AccountNumberLongCode)
+            .Distinct()
+            .ToListAsync();
+
+        if (!longCodes.Any())
+            return Ok(new PropertyRatesProjectBudgetDto(fyText, scoaVersion, 0, 0, 0, 0, 0, new()));
+
+        var scoaRows = await _db.ConstScoaStructureConsolidated
+            .Where(s => s.FinYearText == fyText && longCodes.Contains(s.ScoaCode))
+            .Select(s => new { s.ScoaID, s.ScoaCode, s.ScoaDesc })
+            .Distinct()
+            .ToListAsync();
+
+        var scoaIds = scoaRows.Select(s => s.ScoaID).Distinct().ToList();
+
+        if (!scoaIds.Any())
+            return Ok(new PropertyRatesProjectBudgetDto(fyText, scoaVersion, longCodes.Count, 0, 0, 0, 0, new()));
+
+        var itemsRaw = await (
+            from pi in _db.Plan_ProjectItem
+            join pp in _db.Plan_Project on pi.ProjectID equals pp.Project_ID
+            let effectiveScoaItemId = _db.Plan_ProjectScoaItem
+                .Where(psi => psi.ProjectID == pi.ProjectID)
+                .Select(psi => (int?)psi.ScoaItemID)
+                .FirstOrDefault() ?? pi.SCOAItemID
+            where scoaIds.Contains(effectiveScoaItemId)
+            select new
+            {
+                pp.ProjectName,
+                EffectiveScoaItemId = effectiveScoaItemId,
+                pi.BudgetAmount,
+                pi.BudgetAmountCurP1,
+                pi.BudgetAmountCurP2
+            }
+        ).ToListAsync();
+
+        var scoaMap = scoaRows
+            .GroupBy(s => s.ScoaID)
+            .ToDictionary(g => g.Key, g => new { g.First().ScoaCode, g.First().ScoaDesc });
+
+        var items = itemsRaw.Select(i =>
+        {
+            var scoa = scoaMap.GetValueOrDefault(i.EffectiveScoaItemId);
+            return new PropertyRatesProjectBudgetItemDto(
+                i.ProjectName ?? "",
+                scoa?.ScoaCode ?? "",
+                scoa?.ScoaDesc ?? "",
+                i.BudgetAmount ?? 0,
+                i.BudgetAmountCurP1 ?? 0,
+                i.BudgetAmountCurP2 ?? 0
+            );
+        }).ToList();
+
+        var y1 = items.Sum(i => i.Year1);
+        var y2 = items.Sum(i => i.Year2);
+        var y3 = items.Sum(i => i.Year3);
+
+        return Ok(new PropertyRatesProjectBudgetDto(fyText, scoaVersion, scoaIds.Count, items.Count, y1, y2, y3, items));
     }
 }
 

@@ -1,0 +1,101 @@
+<div class="config-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Maintenance Frequencies</h1>
+      <p class="page-subtitle">Manage how often planned maintenance recurs (e.g. Monthly, Quarterly, Annual)</p>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button (click)="exportToExcel()"><mat-icon>download</mat-icon> Export to Excel</button>
+      <button mat-flat-button class="btn-primary" (click)="openAdd()">
+        <mat-icon>add</mat-icon> Add Frequency
+      </button>
+    </div>
+  </div>
+
+  @if (showForm()) {
+    <div class="form-card">
+      <h3 class="form-title">{{editingId() ? 'Edit' : 'Add'}} Maintenance Frequency</h3>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Description *</label>
+          <input type="text" class="form-input" [(ngModel)]="formData.frequencyDesc" placeholder="e.g. Monthly">
+        </div>
+        <div class="form-field form-field-narrow">
+          <label>Interval (days) *</label>
+          <input type="number" class="form-input" [(ngModel)]="formData.intervalDays" min="0" placeholder="e.g. 30">
+        </div>
+        <div class="form-field form-field-narrow">
+          <label>Sort Order</label>
+          <input type="number" class="form-input" [(ngModel)]="formData.sortOrder" min="0" placeholder="0">
+        </div>
+      </div>
+      @if (editingId()) {
+        <div class="form-row">
+          <div class="form-field form-field-narrow">
+            <label>Enabled</label>
+            <select class="form-input" [(ngModel)]="formData.enabled">
+              <option [ngValue]="true">Yes</option>
+              <option [ngValue]="false">No</option>
+            </select>
+          </div>
+        </div>
+      }
+      <div class="form-actions">
+        <button mat-stroked-button (click)="cancelForm()">Cancel</button>
+        <button mat-flat-button class="btn-primary" (click)="save()" [disabled]="!formData.frequencyDesc">
+          {{editingId() ? 'Update' : 'Create'}}
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="loading-container"><mat-spinner diameter="32"></mat-spinner></div>
+  } @else {
+    <div class="table-card">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Description</th>
+            <th>Interval (days)</th>
+            <th>Sort Order</th>
+            <th>Status</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of items(); track item.frequencyId) {
+            <tr>
+              <td class="id-cell">{{item.frequencyId}}</td>
+              <td class="desc-cell">{{item.frequencyDesc}}</td>
+              <td class="days-cell">{{item.intervalDays}} days</td>
+              <td class="order-cell">{{item.sortOrder}}</td>
+              <td>
+                <span class="status-badge" [class.active]="item.enabled">
+                  {{item.enabled ? 'Active' : 'Inactive'}}
+                </span>
+              </td>
+              <td class="actions-cell">
+                <button mat-icon-button (click)="openEdit(item)" matTooltip="Edit">
+                  <mat-icon class="action-icon edit">edit</mat-icon>
+                </button>
+                <button mat-icon-button (click)="toggleEnabled(item)" [matTooltip]="item.enabled ? 'Disable' : 'Enable'">
+                  <mat-icon class="action-icon" [class.enable]="!item.enabled" [class.disable]="item.enabled">
+                    {{item.enabled ? 'toggle_on' : 'toggle_off'}}
+                  </mat-icon>
+                </button>
+                <button mat-icon-button (click)="confirmDelete(item)" matTooltip="Delete">
+                  <mat-icon class="action-icon delete">delete</mat-icon>
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (items().length === 0) {
+        <div class="empty-state">No maintenance frequencies found</div>
+      }
+    </div>
+  }
+</div>

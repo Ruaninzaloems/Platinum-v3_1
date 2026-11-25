@@ -94,12 +94,11 @@
       </div>
       <div>
         <label class="form-label">Custodian</label>
-        <select class="form-input" [(ngModel)]="newProject.custodianId">
-          <option [ngValue]="null">Select Custodian</option>
-          @for (emp of employees(); track emp.employeeId) {
-            <option [ngValue]="emp.employeeId">{{emp.surname}}, {{emp.firstName}}</option>
-          }
-        </select>
+        <app-employee-select
+          [(ngModel)]="newProject.custodianId"
+          placeholder="Select Custodian"
+          selectClass="form-input"
+        ></app-employee-select>
       </div>
       <div>
         <label class="form-label">Latitude</label>

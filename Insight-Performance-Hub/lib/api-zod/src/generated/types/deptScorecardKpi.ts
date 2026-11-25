@@ -5,6 +5,7 @@
  * Organisational Performance Management API
  * OpenAPI spec version: 0.1.0
  */
+import type { DeptScorecardKpiCustomFields } from "./deptScorecardKpiCustomFields";
 
 export interface DeptScorecardKpi {
   id: number;
@@ -21,6 +22,7 @@ export interface DeptScorecardKpi {
   weighting: number;
   unitOfMeasureId?: number | null;
   isCumulative?: boolean;
+  customFields?: DeptScorecardKpiCustomFields;
   isInherited?: boolean;
   sortOrder?: number;
   createdAt?: string;

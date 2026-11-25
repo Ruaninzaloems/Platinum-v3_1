@@ -1,53 +1,130 @@
-import { Component, signal, OnInit, inject } from '@angular/core';
-  import { CommonModule } from '@angular/common';
-  import { HttpClient } from '@angular/common/http';
-  import { MatCardModule } from '@angular/material/card';
-  import { MatIconModule } from '@angular/material/icon';
-  import { MatButtonModule } from '@angular/material/button';
-  import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-  import { environment } from '../../environment';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
+import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
+import { catchError, finalize, of, tap } from 'rxjs';
+import { ApiService } from '@ins-core/services/api.service';
+import { AppNotification } from '@ins-core/models/domain.model';
+import { PageHeaderComponent } from '@ins-shared/components/page-header/page-header.component';
+import { LoadingSpinnerComponent } from '@ins-shared/components/loading-spinner/loading-spinner.component';
+import { EmptyStateComponent } from '@ins-shared/components/empty-state/empty-state.component';
+import { ToastService } from '@ins-core/services/toast.service';
+import { NotificationsService } from '@ins-core/services/notifications.service';
 
-  @Component({
-    selector: 'app-ins-notification-centre',
-    standalone: true,
-    imports: [CommonModule, MatCardModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule],
-    template: `
-      <div class="page">
-        <div class="page-header">
-          <mat-icon class="page-icon">notifications</mat-icon>
-          <div><h2>Notification Centre</h2><p class="sub">Performance Management System</p></div>
-        </div>
-        @if (loading()) {
-          <div class="center"><mat-spinner diameter="40"></mat-spinner></div>
-        } @else {
-          <mat-card><mat-card-content>
-            <div class="center-content">
-              <mat-icon class="big-icon">notifications</mat-icon>
-              <h3>Notification Centre</h3>
-              <p>Connected to Insights API at {{ apiBase }}</p>
+@Component({
+  selector: 'app-notification-centre',
+  standalone: true,
+  imports: [CommonModule, MatIconModule, MatButtonModule, PageHeaderComponent, LoadingSpinnerComponent, EmptyStateComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <section class="plat-page">
+      <app-page-header title="Notification Centre" subtitle="Recent alerts and reminders" icon="notifications" tone="purple"></app-page-header>
+      <div class="plat-card">
+        <app-loading-spinner *ngIf="loading()"></app-loading-spinner>
+        <ng-container *ngIf="!loading()">
+          <app-empty-state *ngIf="items().length === 0" icon="notifications" title="All caught up!" message="You have no notifications."></app-empty-state>
+          <div class="list" *ngIf="items().length > 0">
+            <div *ngFor="let n of items()" class="row" [class.row--read]="n.isRead">
+              <div class="ico" [class]="'ico--' + n.type">
+                <mat-icon>{{ iconFor(n.type) }}</mat-icon>
+              </div>
+              <div class="body">
+                <div class="head">
+                  <h4 [class.read]="n.isRead">{{ n.title }}</h4>
+                  <span class="time">{{ relTime(n.createdAt) }}</span>
+                </div>
+                <p>{{ n.message }}</p>
+                <div class="actions">
+                  <button *ngIf="n.link" mat-button color="primary" (click)="openLink(n)">
+                    <mat-icon>open_in_new</mat-icon> View
+                  </button>
+                  <button *ngIf="!n.isRead" mat-button color="primary" (click)="markRead(n)">Mark as read</button>
+                </div>
+              </div>
             </div>
-          </mat-card-content></mat-card>
-        }
+          </div>
+        </ng-container>
       </div>
-    `,
-    styles: [`
-      .page { padding: 1.5rem; }
-      .page-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
-      .page-icon { font-size: 32px; width: 32px; height: 32px; color: #311b92; }
-      h2 { font-size: 1.3rem; font-weight: 700; margin: 0; }
-      .sub { color: #64748b; font-size: 0.85rem; margin: 0; }
-      .center { display: flex; justify-content: center; padding: 4rem; }
-      .center-content { text-align: center; padding: 3rem; }
-      .big-icon { font-size: 64px; width: 64px; height: 64px; color: #311b92; opacity: .25; margin-bottom: 1rem; }
-      .center-content h3 { margin-bottom: .5rem; }
-      .center-content p { color: #64748b; }
-    `]
-  })
-  export class NotificationCentreComponent implements OnInit {
-    private http = inject(HttpClient);
-    loading = signal(false);
-    apiBase = environment.apiPrefix + '/api';
+    </section>
+  `,
+  styles: [`
+    .list { display: flex; flex-direction: column; }
+    .row { display: flex; gap: 14px; padding: 18px 22px; border-bottom: 1px solid #f1f5f9; background: #eff6ff14; }
+    .row--read { background: #fff; opacity: .7; }
+    .row:last-child { border-bottom: 0; }
+    .ico { width: 40px; height: 40px; border-radius: 50%; background: #fff; border: 1px solid #e2e8f0; display: grid; place-items: center; flex-shrink: 0; }
+    .row--read .ico { background: #f1f5f9; border-color: transparent; }
+    .ico--reminder mat-icon { color: #2563eb; }
+    .ico--escalation mat-icon { color: #dc2626; }
+    .ico--warning mat-icon { color: #ea580c; }
+    .ico--success mat-icon { color: #16a34a; }
+    .ico--info mat-icon { color: #475569; }
+    .body { flex: 1; }
+    .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    h4 { margin: 0; font-size: 14px; font-weight: 700; color: #0f172a; }
+    h4.read { color: #475569; }
+    .time { font-size: 12px; color: #94a3b8; white-space: nowrap; }
+    p { margin: 4px 0 6px; color: #475569; font-size: 13px; line-height: 1.5; }
+    .actions { display: flex; gap: 8px; align-items: center; }
+    .actions mat-icon { font-size: 16px; width: 16px; height: 16px; }
+  `],
+})
+export class NotificationCentreComponent implements OnInit {
+  private readonly api = inject(ApiService);
+  private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
+  private readonly notifications = inject(NotificationsService);
+  loading = signal(true);
+  items = signal<AppNotification[]>([]);
 
-    ngOnInit() {}
+  ngOnInit() { this.load(); }
+  load() {
+    this.loading.set(true);
+    this.api.get<AppNotification[] | { data: AppNotification[] }>('/notifications').pipe(
+      tap((res) => { const list = Array.isArray(res) ? res : (res?.data ?? []); this.items.set(list); }),
+      catchError(() => { this.items.set([]); return of(null); }),
+      finalize(() => this.loading.set(false)),
+    ).subscribe();
   }
-  
+  openLink(n: AppNotification) {
+    if (!n.link) return;
+    if (!n.isRead) {
+      this.api.post(`/notifications/${n.id}/read`, {}).pipe(catchError(() => of(null))).subscribe(() => this.notifications.refresh());
+    }
+    const [path, query] = n.link.split('?');
+    const queryParams: Record<string, string> = {};
+    if (query) {
+      for (const pair of query.split('&')) {
+        const [k, v] = pair.split('=');
+        if (k) queryParams[decodeURIComponent(k)] = decodeURIComponent(v ?? '');
+      }
+    }
+    this.router.navigate([path], { queryParams });
+  }
+  markRead(n: AppNotification) {
+    this.api.post(`/notifications/${n.id}/read`, {}).pipe(
+      tap(() => { this.load(); this.notifications.refresh(); }),
+      catchError((e) => { this.toast.error('Could not mark as read', e?.error?.message ?? e?.message); return of(null); }),
+    ).subscribe();
+  }
+  iconFor(type: string): string {
+    switch (type) {
+      case 'reminder': return 'schedule';
+      case 'escalation': return 'priority_high';
+      case 'warning': return 'warning';
+      case 'success': return 'check_circle';
+      default: return 'info';
+    }
+  }
+  relTime(iso: string): string {
+    const t = new Date(iso).getTime();
+    const diff = Math.max(0, Date.now() - t);
+    const s = Math.floor(diff / 1000);
+    if (s < 60) return `${s}s ago`;
+    const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
+    const d = Math.floor(h / 24); if (d < 30) return `${d}d ago`;
+    return new Date(iso).toLocaleDateString();
+  }
+}

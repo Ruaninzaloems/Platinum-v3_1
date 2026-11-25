@@ -16,5 +16,5 @@ export interface AuditLogEntry {
   oldValue?: string | null;
   newValue?: string | null;
   cycleId?: number | null;
-  timestamp: Date;
+  timestamp: string;
 }

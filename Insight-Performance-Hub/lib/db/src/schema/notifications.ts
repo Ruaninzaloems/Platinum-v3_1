@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { performanceCyclesTable } from "./performance-cycles";
 
 export const notificationsTable = pgTable("notifications", {
@@ -7,9 +7,14 @@ export const notificationsTable = pgTable("notifications", {
   title: text("title").notNull(),
   message: text("message").notNull(),
   type: text("type").notNull().default("info"),
+  link: text("link"),
+  dedupeKey: text("dedupe_key"),
   isRead: boolean("is_read").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => [
+  // Prevents the reminder sweep from creating the same system notification twice for a user
+  uniqueIndex("notifications_user_dedupe_uq").on(t.userId, t.dedupeKey),
+]);
 
 export const notificationConfigsTable = pgTable("notification_configs", {
   id: serial("id").primaryKey(),

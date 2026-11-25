@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -6,335 +6,375 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService } from '../../core/services/api.service';
 import { FinancialYear } from '../../core/models/budget.models';
 
 @Component({
   selector: 'app-virement-policy',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatIconModule, MatButtonModule, MatSelectModule, MatFormFieldModule, MatInputModule, MatSlideToggleModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [CommonModule, FormsModule, MatIconModule, MatButtonModule, MatSelectModule, MatFormFieldModule, MatInputModule, MatTooltipModule],
   template: `
+    <!-- ── Page header ── -->
     <div class="page-header">
       <div>
         <h1>Virement Policy</h1>
-        <p class="subtitle">Configure virement validation rules and thresholds per financial year</p>
+        <p class="subtitle">Configure virement validation rules per financial year</p>
       </div>
-      <div class="header-actions">
-        <mat-form-field appearance="outline" class="fy-select">
+      <div class="header-controls">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="fy-field">
           <mat-label>Financial Year</mat-label>
-          <mat-select [(ngModel)]="selectedFyId" (selectionChange)="loadPolicy()">
-            @for (fy of financialYears; track fy.id) {
-              <mat-option [value]="fy.id">{{ fy.yearCode }}</mat-option>
-            }
+          <mat-select [(ngModel)]="selectedFyId" (ngModelChange)="onFyChange($event)">
+            <mat-option *ngFor="let fy of financialYears" [value]="fy.id">{{ fy.yearCode }}</mat-option>
           </mat-select>
         </mat-form-field>
-        @if (!policy) {
-          <button class="btn-primary" (click)="createPolicy()" [disabled]="!selectedFyId">
-            <mat-icon>add</mat-icon> Create Policy
-          </button>
+
+        @if (versions.length > 0) {
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="fy-field">
+            <mat-label>Version</mat-label>
+            <mat-select [(ngModel)]="selectedVersionId" (ngModelChange)="onVersionChange($event)">
+              <mat-option *ngFor="let v of versions" [value]="v.id">{{ v.versionNumber }}</mat-option>
+            </mat-select>
+          </mat-form-field>
         }
       </div>
     </div>
 
+    <!-- ── Loading ── -->
     @if (loading) {
       <div class="loading-state">
         <mat-icon class="spin">sync</mat-icon>
-        <span>Loading policy...</span>
+        <span>Loading...</span>
       </div>
     }
 
-    @if (!loading && policy) {
-      <div class="policy-header-card">
-        <div class="policy-info">
-          <div class="policy-meta">
-            <span class="policy-version">{{ policy.policyVersion }}</span>
-            <span class="status-badge" [class.active]="policy.isActive" [class.inactive]="!policy.isActive">
-              {{ policy.isActive ? 'Active' : 'Inactive' }}
+    <!-- ── Version header (existing version selected) ── -->
+    @if (!loading && selectedVersion) {
+      <div class="version-header-card">
+        <div class="version-info">
+          <div class="version-meta">
+            <span class="version-number">{{ selectedVersion.versionNumber }}</span>
+            @if (selectedVersion.versionName && selectedVersion.versionName !== selectedVersion.versionNumber) {
+              <span class="version-name">{{ selectedVersion.versionName }}</span>
+            }
+            <span class="status-chip" [class.locked]="selectedVersion.isLocked" [class.unlocked]="!selectedVersion.isLocked">
+              <mat-icon class="chip-icon">{{ selectedVersion.isLocked ? 'lock' : 'lock_open' }}</mat-icon>
+              {{ selectedVersion.isLocked ? 'Locked' : 'Unlocked' }}
             </span>
-            @if (policy.isLocked) {
-              <span class="status-badge locked">
-                <mat-icon class="badge-icon">lock</mat-icon> Locked
+            @if (selectedVersion.isCouncilApprovedPolicy) {
+              <span class="status-chip council">
+                <mat-icon class="chip-icon">verified</mat-icon>
+                Council Approved
               </span>
             }
           </div>
-          <div class="policy-detail-row">
-            <span class="detail-label">Financial Year:</span>
-            <span>{{ policy.financialYear }}</span>
-          </div>
-          @if (policy.lockedBy) {
-            <div class="policy-detail-row">
-              <span class="detail-label">Locked by:</span>
-              <span>{{ policy.lockedBy }} on {{ policy.lockedOn | date:'medium' }}</span>
+          @if (selectedVersion.comments) {
+            <p class="version-comments">{{ selectedVersion.comments }}</p>
+          }
+          @if (selectedVersion.approvedVirementPolicyFileName) {
+            <div class="file-ref">
+              <mat-icon>attach_file</mat-icon>
+              <span>{{ selectedVersion.approvedVirementPolicyFileName }}</span>
             </div>
           }
         </div>
-        <div class="policy-actions">
-          @if (!policy.isLocked) {
-            <button class="btn-outline" (click)="lockPolicy()">
-              <mat-icon>lock</mat-icon> Lock Policy
-            </button>
-            <button class="btn-primary" (click)="showAddRule = true">
-              <mat-icon>add</mat-icon> Add Rule
+        <div class="version-actions">
+          @if (selectedVersion.isLocked) {
+            <button class="btn-outline" (click)="unlockVersion()">
+              <mat-icon>lock_open</mat-icon> Unlock Configuration
             </button>
           } @else {
-            <button class="btn-outline" (click)="unlockPolicy()">
-              <mat-icon>lock_open</mat-icon> Unlock Policy
+            <button class="btn-primary" (click)="openLockDialog()">
+              <mat-icon>lock</mat-icon> Lock Configuration
             </button>
           }
         </div>
       </div>
+    }
 
-      @if (showAddRule) {
-        <div class="card rule-form-card">
-          <h3>Add New Rule</h3>
-          <div class="form-grid">
-            <mat-form-field appearance="outline">
-              <mat-label>Principle</mat-label>
-              <input matInput [(ngModel)]="newRule.principle" placeholder="e.g. SCOA Function">
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Severity</mat-label>
-              <mat-select [(ngModel)]="newRule.severity">
-                <mat-option value="Error">Error (Block)</mat-option>
-                <mat-option value="Warning">Warning</mat-option>
-                <mat-option value="Info">Info</mat-option>
-              </mat-select>
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="span-2">
-              <mat-label>Description</mat-label>
-              <textarea matInput [(ngModel)]="newRule.description" rows="2"></textarea>
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="span-2">
-              <mat-label>Validation Rule</mat-label>
-              <input matInput [(ngModel)]="newRule.validationRule">
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Segment Type</mat-label>
-              <mat-select [(ngModel)]="newRule.segmentType">
-                <mat-option [value]="null">None (Amount-based)</mat-option>
-                <mat-option value="Item">Item</mat-option>
-                <mat-option value="Fund">Fund</mat-option>
-                <mat-option value="Function">Function</mat-option>
-                <mat-option value="Project">Project</mat-option>
-                <mat-option value="Region">Region</mat-option>
-                <mat-option value="Costing">Costing</mat-option>
-              </mat-select>
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>From Segment Filter</mat-label>
-              <input matInput [(ngModel)]="newRule.fromSegmentFilter" placeholder="e.g. 7000,8000">
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>To Segment Filter</mat-label>
-              <input matInput [(ngModel)]="newRule.toSegmentFilter" placeholder="e.g. 3000,4000">
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Threshold %</mat-label>
-              <input matInput type="number" [(ngModel)]="newRule.thresholdPercent">
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Max Amount (R)</mat-label>
-              <input matInput type="number" [(ngModel)]="newRule.maxAmount">
-            </mat-form-field>
-            <div class="toggle-row">
-              <mat-slide-toggle [(ngModel)]="newRule.requiresCouncilApproval">Requires Council Approval</mat-slide-toggle>
-            </div>
-          </div>
-          <div class="form-actions">
-            <button class="btn-outline" (click)="showAddRule = false">Cancel</button>
-            <button class="btn-primary" (click)="addRule()">
-              <mat-icon>add</mat-icon> Add Rule
-            </button>
+    <!-- ── No versions banner (draft from sys rules) ── -->
+    @if (!loading && versions.length === 0 && selectedFyId) {
+      <div class="draft-banner">
+        <div class="draft-info">
+          <mat-icon>info</mat-icon>
+          <div>
+            <strong>No policy version exists for {{ selectedFyCode }}</strong>
+            <p>Showing system virement rules. Review the rules below then lock to create a new policy version.</p>
           </div>
         </div>
-      }
+        <button class="btn-primary" (click)="openLockDialog()">
+          <mat-icon>lock</mat-icon> Lock Configuration
+        </button>
+      </div>
+    }
 
-      <div class="rules-section">
-        <h2>Policy Rules ({{ policy.rules?.length || 0 }})</h2>
-        @for (rule of policy.rules; track rule.id) {
-          <div class="rule-card" [class.disabled-rule]="!rule.isEnabled">
-            <div class="rule-header">
-              <div class="rule-left">
-                <span class="rule-order">#{{ rule.sortOrder }}</span>
-                <span class="severity-badge" [class]="'severity-' + rule.severity.toLowerCase()">{{ rule.severity }}</span>
-                <span class="rule-principle">{{ rule.principle }}</span>
+    <!-- ── Rules table ── -->
+    @if (!loading && rules.length > 0) {
+      <div class="table-card">
+        <div class="table-header">
+          <h2>
+            @if (selectedVersion) { Policy Rules }
+            @else { System Virement Rules }
+            <span class="rule-count">{{ rules.length }}</span>
+          </h2>
+        </div>
+        <div class="table-scroll">
+          <table class="rules-table">
+            <thead>
+              <tr>
+                <th class="col-option">Option</th>
+                <th class="col-principle">Virement Principle</th>
+                <th class="col-rule">Validation Rule</th>
+                <th class="col-desc">Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (rule of rules; track rule.id) {
+                <tr>
+                  <td class="col-option">
+                    @if (isOptionEditable) {
+                      <div class="option-toggle">
+                        <button class="opt-chip" [class.opt-yes]="!rule.option" (click)="setOption(rule, false)">Yes</button>
+                        <button class="opt-chip" [class.opt-no]="rule.option" (click)="setOption(rule, true)">No</button>
+                      </div>
+                    } @else {
+                      <span class="option-badge" [class.opt-yes]="!rule.option" [class.opt-no]="rule.option">
+                        {{ rule.option ? 'No' : 'Yes' }}
+                      </span>
+                    }
+                  </td>
+                  <td class="col-principle">{{ rule.virementDesc }}</td>
+                  <td class="col-rule">{{ rule.virementRuleDesc }}</td>
+                  <td class="col-desc">{{ rule.virementDefinition }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+
+    <!-- ── Empty state ── -->
+    @if (!loading && rules.length === 0 && selectedFyId) {
+      <div class="empty-state">
+        <mat-icon class="empty-icon">policy</mat-icon>
+        <h3>No rules found</h3>
+        <p>No enabled virement rules are configured for {{ selectedFyCode }}.</p>
+      </div>
+    }
+
+    <!-- ── Lock dialog overlay (new version only) ── -->
+    @if (showLockDialog) {
+      <div class="overlay-backdrop" (click)="closeLockDialog()">
+        <div class="overlay-card" (click)="$event.stopPropagation()">
+          <div class="overlay-header">
+            <div>
+              <h3>Lock Policy Configuration</h3>
+              <p>This will create a new virement policy version for {{ selectedFyCode }}</p>
+            </div>
+            <button class="icon-btn" (click)="closeLockDialog()">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          <div class="overlay-body">
+            <div class="form-row">
+              <mat-form-field appearance="outline">
+                <mat-label>Version Number</mat-label>
+                <input matInput [value]="nextVersionNumber" readonly>
+                <mat-icon matSuffix>tag</mat-icon>
+              </mat-form-field>
+            </div>
+
+            <div class="form-row">
+              <mat-form-field appearance="outline">
+                <mat-label>Version Name</mat-label>
+                <input matInput [(ngModel)]="lockForm.versionName" placeholder="e.g. Adopted Budget 2025/2026">
+              </mat-form-field>
+            </div>
+
+            <div class="form-row">
+              <mat-form-field appearance="outline">
+                <mat-label>Comments</mat-label>
+                <textarea matInput [(ngModel)]="lockForm.comments" rows="3" placeholder="Add notes about this policy version..."></textarea>
+              </mat-form-field>
+            </div>
+
+            <div class="radio-group">
+              <label class="radio-group-label">New Council Approved Virement Policy</label>
+              <div class="radio-options">
+                <label class="radio-opt" [class.selected]="lockForm.isCouncilApprovedPolicy === true">
+                  <input type="radio" [(ngModel)]="lockForm.isCouncilApprovedPolicy" [value]="true">
+                  <span>Yes</span>
+                </label>
+                <label class="radio-opt" [class.selected]="lockForm.isCouncilApprovedPolicy === false">
+                  <input type="radio" [(ngModel)]="lockForm.isCouncilApprovedPolicy" [value]="false">
+                  <span>No</span>
+                </label>
               </div>
-              <div class="rule-right">
-                @if (!policy.isLocked) {
-                  <mat-slide-toggle [checked]="rule.isEnabled" (change)="toggleRule(rule)" class="rule-toggle"></mat-slide-toggle>
-                  <button class="icon-btn" (click)="editingRuleId = editingRuleId === rule.id ? null : rule.id" title="Edit">
-                    <mat-icon>edit</mat-icon>
-                  </button>
-                  <button class="icon-btn danger" (click)="deleteRule(rule.id)" title="Delete">
-                    <mat-icon>delete</mat-icon>
-                  </button>
-                } @else {
-                  @if (rule.isEnabled) {
-                    <span class="enabled-indicator">Enabled</span>
+            </div>
+
+            @if (lockForm.isCouncilApprovedPolicy) {
+              <div class="file-upload-section">
+                <label class="file-upload-label">Upload Council Approved Virement Policy</label>
+                <div class="file-drop-zone" [class.has-file]="lockForm.policyFile">
+                  <input type="file" id="policy-file" (change)="onFileSelected($event)" accept=".pdf,.doc,.docx" class="file-input">
+                  @if (!lockForm.policyFile) {
+                    <label for="policy-file" class="file-drop-content">
+                      <mat-icon>upload_file</mat-icon>
+                      <span>Click to upload PDF or Word document</span>
+                    </label>
                   } @else {
-                    <span class="disabled-indicator">Disabled</span>
+                    <div class="file-selected">
+                      <mat-icon>description</mat-icon>
+                      <span class="file-name">{{ lockForm.policyFile.name }}</span>
+                      <button class="icon-btn small" (click)="clearFile($event)">
+                        <mat-icon>close</mat-icon>
+                      </button>
+                    </div>
                   }
-                }
-              </div>
-            </div>
-            <div class="rule-body">
-              <p class="rule-validation">{{ rule.validationRule }}</p>
-              <p class="rule-description">{{ rule.description }}</p>
-              <div class="rule-tags">
-                @if (rule.segmentType) {
-                  <span class="tag">Segment: {{ rule.segmentType }}</span>
-                }
-                @if (rule.fromSegmentFilter) {
-                  <span class="tag">From: {{ rule.fromSegmentFilter }}</span>
-                }
-                @if (rule.toSegmentFilter) {
-                  <span class="tag">To: {{ rule.toSegmentFilter }}</span>
-                }
-                @if (rule.thresholdPercent) {
-                  <span class="tag threshold">Threshold: {{ rule.thresholdPercent }}%</span>
-                }
-                @if (rule.maxAmount) {
-                  <span class="tag amount">Max: R {{ rule.maxAmount | number:'1.0-0' }}</span>
-                }
-                @if (rule.requiresCouncilApproval) {
-                  <span class="tag council">Council Approval</span>
-                }
-              </div>
-            </div>
-
-            @if (editingRuleId === rule.id) {
-              <div class="rule-edit-form">
-                <div class="form-grid">
-                  <mat-form-field appearance="outline">
-                    <mat-label>Principle</mat-label>
-                    <input matInput [(ngModel)]="rule.principle">
-                  </mat-form-field>
-                  <mat-form-field appearance="outline">
-                    <mat-label>Severity</mat-label>
-                    <mat-select [(ngModel)]="rule.severity">
-                      <mat-option value="Error">Error</mat-option>
-                      <mat-option value="Warning">Warning</mat-option>
-                      <mat-option value="Info">Info</mat-option>
-                    </mat-select>
-                  </mat-form-field>
-                  <mat-form-field appearance="outline" class="span-2">
-                    <mat-label>Validation Rule</mat-label>
-                    <input matInput [(ngModel)]="rule.validationRule">
-                  </mat-form-field>
-                  <mat-form-field appearance="outline">
-                    <mat-label>Threshold %</mat-label>
-                    <input matInput type="number" [(ngModel)]="rule.thresholdPercent">
-                  </mat-form-field>
-                  <mat-form-field appearance="outline">
-                    <mat-label>Max Amount (R)</mat-label>
-                    <input matInput type="number" [(ngModel)]="rule.maxAmount">
-                  </mat-form-field>
-                </div>
-                <div class="form-actions">
-                  <button class="btn-outline" (click)="editingRuleId = null">Cancel</button>
-                  <button class="btn-primary" (click)="saveRule(rule)">
-                    <mat-icon>save</mat-icon> Save Changes
-                  </button>
                 </div>
               </div>
             }
           </div>
-        }
-      </div>
-    }
 
-    @if (!loading && !policy && selectedFyId) {
-      <div class="empty-state">
-        <mat-icon class="empty-icon">policy</mat-icon>
-        <h3>No Virement Policy</h3>
-        <p>No virement policy exists for the selected financial year. Create one to define validation rules for budget transfers.</p>
-        <button class="btn-primary" (click)="createPolicy()">
-          <mat-icon>add</mat-icon> Create Policy
-        </button>
+          <div class="overlay-footer">
+            <button class="btn-outline" (click)="closeLockDialog()" [disabled]="locking">Cancel</button>
+            <button class="btn-primary" (click)="lockConfiguration()" [disabled]="locking || !lockForm.versionName">
+              @if (locking) {
+                <mat-icon class="spin">sync</mat-icon> Locking...
+              } @else {
+                <mat-icon>lock</mat-icon> Lock Configuration
+              }
+            </button>
+          </div>
+        </div>
       </div>
     }
   `,
   styles: [`
     :host { display: block; padding: 24px; }
+
+    /* ── Header ── */
     .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
-    .page-header h1 { font-size: 24px; font-weight: 600; color: #0f2b46; margin: 0 0 4px 0; }
+    .page-header h1 { font-size: 24px; font-weight: 600; color: #0f2b46; margin: 0 0 4px; }
     .subtitle { color: #64748b; font-size: 14px; margin: 0; }
-    .header-actions { display: flex; gap: 12px; align-items: center; }
-    .fy-select { width: 180px; }
-    .fy-select .mat-mdc-form-field-subscript-wrapper { display: none; }
+    .header-controls { display: flex; gap: 12px; align-items: center; }
+    .fy-field { min-width: 180px; }
 
-    .btn-primary { display: inline-flex; align-items: center; gap: 6px; padding: 8px 20px; background: #0f2b46; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
+    /* ── Buttons ── */
+    .btn-primary { display: inline-flex; align-items: center; gap: 6px; padding: 9px 20px; background: #0f2b46; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background .2s; white-space: nowrap; }
     .btn-primary:hover { background: #1a3d5c; }
-    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
     .btn-primary mat-icon { font-size: 18px; width: 18px; height: 18px; }
-    .btn-outline { display: inline-flex; align-items: center; gap: 6px; padding: 8px 20px; background: white; color: #0f2b46; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+    .btn-outline { display: inline-flex; align-items: center; gap: 6px; padding: 9px 20px; background: #fff; color: #0f2b46; border: 1.5px solid #d1d5db; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all .2s; white-space: nowrap; }
     .btn-outline:hover { border-color: #0f2b46; background: #f8fafc; }
+    .btn-outline:disabled { opacity: .5; cursor: not-allowed; }
     .btn-outline mat-icon { font-size: 18px; width: 18px; height: 18px; }
+    .icon-btn { background: none; border: none; padding: 6px; border-radius: 6px; cursor: pointer; color: #64748b; transition: all .2s; display: inline-flex; align-items: center; }
+    .icon-btn:hover { background: #f1f5f9; color: #0f2b46; }
+    .icon-btn mat-icon { font-size: 20px; width: 20px; height: 20px; }
+    .icon-btn.small mat-icon { font-size: 16px; width: 16px; height: 16px; }
 
+    /* ── Loading ── */
     .loading-state { display: flex; align-items: center; gap: 12px; justify-content: center; padding: 60px; color: #64748b; font-size: 16px; }
     .spin { animation: spin 1s linear infinite; }
     @keyframes spin { 100% { transform: rotate(360deg); } }
 
-    .policy-header-card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-    .policy-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-    .policy-version { font-size: 18px; font-weight: 600; color: #0f2b46; font-family: 'JetBrains Mono', monospace; }
-    .status-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-    .status-badge.active { background: #dcfce7; color: #166534; }
-    .status-badge.inactive { background: #f1f5f9; color: #64748b; }
-    .status-badge.locked { background: #fef3c7; color: #92400e; }
-    .badge-icon { font-size: 14px; width: 14px; height: 14px; }
-    .policy-detail-row { font-size: 13px; color: #475569; margin-bottom: 4px; }
-    .detail-label { font-weight: 600; margin-right: 6px; }
-    .policy-actions { display: flex; gap: 10px; }
+    /* ── Version header card ── */
+    .version-header-card { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px 24px; display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; gap: 16px; }
+    .version-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+    .version-number { font-size: 17px; font-weight: 700; color: #0f2b46; font-family: 'JetBrains Mono', monospace; }
+    .version-name { font-size: 15px; color: #475569; font-weight: 500; }
+    .version-comments { font-size: 13px; color: #64748b; margin: 4px 0 6px; }
+    .file-ref { display: flex; align-items: center; gap: 4px; font-size: 13px; color: #3b82f6; margin-top: 4px; }
+    .file-ref mat-icon { font-size: 16px; width: 16px; height: 16px; }
+    .version-actions { flex-shrink: 0; }
 
-    .card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px 24px; margin-bottom: 24px; }
-    .rule-form-card h3 { font-size: 16px; font-weight: 600; color: #0f2b46; margin: 0 0 16px 0; }
-    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
-    .form-grid .span-2 { grid-column: span 2; }
-    .toggle-row { display: flex; align-items: center; padding: 8px 0; }
-    .form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0; }
+    /* ── Status chips ── */
+    .status-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .status-chip.locked { background: #fef3c7; color: #92400e; }
+    .status-chip.unlocked { background: #dcfce7; color: #166534; }
+    .status-chip.council { background: #e0f2fe; color: #075985; }
+    .chip-icon { font-size: 14px !important; width: 14px !important; height: 14px !important; }
 
-    .rules-section h2 { font-size: 18px; font-weight: 600; color: #0f2b46; margin: 0 0 16px 0; }
+    /* ── Draft banner ── */
+    .draft-banner { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; }
+    .draft-info { display: flex; align-items: flex-start; gap: 12px; color: #0369a1; }
+    .draft-info mat-icon { flex-shrink: 0; margin-top: 2px; }
+    .draft-info strong { display: block; font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+    .draft-info p { margin: 0; font-size: 13px; color: #0c4a6e; }
 
-    .rule-card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 16px 20px; margin-bottom: 12px; transition: all 0.2s; }
-    .rule-card:hover { border-color: #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
-    .rule-card.disabled-rule { opacity: 0.55; }
-    .rule-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .rule-left { display: flex; align-items: center; gap: 10px; }
-    .rule-order { font-size: 13px; font-weight: 700; color: #94a3b8; font-family: 'JetBrains Mono', monospace; min-width: 28px; }
-    .rule-principle { font-size: 15px; font-weight: 600; color: #0f2b46; }
-    .rule-right { display: flex; align-items: center; gap: 8px; }
-    .rule-toggle { transform: scale(0.85); }
+    /* ── Rules table ── */
+    .table-card { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
+    .table-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #e2e8f0; }
+    .table-header h2 { font-size: 16px; font-weight: 600; color: #0f2b46; margin: 0; display: flex; align-items: center; gap: 10px; }
+    .rule-count { background: #e2e8f0; color: #475569; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+    .table-scroll { overflow-x: auto; }
+    .rules-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .rules-table thead th { background: #f8fafc; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; padding: 10px 16px; text-align: left; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+    .rules-table tbody tr { border-bottom: 1px solid #f1f5f9; transition: background .15s; }
+    .rules-table tbody tr:hover { background: #f8fafc; }
+    .rules-table tbody tr:last-child { border-bottom: none; }
+    .rules-table td { padding: 12px 16px; vertical-align: top; color: #1e293b; line-height: 1.5; }
+    .col-option { width: 80px; text-align: center; }
+    .col-principle { width: 220px; font-weight: 500; }
+    .col-rule { width: 280px; }
+    .col-desc { }
 
-    .severity-badge { padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-    .severity-error { background: #fee2e2; color: #991b1b; }
-    .severity-warning { background: #fef3c7; color: #92400e; }
-    .severity-info { background: #e0f2fe; color: #075985; }
+    /* ── Option badge (read-only) ── */
+    .option-badge { display: inline-flex; align-items: center; justify-content: center; padding: 3px 12px; border-radius: 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .opt-yes { background: #dcfce7; color: #166534; }
+    .opt-no { background: #fee2e2; color: #991b1b; }
 
-    .rule-body { padding-left: 38px; }
-    .rule-validation { font-size: 14px; color: #1e293b; font-weight: 500; margin: 0 0 4px 0; }
-    .rule-description { font-size: 13px; color: #64748b; margin: 0 0 10px 0; line-height: 1.5; }
-    .rule-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-    .tag { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; background: #e3f2fd; color: #1565c0; font-family: 'JetBrains Mono', monospace; }
-    .tag.threshold { background: #fef3c7; color: #92400e; }
-    .tag.amount { background: #f0fdf4; color: #166534; }
-    .tag.council { background: #fae8ff; color: #86198f; }
+    /* ── Option toggle (editable) ── */
+    .option-toggle { display: inline-flex; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; }
+    .opt-chip { padding: 4px 12px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border: none; cursor: pointer; background: #f8fafc; color: #94a3b8; transition: all .15s; white-space: nowrap; }
+    .opt-chip:first-child { border-right: 1px solid #e2e8f0; }
+    .opt-chip.opt-yes { background: #dcfce7; color: #166534; }
+    .opt-chip.opt-no { background: #fee2e2; color: #991b1b; }
 
-    .icon-btn { background: none; border: none; padding: 6px; border-radius: 6px; cursor: pointer; color: #64748b; transition: all 0.2s; display: inline-flex; align-items: center; }
-    .icon-btn:hover { background: #f1f5f9; color: #0f2b46; }
-    .icon-btn.danger:hover { background: #fee2e2; color: #991b1b; }
-    .icon-btn mat-icon { font-size: 18px; width: 18px; height: 18px; }
-
-    .enabled-indicator { font-size: 12px; font-weight: 600; color: #16a34a; }
-    .disabled-indicator { font-size: 12px; font-weight: 600; color: #94a3b8; }
-
-    .rule-edit-form { margin-top: 16px; padding-top: 16px; border-top: 1px dashed #e2e8f0; }
-
+    /* ── Empty state ── */
     .empty-state { text-align: center; padding: 80px 40px; }
-    .empty-icon { font-size: 64px; width: 64px; height: 64px; color: #cbd5e1; margin-bottom: 16px; }
-    .empty-state h3 { font-size: 20px; font-weight: 600; color: #0f2b46; margin: 0 0 8px 0; }
-    .empty-state p { color: #64748b; font-size: 14px; margin: 0 0 24px 0; max-width: 480px; margin-left: auto; margin-right: auto; }
+    .empty-icon { font-size: 56px; width: 56px; height: 56px; color: #cbd5e1; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 18px; font-weight: 600; color: #0f2b46; margin: 0 0 8px; }
+    .empty-state p { color: #64748b; font-size: 14px; margin: 0; }
+
+    /* ── Lock dialog overlay ── */
+    .overlay-backdrop { position: fixed; inset: 0; background: rgba(15,43,70,.35); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .overlay-card { background: #fff; border-radius: 16px; width: 100%; max-width: 540px; box-shadow: 0 20px 60px rgba(0,0,0,.25); display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; }
+    .overlay-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 20px 24px 16px; border-bottom: 1px solid #e2e8f0; }
+    .overlay-header h3 { font-size: 18px; font-weight: 600; color: #0f2b46; margin: 0 0 4px; }
+    .overlay-header p { font-size: 13px; color: #64748b; margin: 0; }
+    .overlay-body { padding: 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+    .overlay-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 24px; border-top: 1px solid #e2e8f0; }
+    .form-row { width: 100%; }
+    .form-row .mat-mdc-form-field { width: 100%; }
+    .form-row .mat-mdc-form-field-subscript-wrapper { display: none; }
+
+    /* ── Radio group ── */
+    .radio-group { margin: 8px 0 4px; }
+    .radio-group-label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 10px; }
+    .radio-options { display: flex; gap: 12px; }
+    .radio-opt { display: flex; align-items: center; gap: 8px; padding: 10px 18px; border: 1.5px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; color: #374151; transition: all .2s; }
+    .radio-opt:hover { border-color: #0f2b46; background: #f8fafc; }
+    .radio-opt.selected { border-color: #0f2b46; background: #eff6ff; color: #0f2b46; }
+    .radio-opt input[type="radio"] { accent-color: #0f2b46; }
+
+    /* ── File upload ── */
+    .file-upload-section { margin-top: 8px; }
+    .file-upload-label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 8px; }
+    .file-drop-zone { border: 2px dashed #d1d5db; border-radius: 10px; overflow: hidden; transition: border-color .2s; }
+    .file-drop-zone:hover { border-color: #0f2b46; }
+    .file-drop-zone.has-file { border-style: solid; border-color: #0f2b46; background: #f0f9ff; }
+    .file-input { display: none; }
+    .file-drop-content { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 24px; cursor: pointer; color: #64748b; }
+    .file-drop-content mat-icon { font-size: 32px; width: 32px; height: 32px; color: #94a3b8; }
+    .file-drop-content span { font-size: 13px; }
+    .file-selected { display: flex; align-items: center; gap: 10px; padding: 12px 16px; }
+    .file-selected mat-icon { font-size: 24px; width: 24px; height: 24px; color: #0f2b46; }
+    .file-name { flex: 1; font-size: 13px; font-weight: 500; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .mat-mdc-form-field { width: 100%; }
   `]
@@ -342,17 +382,27 @@ import { FinancialYear } from '../../core/models/budget.models';
 export class VirementPolicyPage implements OnInit {
   financialYears: FinancialYear[] = [];
   selectedFyId: number | null = null;
-  policy: any = null;
+  selectedFyCode = '';
+
+  versions: any[] = [];
+  selectedVersionId: number | null = null;
+  selectedVersion: any = null;
+
+  rules: any[] = [];
   loading = false;
-  showAddRule = false;
-  editingRuleId: number | null = null;
-  newRule: any = {
-    principle: '', description: '', validationRule: '', severity: 'Error',
-    segmentType: null, fromSegmentFilter: '', toSegmentFilter: '',
-    thresholdPercent: null, maxAmount: null, requiresCouncilApproval: false
+
+  showLockDialog = false;
+  locking = false;
+  nextVersionNumber = '';
+
+  lockForm = {
+    versionName: '',
+    comments: '',
+    isCouncilApprovedPolicy: false as boolean,
+    policyFile: null as File | null
   };
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit() {
     this.api.getFinancialYears().subscribe(fys => {
@@ -360,67 +410,143 @@ export class VirementPolicyPage implements OnInit {
       const active = fys.find(f => f.isActive);
       if (active) {
         this.selectedFyId = active.id;
-        this.loadPolicy();
+        this.selectedFyCode = active.yearCode;
+        this.loadVersions();
       }
+      this.cdr.markForCheck();
     });
   }
 
-  loadPolicy() {
-    if (!this.selectedFyId) return;
+  onFyChange(fyId: number) {
+    const fy = this.financialYears.find(f => f.id === fyId);
+    this.selectedFyCode = fy?.yearCode ?? '';
+    this.versions = [];
+    this.selectedVersionId = null;
+    this.selectedVersion = null;
+    this.rules = [];
+    if (this.selectedFyCode) this.loadVersions();
+  }
+
+  onVersionChange(versionId: number) {
+    const v = this.versions.find(v => v.id === versionId);
+    this.selectedVersion = v ?? null;
+    if (v) this.loadVersionDetails(v.id);
+  }
+
+  loadVersions() {
+    if (!this.selectedFyCode) return;
     this.loading = true;
-    this.policy = null;
-    this.api.getActiveVirementPolicy(this.selectedFyId).subscribe({
-      next: (p) => { this.policy = p; this.loading = false; },
-      error: () => { this.policy = null; this.loading = false; }
+    this.rules = [];
+    this.api.getVirementPolicyVersions(this.selectedFyCode).subscribe({
+      next: (versions) => {
+        this.versions = versions;
+        if (versions.length > 0) {
+          const latest = versions[0];
+          this.selectedVersionId = latest.id;
+          this.selectedVersion = latest;
+          this.loadVersionDetails(latest.id);
+        } else {
+          this.loadSysRules();
+        }
+        this.cdr.markForCheck();
+      },
+      error: () => { this.loading = false; this.cdr.markForCheck(); }
     });
   }
 
-  createPolicy() {
-    if (!this.selectedFyId) return;
-    this.api.createVirementPolicy({ financialYearId: this.selectedFyId }).subscribe(() => {
-      this.loadPolicy();
+  loadVersionDetails(versionId: number) {
+    this.loading = true;
+    this.rules = [];
+    this.api.getVirementPolicyVersionDetails(versionId).subscribe({
+      next: (details) => { this.rules = details; this.loading = false; this.cdr.markForCheck(); },
+      error: () => { this.loading = false; this.cdr.markForCheck(); }
     });
   }
 
-  lockPolicy() {
-    if (!this.policy) return;
-    this.api.lockVirementPolicy(this.policy.id).subscribe(() => this.loadPolicy());
-  }
-
-  unlockPolicy() {
-    if (!this.policy) return;
-    this.api.unlockVirementPolicy(this.policy.id).subscribe(() => this.loadPolicy());
-  }
-
-  addRule() {
-    if (!this.policy) return;
-    this.api.addVirementPolicyRule(this.policy.id, {
-      ...this.newRule,
-      virementPolicyId: this.policy.id
-    }).subscribe(() => {
-      this.showAddRule = false;
-      this.newRule = {
-        principle: '', description: '', validationRule: '', severity: 'Error',
-        segmentType: null, fromSegmentFilter: '', toSegmentFilter: '',
-        thresholdPercent: null, maxAmount: null, requiresCouncilApproval: false
-      };
-      this.loadPolicy();
+  loadSysRules() {
+    this.loading = true;
+    this.rules = [];
+    this.api.getVirementSysRules(this.selectedFyCode).subscribe({
+      next: (rules) => { this.rules = rules; this.loading = false; this.cdr.markForCheck(); },
+      error: () => { this.loading = false; this.cdr.markForCheck(); }
     });
   }
 
-  toggleRule(rule: any) {
-    rule.isEnabled = !rule.isEnabled;
-    this.api.updateVirementPolicyRule(rule.id, rule).subscribe();
+  openLockDialog() {
+    this.api.getVirementNextVersionNumber(this.selectedFyCode).subscribe(r => {
+      this.nextVersionNumber = r.versionNumber;
+      this.cdr.markForCheck();
+    });
+    this.resetLockForm();
+    this.showLockDialog = true;
   }
 
-  saveRule(rule: any) {
-    this.api.updateVirementPolicyRule(rule.id, rule).subscribe(() => {
-      this.editingRuleId = null;
-      this.loadPolicy();
+  closeLockDialog() {
+    if (!this.locking) {
+      this.showLockDialog = false;
+      this.resetLockForm();
+    }
+  }
+
+  resetLockForm() {
+    this.lockForm = { versionName: '', comments: '', isCouncilApprovedPolicy: false, policyFile: null };
+  }
+
+  lockConfiguration() {
+    if (!this.selectedFyCode || !this.lockForm.versionName) return;
+    this.locking = true;
+    const fd = new FormData();
+    fd.append('FyCode', this.selectedFyCode);
+    fd.append('VersionName', this.lockForm.versionName);
+    fd.append('Comments', this.lockForm.comments);
+    fd.append('IsCouncilApprovedPolicy', String(this.lockForm.isCouncilApprovedPolicy));
+    if (this.lockForm.policyFile) fd.append('PolicyFile', this.lockForm.policyFile);
+
+    this.api.lockVirementPolicyVersion(fd).subscribe({
+      next: () => {
+        this.locking = false;
+        this.showLockDialog = false;
+        this.resetLockForm();
+        this.loadVersions();
+      },
+      error: () => { this.locking = false; }
     });
   }
 
-  deleteRule(ruleId: number) {
-    this.api.deleteVirementPolicyRule(ruleId).subscribe(() => this.loadPolicy());
+  get isOptionEditable(): boolean {
+    if (this.versions.length === 0) return true;
+    return !!this.selectedVersion && !this.selectedVersion.isLocked;
+  }
+
+  setOption(rule: any, newOption: boolean) {
+    if (rule.option === newOption) return;
+    rule.option = newOption;
+    if (this.versions.length === 0) {
+      this.api.updateVirementSysRuleOption(rule.id, newOption).subscribe();
+    } else {
+      this.api.updateVirementDetailOption(rule.id, newOption).subscribe();
+    }
+  }
+
+  unlockVersion() {
+    if (!this.selectedVersionId) return;
+    this.api.unlockVirementPolicyVersion(this.selectedVersionId).subscribe(() => this.loadVersions());
+  }
+
+  relockVersion() {
+    if (!this.selectedVersionId) return;
+    this.api.relockVirementPolicyVersion(this.selectedVersionId).subscribe(() => this.loadVersions());
+  }
+
+  onFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    this.lockForm.policyFile = input.files?.[0] ?? null;
+  }
+
+  clearFile(event: Event) {
+    event.stopPropagation();
+    this.lockForm.policyFile = null;
+    const input = document.getElementById('policy-file') as HTMLInputElement;
+    if (input) input.value = '';
   }
 }

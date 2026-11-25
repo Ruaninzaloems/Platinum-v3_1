@@ -97,27 +97,6 @@
   border-bottom-color: #c9a84c;
 }
 
-.detail-card {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 20px 24px;
-  margin-bottom: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-}
-
-.section-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #0f2b46;
-  margin-bottom: 16px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #e5e7eb;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -162,6 +141,23 @@
   cursor: pointer;
   font-size: 13px;
   color: #374151;
+}
+.checkbox-inline-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  letter-spacing: 0.03em;
+  padding-top: 4px;
+}
+.checkbox-inline-label input[type="checkbox"] {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
 }
 
 .tag {

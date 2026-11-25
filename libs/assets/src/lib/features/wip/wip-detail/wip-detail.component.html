@@ -205,12 +205,11 @@
           </div>
           <div>
             <div class="field-label">Custodian</div>
-            <select class="field-input" [(ngModel)]="editData.custodianId">
-              <option [ngValue]="null">Select Custodian</option>
-              @for (emp of employees(); track emp.employeeId) {
-                <option [ngValue]="emp.employeeId">{{emp.surname}}, {{emp.firstName}}</option>
-              }
-            </select>
+            <app-employee-select
+              [(ngModel)]="editData.custodianId"
+              placeholder="Select Custodian"
+              selectClass="field-input"
+            ></app-employee-select>
           </div>
           <div><div class="field-label">Latitude</div><input class="field-input" [(ngModel)]="editData.latitude" /></div>
           <div><div class="field-label">Longitude</div><input class="field-input" [(ngModel)]="editData.longitude" /></div>

@@ -1,0 +1,70 @@
+<div class="page-container">
+
+  <div class="page-header">
+    <h1>Approve Budget - Approve Draft</h1>
+  </div>
+
+  <div class="approval-card">
+
+    @if (loading) {
+      <div class="loading-row"><span>Loading...</span></div>
+    } @else {
+      <div class="section-body">
+
+        <div class="info-row">
+          <span class="info-label">IDP Period</span>
+          <span class="info-value">({{ idpPeriod }})</span>
+        </div>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Financial Year</mat-label>
+          <mat-select [(ngModel)]="selectedYear">
+            @for (y of financialYears; track y.id) {
+              <mat-option [value]="y.yearCode">{{ y.yearCode }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <div class="radio-row">
+          <div class="radio-group">
+            <label class="radio-opt">
+              <input type="radio" name="action" value="Approve" [(ngModel)]="action">
+              <span>Approve</span>
+            </label>
+            <label class="radio-opt">
+              <input type="radio" name="action" value="Reject" [(ngModel)]="action">
+              <span>Reject</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="file-row">
+          <div class="file-wrap">
+            <input #fileInput type="file" class="hidden-input" (change)="onFileChange($event)">
+            <button class="btn-choose" (click)="fileInput.click()">Choose File</button>
+            <span class="file-name">{{ selectedFile ? selectedFile.name : 'No file chosen' }}</span>
+          </div>
+          <p class="file-warning">Restricted Extension: .exe, .dmg</p>
+        </div>
+
+        @if (successMsg) {
+          <div class="alert-success">{{ successMsg }}</div>
+        }
+        @if (errorMsg) {
+          <div class="alert-error">{{ errorMsg }}</div>
+        }
+
+      </div>
+    }
+
+    <div class="card-footer">
+      <button class="btn-primary" [disabled]="submitting || !selectedYear" (click)="onSubmit()">
+        @if (submitting) { <span class="spinner"></span> }
+        Submit
+      </button>
+      <button class="btn-outline" (click)="onCancel()">Cancel</button>
+    </div>
+
+  </div>
+
+</div>

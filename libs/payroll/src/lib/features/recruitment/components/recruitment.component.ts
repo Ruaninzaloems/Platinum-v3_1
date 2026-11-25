@@ -10,6 +10,7 @@ import { DateInputComponent } from '../../../shared/components/date-input/date-i
 @Component({
   selector: 'app-recruitment',
   standalone: true,
+  host: { 'data-accent': 'talent' },
   imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, DateInputComponent],
   templateUrl: './recruitment.component.html',
   styleUrl: './recruitment.component.css'

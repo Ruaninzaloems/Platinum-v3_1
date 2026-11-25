@@ -85,10 +85,15 @@ export class MappingWorkbenchComponent implements OnInit {
   rc11Reason = '';
   sfpHighRiskAcknowledged = false;
   sfpMaterialExceptionAcknowledged = false;
+  adminOverride = false;
 
   sfpValidation: any = null;
   sfpOverrides: any[] = [];
   sfpValidationLoading = false;
+
+  expandedFindingCode: string | null = null;
+  findingDrilldownData: any = null;
+  findingDrilldownLoading = false;
 
   overrideDialogOpen = false;
   overrideFinding: any = null;
@@ -254,6 +259,10 @@ export class MappingWorkbenchComponent implements OnInit {
 
   get activeRunInfo(): any {
     return this.activeRunForSelectedBatch;
+  }
+
+  get isSystemAdmin(): boolean {
+    return this.authService.hasAnyRole('SYSTEM_ADMIN');
   }
 
   get canCreateRun(): boolean {
@@ -573,10 +582,13 @@ export class MappingWorkbenchComponent implements OnInit {
 
   submitForReview(): void {
     this.loading = true;
-    this.workbenchService.submitForReview(this.selectedRun.id).subscribe({
+    const useOverride = this.adminOverride;
+    const options = useOverride ? { adminOverride: true } : undefined;
+    this.workbenchService.submitForReview(this.selectedRun.id, options).subscribe({
       next: (run) => {
         this.selectedRun = run;
-        this.showSuccess('Mapping run submitted for review');
+        this.adminOverride = false;
+        this.showSuccess(useOverride ? 'Mapping run submitted for review (admin override)' : 'Mapping run submitted for review');
         this.loading = false;
       },
       error: (err) => {
@@ -592,6 +604,7 @@ export class MappingWorkbenchComponent implements OnInit {
 
   approve(): void {
     this.loading = true;
+    const useOverride = this.adminOverride;
     this.workbenchService.approve(this.selectedRun.id, {
       rc09Acknowledged: this.rc09Acknowledged,
       rc09Reason: this.rc09Reason,
@@ -599,11 +612,13 @@ export class MappingWorkbenchComponent implements OnInit {
       rc11Reason: this.rc11Reason,
       sfpHighRiskAcknowledged: this.sfpHighRiskAcknowledged,
       sfpMaterialExceptionAcknowledged: this.sfpMaterialExceptionAcknowledged,
+      adminOverride: useOverride || undefined,
     }).subscribe({
       next: (run) => {
         this.selectedRun = run;
+        this.adminOverride = false;
         this.loadRuns();
-        this.showSuccess('Mapping run approved');
+        this.showSuccess(useOverride ? 'Mapping run approved (admin override)' : 'Mapping run approved');
         this.loading = false;
       },
       error: (err) => {
@@ -830,6 +845,63 @@ export class MappingWorkbenchComponent implements OnInit {
     return this.getSfpFindings().filter((f: any) => f.status === 'PASS').length;
   }
 
+  private drilldownRequestId = 0;
+
+  toggleFindingDrilldown(findingCode: string): void {
+    if (this.expandedFindingCode === findingCode) {
+      this.expandedFindingCode = null;
+      this.findingDrilldownData = null;
+      this.findingDrilldownLoading = false;
+      return;
+    }
+    this.expandedFindingCode = findingCode;
+    this.findingDrilldownLoading = true;
+    this.findingDrilldownData = null;
+    const requestId = ++this.drilldownRequestId;
+    this.workbenchService.getFindingDrilldown(this.selectedRun.id, findingCode).subscribe({
+      next: (data) => {
+        if (this.drilldownRequestId !== requestId) return;
+        this.findingDrilldownData = data;
+        this.findingDrilldownLoading = false;
+      },
+      error: () => {
+        if (this.drilldownRequestId !== requestId) return;
+        this.findingDrilldownLoading = false;
+        this.snackBar.open('Failed to load drill-through data', 'Close', { duration: 3000 });
+      },
+    });
+  }
+
+  downloadFindingCsv(findingCode: string): void {
+    const url = this.workbenchService.getFindingDrilldownCsvUrl(this.selectedRun.id, findingCode);
+    const token = localStorage.getItem('accessToken') || '';
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.responseType = 'blob';
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        const blob = new Blob([xhr.response], { type: 'text/csv' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${findingCode}_drilldown.csv`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      } else {
+        this.snackBar.open('Failed to download CSV', 'Close', { duration: 3000 });
+      }
+    };
+    xhr.onerror = () => {
+      this.snackBar.open('Network error downloading CSV', 'Close', { duration: 3000 });
+    };
+    xhr.send();
+  }
+
+  getDrilldownDisplayRows(): any[] {
+    if (!this.findingDrilldownData?.rows) return [];
+    return this.findingDrilldownData.rows.slice(0, 50);
+  }
+
   getSeverityColor(severity: string): string {
     switch (severity) {
       case 'BLOCK': return '#d32f2f';
@@ -935,6 +1007,9 @@ export class MappingWorkbenchComponent implements OnInit {
     this.decisions = [];
     this.sfpValidation = null;
     this.sfpOverrides = [];
+    this.expandedFindingCode = null;
+    this.findingDrilldownData = null;
+    this.findingDrilldownLoading = false;
     this.diagnostics = [];
     this.selectedDiagnostic = null;
     this.resolveDisclosureId = '';

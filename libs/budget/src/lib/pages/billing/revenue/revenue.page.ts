@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '../../../core/services/api.service';
-import { RevenueProjection, RevenueProjectionSummary, TariffScenarioSummary } from '../../../core/models/budget.models';
+import { RevenueProjection, RevenueProjectionSummary, TariffScenarioSummary, FinancialYear } from '../../../core/models/budget.models';
 
 @Component({
   selector: 'app-revenue-page',
@@ -155,7 +155,12 @@ import { RevenueProjection, RevenueProjectionSummary, TariffScenarioSummary } fr
           </div>
           <div class="dialog-body">
             <div class="form-grid">
-              <div class="form-group"><label>Financial Year ID</label><input type="number" [(ngModel)]="calcForm.financialYearId" value="1"></div>
+              <div class="form-group">
+                <label>Financial Year</label>
+                <select [(ngModel)]="calcForm.financialYearId">
+                  <option *ngFor="let fy of financialYears" [ngValue]="fy.id">{{fy.yearCode}}</option>
+                </select>
+              </div>
               <div class="form-group">
                 <label>Tariff Scenario (optional)</label>
                 <select [(ngModel)]="calcForm.tariffScenarioId">
@@ -268,15 +273,24 @@ export class RevenuePage implements OnInit {
   projections: RevenueProjection[] = [];
   summary: RevenueProjectionSummary | null = null;
   scenarios: TariffScenarioSummary[] = [];
+  financialYears: FinancialYear[] = [];
   kpiCards: any[] = [];
   showCalcDialog = false;
   calculating = false;
   expandedId: number | null = null;
-  calcForm: any = { financialYearId: 1, tariffScenarioId: null, growthRateY2: 5.5, growthRateY3: 5.5 };
+  calcForm: any = { financialYearId: 0, tariffScenarioId: null, growthRateY2: 5.5, growthRateY3: 5.5 };
 
   constructor(private api: ApiService, private cdr: ChangeDetectorRef) {}
 
-  ngOnInit() { this.loadData(); this.api.getTariffScenarios().subscribe(d => { this.scenarios = d; this.cdr.markForCheck(); }); }
+  ngOnInit() {
+    this.loadData();
+    this.api.getTariffScenarios().subscribe(d => { this.scenarios = d; this.cdr.markForCheck(); });
+    this.api.getFinancialYears().subscribe(fys => {
+      this.financialYears = fys;
+      if (fys.length) this.calcForm.financialYearId = fys[0].id;
+      this.cdr.markForCheck();
+    });
+  }
 
   loadData() {
     this.api.getRevenueProjections().subscribe(data => {
@@ -309,8 +323,8 @@ export class RevenuePage implements OnInit {
 
   submitProjection(id: number) { this.api.submitRevenueProjection(id).subscribe(() => this.loadData()); }
   approveProjection(id: number) { this.api.approveRevenueProjection(id).subscribe(() => this.loadData()); }
-  submitAll() { this.api.submitAllRevenueProjections(1).subscribe(() => this.loadData()); }
-  approveAll() { this.api.approveAllRevenueProjections(1).subscribe(() => this.loadData()); }
+  submitAll() { this.api.submitAllRevenueProjections(this.calcForm.financialYearId).subscribe(() => this.loadData()); }
+  approveAll() { this.api.approveAllRevenueProjections(this.calcForm.financialYearId).subscribe(() => this.loadData()); }
 
   toggleExpand(id: number) { this.expandedId = this.expandedId === id ? null : id; }
 

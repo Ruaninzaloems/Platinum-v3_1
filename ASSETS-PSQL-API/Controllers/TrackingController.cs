@@ -17,7 +17,7 @@ public class TrackingController : ControllerBase
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
-        var items = await conn.QueryAsync<dynamic>(@"SELECT * FROM ""Asset_TrackingZones"" WHERE ""is_active"" = 1 ORDER BY ""name""");
+        var items = await conn.QueryAsync<dynamic>(@"SELECT * FROM ""Asset_TrackingZones"" WHERE ""is_active"" = TRUE ORDER BY ""name""");
         return Ok(items);
     }
 
@@ -51,7 +51,7 @@ public class TrackingController : ControllerBase
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
         var result = await conn.QueryFirstOrDefaultAsync<dynamic>(@"
-            UPDATE ""Asset_TrackingAlerts"" SET ""acknowledged_by"" = 1, ""acknowledged_at"" = GETDATE()
+            UPDATE ""Asset_TrackingAlerts"" SET ""acknowledged_by"" = 1, ""acknowledged_at"" = NOW()
             WHERE ""id"" = @id RETURNING *", new { id });
         return result is null ? NotFound(new { error = "Alert not found" }) : Ok(result);
     }

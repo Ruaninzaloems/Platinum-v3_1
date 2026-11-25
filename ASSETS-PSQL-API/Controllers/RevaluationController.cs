@@ -14,12 +14,14 @@ public class RevaluationController : ControllerBase
     private readonly DbConnectionFactory _db;
     private readonly TransactionService _txnService;
     private readonly LookupService _lookupService;
+    private readonly EmailService _emailService;
 
-    public RevaluationController(DbConnectionFactory db, TransactionService txnService, LookupService lookupService)
+    public RevaluationController(DbConnectionFactory db, TransactionService txnService, LookupService lookupService, EmailService emailService)
     {
         _db = db;
         _txnService = txnService;
         _lookupService = lookupService;
+        _emailService = emailService;
     }
 
     [HttpGet]
@@ -390,7 +392,7 @@ public class RevaluationController : ControllerBase
                 {
                     await _txnService.InsertGeneralLedgerEntry(conn, txn,
                         revalutionDate, processingMonth, debitVoteId, finYear,
-                        journalTransactionTypeId, itemDescription, documentNumber,
+                        documentTypeId, itemDescription, documentNumber,
                         debit: revaluationDebit, credit: null, matchTranGuid: transactionId,
                         journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                         scoaFundsId: mscoaConfig?.DebitScoaFundId, scoaRegionId: mscoaConfig?.DebitScoaRegionId,
@@ -406,7 +408,7 @@ public class RevaluationController : ControllerBase
                 {
                     await _txnService.InsertGeneralLedgerEntry(conn, txn,
                         revalutionDate, processingMonth, creditVoteId, finYear,
-                        journalTransactionTypeId, itemDescription, documentNumber,
+                        documentTypeId, itemDescription, documentNumber,
                         debit: null, credit: revaluationGainCt, matchTranGuid: transactionId,
                         journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                         scoaFundsId: mscoaConfig?.CreditScoaFundId, scoaRegionId: mscoaConfig?.CreditScoaRegionId,
@@ -422,7 +424,7 @@ public class RevaluationController : ControllerBase
                 {
                     await _txnService.InsertGeneralLedgerEntry(conn, txn,
                         revalutionDate, processingMonth, offsetVoteId, finYear,
-                        journalTransactionTypeId, itemDescription + " - DepreciationAdjustment", documentNumber,
+                        documentTypeId, itemDescription + " - DepreciationAdjustment", documentNumber,
                         debit: null, credit: depreciationAdjustment, matchTranGuid: transactionId,
                         journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                         scoaFundsId: mscoaConfig?.OffsetScoaFundId, scoaRegionId: mscoaConfig?.OffsetScoaRegionId,
@@ -441,7 +443,7 @@ public class RevaluationController : ControllerBase
                 {
                     await _txnService.InsertGeneralLedgerEntry(conn, txn,
                         revalutionDate, processingMonth, creditVoteId, finYear,
-                        journalTransactionTypeId, itemDescription, documentNumber,
+                        documentTypeId, itemDescription, documentNumber,
                         debit: revaluationGainDt, credit: null, matchTranGuid: transactionId,
                         journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                         scoaFundsId: mscoaConfig?.CreditScoaFundId, scoaRegionId: mscoaConfig?.CreditScoaRegionId,
@@ -457,7 +459,7 @@ public class RevaluationController : ControllerBase
                 {
                     await _txnService.InsertGeneralLedgerEntry(conn, txn,
                         revalutionDate, processingMonth, reserveVoteId, finYear,
-                        journalTransactionTypeId, itemDescription, documentNumber,
+                        documentTypeId, itemDescription, documentNumber,
                         debit: revaluationLoss, credit: null, matchTranGuid: transactionId,
                         journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                         scoaFundsId: mscoaConfig?.ReserveScoaFundId, scoaRegionId: mscoaConfig?.ReserveScoaRegionId,
@@ -473,7 +475,7 @@ public class RevaluationController : ControllerBase
                 {
                     await _txnService.InsertGeneralLedgerEntry(conn, txn,
                         revalutionDate, processingMonth, offsetVoteId, finYear,
-                        journalTransactionTypeId, itemDescription, documentNumber,
+                        documentTypeId, itemDescription, documentNumber,
                         debit: null, credit: revaluationCredit, matchTranGuid: transactionId,
                         journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                         scoaFundsId: mscoaConfig?.OffsetScoaFundId, scoaRegionId: mscoaConfig?.OffsetScoaRegionId,
@@ -489,7 +491,7 @@ public class RevaluationController : ControllerBase
                 {
                     await _txnService.InsertGeneralLedgerEntry(conn, txn,
                         revalutionDate, processingMonth, offsetVoteId, finYear,
-                        journalTransactionTypeId, itemDescription + " - DepreciationAdjustment", documentNumber,
+                        documentTypeId, itemDescription + " - DepreciationAdjustment", documentNumber,
                         debit: Math.Abs(depreciationAdjustment), credit: null, matchTranGuid: transactionId,
                         journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                         scoaFundsId: mscoaConfig?.OffsetScoaFundId, scoaRegionId: mscoaConfig?.OffsetScoaRegionId,
@@ -541,7 +543,7 @@ public class RevaluationController : ControllerBase
 
             await conn.ExecuteAsync(@"
                 UPDATE ""Asset_Revaluations""
-                SET ""PostDateTime"" = GETDATE(), ""Approved"" = TRUE, ""ApprovedBy"" = @approvedBy, ""ApprovedDate"" = GETDATE()
+                SET ""PostDateTime"" = NOW(), ""Approved"" = TRUE, ""ApprovedBy"" = @approvedBy, ""ApprovedDate"" = NOW()
                 WHERE ""AssetRegisterID"" = @assetRegId AND (""Approved"" IS NULL OR ""Approved"" = FALSE)",
                 new { approvedBy = request.ApprovedBy, assetRegId }, txn);
 
@@ -556,10 +558,49 @@ public class RevaluationController : ControllerBase
 
             await conn.ExecuteAsync(@"
                 UPDATE ""Asset_WorkflowInstances""
-                SET ""status"" = 'approved', ""completed_at"" = GETDATE()
+                SET ""status"" = 'approved', ""completed_at"" = NOW()
                 WHERE ""entity_type"" = 'revaluation' AND ""mssql_reference_id"" = @refId AND ""status"" IN ('pending', 'in_progress')",
                 new { refId = id.ToString() });
 
+            var revalTokens = await _emailService.BuildAssetBaseTokensAsync(conn, assetRegId);
+            revalTokens["RevaluationDate"]        = revalutionDate.ToString("dd MMM yyyy");
+            revalTokens["CostRevaluedAmount"]     = revalautionAmt.ToString("N2");
+            revalTokens["SurplusAmount"]          = surplusAmount.ToString("N2");
+            revalTokens["DepreciationAdjustment"] = depreciationAdjustment.ToString("N2");
+            revalTokens["FinancialYear"]          = finYear;
+            revalTokens["LastDepreciationDate"]   = "";
+            revalTokens["MarketValue"]            = "";
+            try
+            {
+                var revalSnap = await conn.QueryFirstOrDefaultAsync<dynamic>(@"
+                    SELECT r.""DiffDepAcc"", r.""DiffBook"", r.""RevalModel"",
+                           a.""AccumulatedDepreciationClosingBalance"",
+                           a.""CarryingAmountClosingBalance"",
+                           a.""RevaluationReserveClosingBalance"",
+                           COALESCE(a.""MarketValue"", 0) AS ""MarketValue""
+                    FROM ""Asset_Revaluations"" r
+                    LEFT JOIN ""Asset_Register_Items"" a ON r.""AssetRegisterID"" = a.""AssetRegisterItem_ID""
+                    WHERE r.""Asset_RevaluationsID"" = @id", new { id });
+                if (revalSnap != null)
+                {
+                    revalTokens["AccumDepAdjustment"]        = Convert.ToDecimal(revalSnap.DiffDepAcc ?? 0m).ToString("N2");
+                    revalTokens["FairValueAdjustment"]       = Convert.ToDecimal(revalSnap.DiffBook ?? 0m).ToString("N2");
+                    revalTokens["ValuationModule"]           = Convert.ToString(revalSnap.RevalModel ?? 0) ?? "";
+                    revalTokens["AccumulatedDepreciation"]   = Convert.ToDecimal(revalSnap.AccumulatedDepreciationClosingBalance ?? 0m).ToString("N2");
+                    revalTokens["AdjustedCarryingAmount"]    = Convert.ToDecimal(revalSnap.CarryingAmountClosingBalance ?? 0m).ToString("N2");
+                    revalTokens["CarryingAmountAtLastDep"]   = Convert.ToDecimal(revalSnap.CarryingAmountClosingBalance ?? 0m).ToString("N2");
+                    revalTokens["RevaluationReserveBalance"] = Convert.ToDecimal(revalSnap.RevaluationReserveClosingBalance ?? 0m).ToString("N2");
+                    revalTokens["RevaluationReserveAfter"]   = Convert.ToDecimal(revalSnap.RevaluationReserveClosingBalance ?? 0m).ToString("N2");
+                    revalTokens["MarketValue"]               = Convert.ToDecimal(revalSnap.MarketValue ?? 0m).ToString("N2");
+                }
+                var lastDepRow = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                    @"SELECT MAX(""DepreciationDate"") AS last_dep FROM ""Asset_Depreciation"" WHERE ""AssetRegisterItem_ID"" = @assetRegId",
+                    new { assetRegId });
+                if (lastDepRow?.last_dep is DateTime lastDepDt)
+                    revalTokens["LastDepreciationDate"] = lastDepDt.ToString("dd MMM yyyy");
+            }
+            catch { }
+            _ = _emailService.SendTransactionEmailsAsync("Revaluation", revalTokens);
             return Ok(new { success = 1, journalId, documentNumber, transactionId });
         }
         catch (Exception ex)
@@ -611,7 +652,7 @@ public class RevaluationController : ControllerBase
         {
             await _txnService.InsertGeneralLedgerEntry(conn, txn,
                 transactionDate, processingMonth, mscoaConfig.DebitVoteId, finYear,
-                depJournalTypeId, "Asset Depreciation - Catch-up to Revaluation Date", depDocNumber,
+                depDocTypeId, "Asset Depreciation - Catch-up to Revaluation Date", depDocNumber,
                 debit: catchUpAmount, credit: null, matchTranGuid: depTxnId,
                 journalTransactionTypeId: depJournalTypeId, assetLinkId: depJournalId,
                 scoaFundsId: mscoaConfig.DebitScoaFundId, scoaRegionId: mscoaConfig.DebitScoaRegionId,
@@ -627,7 +668,7 @@ public class RevaluationController : ControllerBase
         {
             await _txnService.InsertGeneralLedgerEntry(conn, txn,
                 transactionDate, processingMonth, mscoaConfig.CreditVoteId, finYear,
-                depJournalTypeId, "Asset Depreciation - Catch-up to Revaluation Date", depDocNumber,
+                depDocTypeId, "Asset Depreciation - Catch-up to Revaluation Date", depDocNumber,
                 debit: null, credit: catchUpAmount, matchTranGuid: depTxnId,
                 journalTransactionTypeId: depJournalTypeId, assetLinkId: depJournalId,
                 scoaFundsId: mscoaConfig.CreditScoaFundId, scoaRegionId: mscoaConfig.CreditScoaRegionId,
@@ -673,7 +714,7 @@ public class RevaluationController : ControllerBase
 
             await _txnService.InsertGeneralLedgerEntry(conn, txn,
                 transactionDate, processingMonth, mscoaConfig.ReserveVoteId, finYear,
-                depJournalTypeId, "Asset Depreciation Offset - Catch-up", depDocNumber,
+                depDocTypeId, "Asset Depreciation Offset - Catch-up", depDocNumber,
                 debit: postedOffset, credit: null, matchTranGuid: depTxnId,
                 journalTransactionTypeId: depJournalTypeId, assetLinkId: depJournalId,
                 scoaFundsId: mscoaConfig.ReserveScoaFundId, scoaRegionId: mscoaConfig.ReserveScoaRegionId,
@@ -686,7 +727,7 @@ public class RevaluationController : ControllerBase
 
             await _txnService.InsertGeneralLedgerEntry(conn, txn,
                 transactionDate, processingMonth, mscoaConfig.OffsetVoteId, finYear,
-                depJournalTypeId, "Asset Depreciation Offset - Catch-up", depDocNumber,
+                depDocTypeId, "Asset Depreciation Offset - Catch-up", depDocNumber,
                 debit: null, credit: postedOffset, matchTranGuid: depTxnId,
                 journalTransactionTypeId: depJournalTypeId, assetLinkId: depJournalId,
                 scoaFundsId: mscoaConfig.OffsetScoaFundId, scoaRegionId: mscoaConfig.OffsetScoaRegionId,
@@ -711,8 +752,8 @@ public class RevaluationController : ControllerBase
         var scheduleId = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Asset_DepreciationSchedule"" (""FinYear"", ""RunDate"", ""RunType_ID"", ""RunStatus_ID"",
                 ""DateCaptured"", ""CapturerID"", ""ScheduledDate"", ""StatusID"", ""TotalAssets"")
-            VALUES (@finYear, GETDATE(), 2, 2, GETDATE(), 1, @transactionDate, 2, 1)
-            ON CONFLICT (""FinYear"") DO UPDATE SET ""RunDate"" = GETDATE()
+            VALUES (@finYear, NOW(), 2, 2, NOW(), 1, @transactionDate, 2, 1)
+            ON CONFLICT (""FinYear"") DO UPDATE SET ""RunDate"" = NOW()
             RETURNING ""Asset_DepreciationSchedule_ID""",
             new { finYear, transactionDate }, txn);
 
@@ -741,7 +782,7 @@ public class RevaluationController : ControllerBase
                 ""RunType_ID"", ""RunStatus_ID"", ""FinYear"", ""MonthID"",
                 ""Depreciation_ScheduledItemID"", ""DaysFromLastRun"", ""DateCaptured"", ""CapturerID"", ""IsApproved"")
             VALUES (@assetRegId, @transactionDate, @catchUpAmount, @newAccDep, @newCarrying,
-                2, 2, @finYear, @fyPeriod, @scheduleItemId, @catchUpDays, GETDATE(), 1, 1)",
+                2, 2, @finYear, @fyPeriod, @scheduleItemId, @catchUpDays, NOW(), 1, 1)",
             new { assetRegId, transactionDate, catchUpAmount, newAccDep, newCarrying,
                   finYear, fyPeriod, scheduleItemId, catchUpDays }, txn);
 
@@ -766,14 +807,14 @@ public class RevaluationController : ControllerBase
         await conn.OpenAsync();
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Asset_Revaluations""
-            SET ""Approved"" = FALSE, ""RejectedBy"" = @rejectedBy, ""RejectedDate"" = GETDATE(), ""RejectionReason"" = @reason
+            SET ""Approved"" = FALSE, ""RejectedBy"" = @rejectedBy, ""RejectedDate"" = NOW(), ""RejectionReason"" = @reason
             WHERE ""Asset_RevaluationsID"" = @id AND (""Approved"" IS NULL OR ""Approved"" = FALSE) AND ""PostDateTime"" IS NULL",
             new { id, rejectedBy = request?.RejectedBy ?? 0, reason = request?.Reason ?? "" });
         if (rows == 0) return NotFound(new { error = "Revaluation record not found or already processed" });
 
         await conn.ExecuteAsync(@"
             UPDATE ""Asset_WorkflowInstances""
-            SET ""status"" = 'rejected', ""completed_at"" = GETDATE()
+            SET ""status"" = 'rejected', ""completed_at"" = NOW()
             WHERE ""entity_type"" = 'revaluation' AND ""mssql_reference_id"" = @refId AND ""status"" IN ('pending', 'in_progress')",
             new { refId = id.ToString() });
 

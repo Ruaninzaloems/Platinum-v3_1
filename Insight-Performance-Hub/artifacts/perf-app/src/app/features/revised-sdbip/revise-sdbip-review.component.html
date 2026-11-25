@@ -1,0 +1,235 @@
+<!-- ── Review Detail View ────────────────────────────────────────────────── -->
+<section class="plat-page" *ngIf="selectedScorecardId() && selectedScorecard() as sc; else listView">
+  <div class="detail-head">
+    <div class="left">
+      <button mat-button type="button" (click)="back()"><mat-icon>arrow_back</mat-icon> Back</button>
+      <div>
+        <h2 class="title">Review Revised: {{ sc.name }}</h2>
+        <p class="sub">Revised SDBIP · Mid-Year Revision</p>
+      </div>
+      <span class="badge" [ngClass]="statusTone[sc.status] || 'tone-slate'">{{ sc.status }}</span>
+    </div>
+  </div>
+
+  <div class="summary-grid">
+    <div class="plat-card stat"><div class="lbl">Total KPIs</div><div class="val">{{ kpis().length }}</div></div>
+    <div class="plat-card stat"><div class="lbl">Reviewed</div><div class="val amber">{{ reviewedKpis().length }}</div></div>
+    <div class="plat-card stat"><div class="lbl">Pending Review</div><div class="val blue">{{ submittedKpis().length }}</div></div>
+  </div>
+
+  <mat-tab-group class="plat-tabs" [disableRipple]="true" animationDuration="150ms" [selectedIndex]="tabIndex()" (selectedIndexChange)="tabIndex.set($event)">
+    <mat-tab label="KPI Review ({{ kpis().length }})">
+      <div class="plat-card">
+        <h3 class="card-title">Revised KPI Review</h3>
+        <p class="card-desc">Review each revised KPI. Check that revision reasons are adequate for any changed targets.</p>
+
+        <div class="filter-panel" *ngIf="kpis().length > 0">
+          <div class="filter-grid">
+            <div class="filter-row">
+              <label>Indicator</label>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <input matInput placeholder="Type to search..." [ngModel]="filterQ()" (ngModelChange)="filterQ.set($event)" />
+              </mat-form-field>
+            </div>
+            <div class="filter-row">
+              <label>Department</label>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-select placeholder="-- All Departments --" [ngModel]="filterDept()" (ngModelChange)="filterDept.set($event)">
+                  <mat-option [value]="null">-- All Departments --</mat-option>
+                  <mat-option *ngFor="let d of deptOptions()" [value]="d">{{ d }}</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="filter-row">
+              <label>Responsible Person</label>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-select placeholder="-- All Persons --" panelClass="person-select-panel" [ngModel]="filterResp()" (ngModelChange)="filterResp.set($event)">
+                  <mat-select-trigger>{{ respTriggerLabel() }}</mat-select-trigger>
+                  <mat-option [value]="null">-- All Persons --</mat-option>
+                  <mat-option *ngFor="let u of respOptions()" [value]="u.id">
+                    <span class="person-opt">
+                      <span class="person-name">{{ u.displayName }}</span>
+                      <span class="person-title" *ngIf="u.jobTitle">{{ u.jobTitle }}</span>
+                    </span>
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
+          <p class="shown-line">{{ filteredKpis().length }} of {{ kpis().length }} KPI{{ kpis().length === 1 ? '' : 's' }} shown</p>
+        </div>
+
+        <div class="kpi-list">
+          <app-revision-kpi-review-card
+            *ngFor="let kpi of filteredKpis(); trackBy: trackById"
+            [kpi]="kpi"
+            [responsibleName]="getUserName(kpi.responsiblePostId)"
+            [processing]="processing()"
+            (review)="reviewKpi(kpi.id, 'review', $event)"
+            (return)="reviewKpi(kpi.id, 'return', $event)">
+          </app-revision-kpi-review-card>
+          <p class="empty-msg" *ngIf="!kpis().length">No KPIs found.</p>
+          <p class="empty-msg" *ngIf="kpis().length && !filteredKpis().length">No KPIs match the current filters.</p>
+        </div>
+      </div>
+
+      <div class="plat-card decision-card" *ngIf="sc.status === 'Submitted'">
+        <h3 class="card-title"><mat-icon class="inline-icon">fact_check</mat-icon> Revised Scorecard Review Decision</h3>
+        <p class="card-desc">
+          {{ allKpisReviewed() ? 'All revised KPIs have been reviewed.' : submittedKpis().length + ' KPI(s) still pending review.' }}
+        </p>
+        <mat-form-field appearance="outline">
+          <mat-label>Review Comments (Optional)</mat-label>
+          <textarea matInput rows="3" [ngModel]="reviewComments()" (ngModelChange)="reviewComments.set($event)" placeholder="Add review comments..."></textarea>
+        </mat-form-field>
+        <div class="dc-actions">
+          <button mat-flat-button color="primary" type="button" [disabled]="!allKpisReviewed() || processing()" (click)="reviewScorecard()">
+            <mat-icon>check_circle</mat-icon> Mark as Reviewed
+          </button>
+          <button mat-stroked-button color="warn" type="button" [disabled]="processing()" (click)="openReturnDialog()">
+            <mat-icon>cancel</mat-icon> Return to Draft
+          </button>
+        </div>
+      </div>
+    </mat-tab>
+
+    <mat-tab label="Revision Audit Trail ({{ revisionLogs().length }})">
+      <div class="plat-card" *ngIf="revisionLogs().length; else noLogs">
+        <div class="audit-head">
+          <div>
+            <h3 class="card-title"><mat-icon class="inline-icon">history</mat-icon> Revision Audit Trail</h3>
+            <p class="card-desc">{{ revisionLogs().length }} revision event(s) recorded</p>
+          </div>
+          <div class="audit-export" *ngIf="auditRows().length">
+            <button type="button" class="export-btn" [disabled]="exporting()" (click)="exportAudit('xlsx')">
+              <span class="fmt-icon excel">X</span> Excel
+            </button>
+            <button type="button" class="export-btn" [disabled]="exporting()" (click)="exportAudit('pdf')">
+              <span class="fmt-icon pdf">P</span> PDF
+            </button>
+            <button type="button" class="export-btn" [disabled]="exporting()" (click)="exportAudit('docx')">
+              <span class="fmt-icon word">W</span> Word
+            </button>
+          </div>
+        </div>
+
+        <div class="table-wrap audit-wrap" *ngIf="auditRows().length">
+          <table class="plat-table kpi-table audit-table">
+            <thead>
+              <tr>
+                <th>Revision No.</th>
+                <th>KPI Ref No.</th>
+                <th class="desc-th">KPI Description</th>
+                <th>Field Changed</th>
+                <th>Previous Value</th>
+                <th>New Value</th>
+                <th>Change Type</th>
+                <th>Reason for Change</th>
+                <th>Changed By</th>
+                <th>Changed Date &amp; Time</th>
+                <th>Submitted By</th>
+                <th>Approved By</th>
+                <th>Approval Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of auditRows(); trackBy: trackById">
+                <td>Rev {{ revisionNo() }}</td>
+                <td>{{ row.kpiRef }}</td>
+                <td class="desc-col"><span class="cell-clamp" [title]="row.kpiDesc">{{ row.kpiDesc }}</span></td>
+                <td>{{ row.field }}</td>
+                <td><span class="cell-clamp val-old" [title]="row.oldValue">{{ row.oldValue }}</span></td>
+                <td><span class="cell-clamp val-new" [title]="row.newValue">{{ row.newValue }}</span></td>
+                <td>
+                  <span class="badge" [ngClass]="{
+                    'tone-green': row.changeType === 'Added',
+                    'tone-blue': row.changeType === 'Modified',
+                    'tone-red': row.changeType === 'Deleted'
+                  }">{{ row.changeType }}</span>
+                </td>
+                <td><span class="cell-clamp" [title]="row.reason">{{ row.reason || '—' }}</span></td>
+                <td>{{ row.changedBy }}</td>
+                <td class="nowrap">
+                  <span class="dt">{{ row.changedAt | date:'d MMM y' }}
+                    <span class="dt-time">{{ row.changedAt | date:'HH:mm' }}</span>
+                  </span>
+                </td>
+                <td>{{ submittedBy() || '—' }}</td>
+                <td>{{ approvedByName() || '—' }}</td>
+                <td class="nowrap">{{ sc.approvedAt ? (sc.approvedAt | date:'d MMM y') : '—' }}</td>
+                <td><span class="badge tone-outline">{{ auditStatus() }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="card-desc" *ngIf="!auditRows().length">No KPI-level changes recorded yet — amendments made to KPIs will appear here.</p>
+
+        <h4 class="audit-sub" *ngIf="workflowLogs().length">Workflow Events</h4>
+        <div class="timeline">
+          <div *ngFor="let log of workflowLogs()" class="tl-item">
+            <div class="tl-dot"><mat-icon>schedule</mat-icon></div>
+            <div class="tl-body">
+              <div class="tl-head">
+                <span class="badge tone-outline">{{ revisionLabels[log.revisionType] || log.revisionType }}</span>
+                <span class="tl-date">{{ log.createdAt | date:'medium' }}</span>
+              </div>
+              <p class="tl-user"><strong>{{ log.userName }}</strong></p>
+              <p class="tl-field" *ngIf="log.fieldName">
+                <strong>{{ log.fieldName }}:</strong>
+                <span class="old" *ngIf="log.oldValue">{{ log.oldValue }}</span>
+                <span *ngIf="log.oldValue && log.newValue"> → </span>
+                <span class="new" *ngIf="log.newValue">{{ log.newValue }}</span>
+              </p>
+              <p class="tl-new" *ngIf="!log.fieldName && log.newValue">{{ log.newValue }}</p>
+              <p class="tl-reason" *ngIf="log.revisionReason">Reason: {{ log.revisionReason }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <ng-template #noLogs>
+        <div class="plat-card empty-card">
+          <mat-icon>history</mat-icon>
+          <h3>No Revision History</h3>
+          <p>Changes made during this revision will be recorded here.</p>
+        </div>
+      </ng-template>
+    </mat-tab>
+  </mat-tab-group>
+</section>
+
+<!-- ── Queue List View ───────────────────────────────────────────────────── -->
+<ng-template #listView>
+  <section class="plat-page">
+    <app-page-header title="Review Revised SDBIP" subtitle="Review mid-year revised scorecards submitted for approval. Verify that revision reasons are valid." icon="rate_review" tone="orange">
+      <mat-form-field appearance="outline" class="cycle-pick">
+        <mat-label>Performance Cycle</mat-label>
+        <mat-select [ngModel]="effectiveCycleId()" (ngModelChange)="onCycle($event)">
+          <mat-option *ngFor="let c of cycles()" [value]="c.id">{{ c.financialYearLabel }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </app-page-header>
+
+    <div class="plat-card empty-card" *ngIf="!scorecards().length">
+      <mat-icon>find_in_page</mat-icon>
+      <h3>No Revised Scorecards Pending Review</h3>
+      <p>Submitted revised scorecards will appear here.</p>
+    </div>
+
+    <div class="list-cards" *ngIf="scorecards().length">
+      <div *ngFor="let sc of scorecards(); trackBy: trackById" class="plat-card list-row" (click)="openScorecard(sc)">
+        <div>
+          <div class="lr-name">
+            <h3>{{ sc.name }}</h3>
+            <span class="badge tone-amber">Revised</span>
+          </div>
+          <p class="lr-meta">Revision of an approved SDBIP · Created {{ sc.createdAt | date:'mediumDate' }} by {{ getUserName(sc.createdById) }}</p>
+        </div>
+        <div class="lr-actions">
+          <span class="badge" [ngClass]="statusTone[sc.status] || 'tone-slate'">{{ sc.status }}</span>
+          <button mat-stroked-button type="button"><mat-icon>visibility</mat-icon> Review</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</ng-template>

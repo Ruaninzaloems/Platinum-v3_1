@@ -1,15 +1,18 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { UiService } from '../../core/services/ui.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { ApiService } from '../../core/services/api.service';
+import { ApprovalsService, ApprovalCounts } from '../../core/services/approvals.service';
+import { CurrentUserService } from '../../core/services/current-user.service';
+import { UserSwitcherComponent } from '../user-switcher/user-switcher.component';
 
 @Component({
   selector: 'app-topbar',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, UserSwitcherComponent],
   templateUrl: './topbar.component.html',
   styleUrl: './topbar.component.css'
 })
@@ -18,6 +21,7 @@ export class TopbarComponent implements OnInit {
   notifications$;
   showNotifications = false;
   activeTaxYear: string = '';
+  approvalCounts$;
 
   private routeLabels: Record<string, string> = {
     '/dashboard': 'Executive Dashboard',
@@ -26,25 +30,31 @@ export class TopbarComponent implements OnInit {
     '/job-profiles': 'Job Profiles',
     '/positions': 'Staff Establishment',
     '/departments': 'Departments',
-    '/payroll': 'Payroll',
     '/leave': 'Leave Management',
     '/benefits': 'Benefits',
     '/time': 'Time & Attendance',
-    '/performance': 'Staff Performance',
     '/reports': 'Reports & Exports',
     '/disciplinary': 'Disciplinary',
     '/skills': 'Skills & Training',
     '/recruitment': 'Recruitment',
     '/ess': 'Employee Self-Service',
+    '/approvals': 'My Approvals',
   };
 
   constructor(
     private router: Router,
     private ui: UiService,
     private notificationService: NotificationService,
-    private api: ApiService
+    private api: ApiService,
+    private approvals: ApprovalsService,
+    private currentUser: CurrentUserService
   ) {
     this.notifications$ = this.notificationService.notifications$;
+    this.approvalCounts$ = this.approvals.counts$;
+    effect(() => {
+      this.currentUser.currentUser();
+      this.approvals.refreshCounts();
+    });
   }
 
   ngOnInit(): void {
@@ -61,6 +71,11 @@ export class TopbarComponent implements OnInit {
 
     this.notificationService.loadNotifications();
     this.notificationService.startPolling();
+
+    this.approvals.refreshCounts();
+    this.router.events.pipe(filter(e => e instanceof NavigationEnd)).subscribe(() => {
+      this.approvals.refreshCounts();
+    });
 
     this.api.get<{ tax_year: number | null }>('/settings/active-tax-year').subscribe({
       next: (data) => {
@@ -85,7 +100,6 @@ export class TopbarComponent implements OnInit {
       'salary-trans-groups': 'Salary Trans Groups',
       'upper-limits': 'Upper Limits',
       'leave-policies': 'Leave Policies',
-      'claim-rates': 'Claim Rates',
       'bank': 'Bank & Payments',
       'security': 'Security & RBAC',
       'workflows': 'Workflows',
@@ -115,5 +129,9 @@ export class TopbarComponent implements OnInit {
 
   toggleSidebar(): void {
     this.ui.toggleSidebar();
+  }
+
+  goToApprovals(): void {
+    this.router.navigate(['/payroll/approvals']);
   }
 }

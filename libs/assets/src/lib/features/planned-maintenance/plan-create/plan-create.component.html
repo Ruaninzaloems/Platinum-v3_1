@@ -1,0 +1,224 @@
+<div class="page-header">
+  <button class="btn-back" (click)="cancel()"><mat-icon>arrow_back</mat-icon></button>
+  <div>
+    <h1>New Maintenance Plan</h1>
+    <p class="subtitle">Create a maintenance plan and link it to one or more assets</p>
+  </div>
+</div>
+
+<div class="stepper">
+  <div class="step" [class.active]="step() === 1" [class.done]="step() === 2">
+    <div class="step-circle">
+      @if (step() === 2) { <mat-icon>check</mat-icon> } @else { <span>1</span> }
+    </div>
+    <div class="step-label">Plan Details</div>
+  </div>
+  <div class="step-line" [class.done]="step() === 2"></div>
+  <div class="step" [class.active]="step() === 2">
+    <div class="step-circle"><span>2</span></div>
+    <div class="step-label">Select Assets</div>
+  </div>
+</div>
+
+@if (step() === 1) {
+  <div class="form-card">
+    <h3>Plan Details</h3>
+    <div class="plan-form-grid">
+      <div class="form-group full-width">
+        <label>Plan Name *</label>
+        <input type="text" [(ngModel)]="form.planName" placeholder="e.g. Annual Generator Service">
+      </div>
+      <div class="form-group">
+        <label>Maintenance Type *</label>
+        <select [(ngModel)]="form.maintenanceTypeId">
+          <option value="">Select Type</option>
+          @for (t of maintTypes(); track t.maintTypeId) {
+            <option [value]="t.maintTypeId">{{t.maintTypeDesc}}</option>
+          }
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Frequency *</label>
+        <select [(ngModel)]="form.frequencyId">
+          <option value="">Select Frequency</option>
+          @for (f of frequencies(); track f.frequencyId) {
+            <option [value]="f.frequencyId">{{f.frequencyDesc}}</option>
+          }
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Start Date</label>
+        <input type="date" [(ngModel)]="form.startDate">
+      </div>
+      <div class="form-group">
+        <label>Estimated Cost (R)</label>
+        <input type="number" [(ngModel)]="form.estimatedCost" min="0" step="0.01">
+      </div>
+      <div class="form-group">
+        <label>mSCOA Project</label>
+        <select [(ngModel)]="form.debitProjectId" (ngModelChange)="onProjectChange()">
+          <option [ngValue]="null">Select Project</option>
+          @for (p of planProjects(); track p.projectId) {
+            <option [value]="p.projectId">{{p.projectName}}</option>
+          }
+        </select>
+      </div>
+      <div class="form-group">
+        <label>mSCOA Project Item</label>
+        <select [(ngModel)]="form.planProjectItemId" [disabled]="!form.debitProjectId">
+          <option [ngValue]="null">Select Item</option>
+          @for (pi of planProjectItems(); track pi.planProjectItemId) {
+            <option [value]="pi.planProjectItemId">{{pi.scoaDesc || pi.scoaShortDesc}}</option>
+          }
+        </select>
+      </div>
+      <div class="form-group full-width">
+        <label>Description</label>
+        <textarea [(ngModel)]="form.description" rows="2" placeholder="Optional description…"></textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" (click)="cancel()">Cancel</button>
+      <button class="btn-primary" (click)="goToStep2()">
+        Next: Select Assets <mat-icon>arrow_forward</mat-icon>
+      </button>
+    </div>
+  </div>
+}
+
+@if (step() === 2) {
+  <input type="file" accept=".csv" style="display:none" id="plan-csv-upload-input" (change)="onCsvFileSelected($event)">
+
+  @if (showMapModal) {
+    <div class="map-overlay" (click)="closeMapModal()">
+      <div class="map-modal" (click)="$event.stopPropagation()">
+        <div class="map-modal-header">
+          <span style="font-size:15px;font-weight:600;color:#1e293b">Select Assets from Map</span>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="font-size:13px;color:#64748b">{{mapSelectedCount}} selected from map</span>
+            <button class="btn-primary" style="height:36px;padding:0 16px" (click)="confirmMapSelection()">
+              Add to Selection
+            </button>
+            <button class="btn-back" (click)="closeMapModal()"><mat-icon>close</mat-icon></button>
+          </div>
+        </div>
+        <div class="map-modal-body">
+          @if (mapLoading) {
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10">
+              <mat-spinner diameter="40"></mat-spinner>
+            </div>
+          }
+          <div id="plan-create-map" style="width:100%;height:100%"></div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <div class="wizard-layout">
+    <div class="asset-picker-card">
+      <div class="picker-header-row">
+        <h3>Available Assets</h3>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="results-count">{{assetResults().length}} assets</span>
+          <button class="btn-tool" (click)="triggerCsvUpload()">
+            <mat-icon style="font-size:16px;width:16px;height:16px">upload_file</mat-icon> Import from CSV
+          </button>
+          <button class="btn-tool" (click)="openMapModal()">
+            <mat-icon style="font-size:16px;width:16px;height:16px">map</mat-icon> Map
+          </button>
+        </div>
+      </div>
+      @if (csvImportMsg) {
+        <div class="csv-msg" [class.csv-error]="csvImportError">{{csvImportMsg}}</div>
+      }
+      <div class="picker-filters">
+        <input type="text" [(ngModel)]="assetSearch" (input)="onAssetSearch()" placeholder="Search barcode, description or serial…" class="search-input">
+        <select [(ngModel)]="assetFilterType" (ngModelChange)="onAssetFilterChange()">
+          <option value="">All Asset Types</option>
+          @for (t of assetTypes(); track t.assetTypeId || t.AssetType_ID) {
+            <option [value]="t.assetTypeId || t.AssetType_ID">{{t.assetTypeDesc || t.AssetTypeDesc}}</option>
+          }
+        </select>
+        <select [(ngModel)]="assetFilterCategory" (ngModelChange)="onAssetFilterChange()">
+          <option value="">All Categories</option>
+          @for (c of assetCategories(); track c.assetCategoryId || c.AssetCategoryID) {
+            <option [value]="c.assetCategoryId || c.AssetCategoryID">{{c.assetCategoryDesc || c.AssetCategoryDesc}}</option>
+          }
+        </select>
+        <button class="btn-sm" (click)="selectAll()">Select All Visible</button>
+      </div>
+
+      @if (assetLoading()) {
+        <div class="picker-loading"><mat-spinner diameter="24"></mat-spinner><span>Loading assets…</span></div>
+      } @else if (assetResults().length === 0) {
+        <div class="picker-empty"><mat-icon>search_off</mat-icon><span>No assets found</span></div>
+      } @else {
+        <div class="picker-table-wrap">
+          <table class="picker-table">
+            <thead>
+              <tr>
+                <th style="width:44px"></th>
+                <th>Asset ID</th>
+                <th>Barcode</th>
+                <th>Description</th>
+                <th>Asset Type</th>
+                <th>Category</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (asset of assetResults(); track asset.assetRegisterItemId) {
+                <tr [class.selected-row]="isSelected(asset)" (click)="toggleAsset(asset)">
+                  <td>
+                    <input type="checkbox" [checked]="isSelected(asset)" (click)="$event.stopPropagation()" (change)="toggleAsset(asset)">
+                  </td>
+                  <td><span class="barcode-cell">{{asset.assetRegisterItemId || '—'}}</span></td>
+                  <td><span class="barcode-cell">{{asset.barcode || '—'}}</span></td>
+                  <td>{{asset.description}}</td>
+                  <td>{{asset.assetTypeDesc || '—'}}</td>
+                  <td>{{asset.assetCategoryDesc || '—'}}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+
+    <div class="selected-card">
+      <div class="selected-header">
+        <h3>Selected Assets <span class="count-badge">{{selectedAssets().length}}</span></h3>
+        @if (selectedAssets().length > 0) {
+          <button class="btn-link-danger" (click)="clearAll()">Clear All</button>
+        }
+      </div>
+      @if (selectedAssets().length === 0) {
+        <div class="selected-empty">
+          <mat-icon>checklist</mat-icon>
+          <p>No assets selected yet.<br>Click assets in the table to add them.</p>
+        </div>
+      } @else {
+        <div class="selected-list">
+          @for (a of selectedAssets(); track a.assetRegisterItemId) {
+            <div class="selected-item">
+              <div class="selected-item-info">
+                <span class="barcode-cell">{{a.assetRegisterItemId}}</span>
+                <span class="selected-item-desc">{{a.description}}</span>
+              </div>
+              <button class="remove-btn" (click)="removeSelected(a)"><mat-icon>close</mat-icon></button>
+            </div>
+          }
+        </div>
+      }
+
+      <div class="wizard-actions">
+        <button class="btn-secondary" (click)="goToStep1()">
+          <mat-icon>arrow_back</mat-icon> Back
+        </button>
+        <button class="btn-primary" (click)="save()" [disabled]="saving()">
+          @if (saving()) { <mat-spinner diameter="16"></mat-spinner> }
+          Create Plan
+        </button>
+      </div>
+    </div>
+  </div>
+}

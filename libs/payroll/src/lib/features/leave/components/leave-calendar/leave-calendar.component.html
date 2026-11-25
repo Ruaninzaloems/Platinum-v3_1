@@ -1,0 +1,161 @@
+<div class="page-container">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1 class="page-title">Leave Calendar</h1>
+      <span class="page-subtitle">Visual overview of approved employee leave</span>
+    </div>
+    <div class="header-actions">
+      <div class="view-toggle">
+        <button class="toggle-btn" [class.active]="viewMode === 'month'" (click)="setView('month')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Month
+        </button>
+        <button class="toggle-btn" [class.active]="viewMode === 'week'" (click)="setView('week')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
+          Week
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Row -->
+  <div class="kpi-row">
+    <div class="kpi-card kpi-blue">
+      <div class="kpi-icon-wrap" style="background:#dbeafe">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" width="22" height="22"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="kpi-content">
+        <div class="kpi-value">{{ totalOnLeaveToday() }}</div>
+        <div class="kpi-label">On Leave Today</div>
+      </div>
+    </div>
+    <div class="kpi-card kpi-green">
+      <div class="kpi-icon-wrap" style="background:#dcfce7">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" width="22" height="22"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </div>
+      <div class="kpi-content">
+        <div class="kpi-value">{{ totalInView() }}</div>
+        <div class="kpi-label">Approved Requests in View</div>
+      </div>
+    </div>
+    <div class="kpi-card kpi-gold">
+      <div class="kpi-icon-wrap" style="background:#fef9c3">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" width="22" height="22"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+      </div>
+      <div class="kpi-content">
+        <div class="kpi-value">{{ leaveTypeLegend.length }}</div>
+        <div class="kpi-label">Leave Types Active</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters & Navigation -->
+  <div class="controls-card">
+    <div class="nav-row">
+      <div class="nav-left">
+        <button class="btn btn-outline btn-sm" (click)="goToToday()">Today</button>
+        <button class="nav-arrow" (click)="prevPeriod()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <button class="nav-arrow" (click)="nextPeriod()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <span class="period-label">{{ viewMode === 'month' ? monthLabel : weekLabel }}</span>
+      </div>
+      <div class="filter-row">
+        <div class="filter-group">
+          <label class="filter-label">Department</label>
+          <select class="form-control form-control-sm" [(ngModel)]="filters.department_id" (change)="onDepartmentChange()">
+            <option value="">All Departments</option>
+            <option *ngFor="let d of departments" [value]="d.id">{{ d.name }}</option>
+          </select>
+        </div>
+        <div class="filter-group" *ngIf="filteredDivisions.length">
+          <label class="filter-label">Division</label>
+          <select class="form-control form-control-sm" [(ngModel)]="filters.division_id" (change)="onDivisionChange()">
+            <option value="">All Divisions</option>
+            <option *ngFor="let d of filteredDivisions" [value]="d.id">{{ d.name }}</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend-bar" *ngIf="leaveTypeLegend.length">
+    <span class="legend-title">Leave Types:</span>
+    <div class="legend-items">
+      <div class="legend-item" *ngFor="let lt of leaveTypeLegend">
+        <span class="legend-dot" [style.background-color]="lt.color"></span>
+        <span class="legend-name">{{ lt.name }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading" class="loading-state">
+    <div class="spinner"></div>
+    <span>Loading leave data...</span>
+  </div>
+
+  <!-- Month View -->
+  <div *ngIf="!loading && viewMode === 'month'" class="calendar-card">
+    <!-- Day Headers -->
+    <div class="cal-grid-header">
+      <div class="cal-day-name" *ngFor="let name of dayNames">{{ name }}</div>
+    </div>
+    <!-- Weeks -->
+    <div class="cal-body">
+      <div class="cal-week" *ngFor="let week of calendarWeeks">
+        <div class="cal-cell"
+             *ngFor="let day of week"
+             [class.other-month]="!day.isCurrentMonth"
+             [class.today]="day.isToday">
+          <div class="cal-date-num">{{ day.date.getDate() }}</div>
+          <div class="cal-events">
+            <div class="cal-event"
+                 *ngFor="let ev of day.events"
+                 [ngStyle]="eventStyle(ev)"
+                 [title]="ev.firstName + ' ' + ev.surname + ' — ' + ev.leaveTypeName + ' (' + fmtDateDisplay(ev.startDate) + ' to ' + fmtDateDisplay(ev.endDate) + ', ' + ev.days + ' days)'">
+              <span class="ev-dot" [style.background-color]="ev.calendarColor"></span>
+              <span class="ev-text">{{ ev.firstName }} {{ ev.surname }}</span>
+              <span class="ev-type">{{ ev.leaveTypeCode }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Week View -->
+  <div *ngIf="!loading && viewMode === 'week'" class="calendar-card">
+    <div class="week-grid">
+      <div class="week-col" *ngFor="let day of weekDays" [class.today]="day.isToday">
+        <div class="week-day-header">
+          <div class="week-day-name">{{ dayNames[day.date.getDay()] }}</div>
+          <div class="week-day-num" [class.today-circle]="day.isToday">{{ day.date.getDate() }}</div>
+        </div>
+        <div class="week-events">
+          <div *ngIf="day.events.length === 0" class="week-empty">—</div>
+          <div class="week-event"
+               *ngFor="let ev of day.events"
+               [ngStyle]="eventStyle(ev)"
+               [title]="ev.firstName + ' ' + ev.surname + ' — ' + ev.leaveTypeName + ' (' + fmtDateDisplay(ev.startDate) + ' to ' + fmtDateDisplay(ev.endDate) + ', ' + ev.days + ' days)'">
+            <div class="wev-name">{{ ev.firstName }} {{ ev.surname }}</div>
+            <div class="wev-type">{{ ev.leaveTypeName }}</div>
+            <div class="wev-dates">{{ fmtDateDisplay(ev.startDate) }} – {{ fmtDateDisplay(ev.endDate) }}</div>
+            <div class="wev-days">{{ ev.days }} day{{ ev.days !== 1 ? 's' : '' }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!loading && events.length === 0" class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5" width="48" height="48"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    <p>No approved leave for {{ monthLabel }}.</p>
+    <span>Use the <strong>◀ ▶</strong> arrows to navigate to a month with approved leave.</span>
+  </div>
+</div>

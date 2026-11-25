@@ -1,0 +1,175 @@
+<div class="page-header">
+  <div>
+    <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);margin-bottom:6px">
+      <a routerLink="/reports" style="color:var(--text-muted);text-decoration:none">Reports</a>
+      <app-icon name="chevronRight" [size]="12"></app-icon>
+      <span>Payroll Totals</span>
+    </div>
+    <h1 class="page-title">Payroll Totals</h1>
+    <p class="page-subtitle">Salary head totals for a payroll period, grouped by transaction type.</p>
+  </div>
+</div>
+
+<div class="card pt-params">
+  <div class="card-header">
+    <div class="card-title"><app-icon name="filter" [size]="14"></app-icon> Report Parameters</div>
+  </div>
+  <div class="card-body">
+    <div class="param-grid">
+      <div class="form-group">
+        <label>Tax Year</label>
+        <select class="form-control" [(ngModel)]="taxYear" (ngModelChange)="onTaxYearChange()">
+          @for (y of taxYears; track y) { <option [ngValue]="y">{{ y }}</option> }
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Cycle</label>
+        <select class="form-control" [(ngModel)]="cycleId" (ngModelChange)="onCycleChange()">
+          @for (c of cycles; track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Period</label>
+        <select class="form-control" [(ngModel)]="periodId">
+          @for (p of filteredPeriods; track p.id) {
+            <option [ngValue]="p.id">{{ p.processing_month }} (P{{ p.period_number }}) — {{ p.status }}</option>
+          }
+          @if (filteredPeriods.length === 0) {
+            <option [ngValue]="null">No periods for this cycle / tax year</option>
+          }
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Department <span class="muted">(optional)</span></label>
+        <select class="form-control" [(ngModel)]="departmentId">
+          <option [ngValue]="null">All departments</option>
+          @for (d of departments; track d.id) { <option [ngValue]="d.id">{{ d.name }}</option> }
+        </select>
+      </div>
+      <div class="form-group" style="grid-column: span 2">
+        <label>Employee <span class="muted">(optional — type code or name)</span></label>
+        <div class="typeahead">
+          <input
+            type="text"
+            class="form-control"
+            [(ngModel)]="employeeQuery"
+            (ngModelChange)="onEmployeeInput()"
+            (focus)="onEmployeeInput()"
+            (blur)="hideEmployeeSuggest()"
+            placeholder="All employees — start typing to filter…"
+            autocomplete="off">
+          @if (employeeQuery) {
+            <button type="button" class="typeahead-clear" (click)="clearEmployee()" aria-label="Clear">×</button>
+          }
+          @if (showEmployeeSuggest && employeeMatches.length > 0) {
+            <div class="typeahead-suggest">
+              @for (e of employeeMatches; track e.id) {
+                <div class="typeahead-item" (mousedown)="pickEmployee(e)">
+                  <strong>{{ e.employee_code }}</strong> — {{ e.surname }}, {{ e.first_name }}
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+      <div class="form-group toggle-group">
+        <label class="toggle-label">
+          <input type="checkbox" [(ngModel)]="includeTrial">
+          <span>Include Trial Runs</span>
+        </label>
+        <div class="hint">When off, only Final/Adhoc-Final runs are included.</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" [disabled]="loading || !cycleId || !periodId" (click)="generate()">
+        <app-icon name="barChart" [size]="14"></app-icon> {{ loading ? 'Generating…' : 'Generate Report' }}
+      </button>
+      <button class="btn" (click)="reset()" [disabled]="loading">Reset</button>
+    </div>
+
+    @if (errorMsg) {
+      <div class="alert alert-error" style="margin-top:12px">{{ errorMsg }}</div>
+    }
+  </div>
+</div>
+
+@if (generated && report) {
+  <div class="card pt-report">
+    <div class="card-header report-header">
+      <div class="report-heading">
+        <div class="muni-badge" aria-hidden="true">{{ muniInitials() }}</div>
+        <div>
+          @if (report.municipality_name) {
+            <div class="report-muni">{{ report.municipality_name }}</div>
+          }
+          <div class="report-title">Payroll Totals Report</div>
+          @if (report.period) {
+            <div class="report-sub">{{ report.period.processing_month }} · {{ report.period.cycle_name }} · TY {{ report.period.tax_year }}</div>
+          }
+        </div>
+      </div>
+      <div class="export-toolbar">
+        <button class="btn btn-sm" (click)="download('pdf')"><app-icon name="fileText" [size]="13"></app-icon> PDF</button>
+        <button class="btn btn-sm" (click)="download('xlsx')"><app-icon name="file" [size]="13"></app-icon> Excel</button>
+        <button class="btn btn-sm" (click)="download('csv')"><app-icon name="download" [size]="13"></app-icon> CSV</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="meta-grid">
+        <div><span class="meta-label">Employee</span><span class="meta-value">{{ report.filters.employee ? (report.filters.employee.employee_code + ' – ' + report.filters.employee.first_name + ' ' + report.filters.employee.surname) : 'All' }}</span></div>
+        <div><span class="meta-label">Department</span><span class="meta-value">{{ report.filters.department ? report.filters.department.name : 'All' }}</span></div>
+        <div><span class="meta-label">Run Type</span><span class="meta-value">{{ report.filters.include_trial ? 'Including Trial' : 'Final Only' }}</span></div>
+        <div><span class="meta-label">Generated By</span><span class="meta-value">{{ report.generated_by || 'System' }}</span></div>
+        <div><span class="meta-label">Generated At</span><span class="meta-value">{{ report.generated_at ? (report.generated_at | date:'medium') : today() }}</span></div>
+      </div>
+
+      @if (report.empty) {
+        <div class="empty-state">
+          <app-icon name="alertTriangle" [size]="22"></app-icon>
+          <div>No payroll results found for the selected parameters.</div>
+          <div class="muted">Try ticking "Include Trial Runs" or selecting another period.</div>
+        </div>
+      } @else {
+        @for (g of report.groups; track g.transaction_type) {
+          <div class="group-block">
+            <div class="group-header">{{ g.label }}</div>
+            <div class="data-grid">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width:90px">Code</th>
+                    <th>Salary Head</th>
+                    <th style="width:120px;text-align:right">Input</th>
+                    <th style="width:160px;text-align:right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (r of g.rows; track r.salary_head_id) {
+                    <tr>
+                      <td><code>{{ r.code }}</code></td>
+                      <td>{{ r.name }}</td>
+                      <td style="text-align:right">{{ formatNumber(r.input) }}</td>
+                      <td style="text-align:right">{{ formatCurrency(r.amount) }}</td>
+                    </tr>
+                  }
+                  <tr class="subtotal-row">
+                    <td colspan="3" style="text-align:right;font-weight:600">Sub-total {{ g.label }}</td>
+                    <td style="text-align:right;font-weight:700">{{ formatCurrency(g.subtotal) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+
+        <div class="totals-block">
+          <div class="total-row"><span>Total Earnings</span><span>{{ formatCurrency(report.totals.earnings) }}</span></div>
+          <div class="total-row"><span>Total Deductions</span><span>{{ formatCurrency(report.totals.deductions) }}</span></div>
+          <div class="total-row nett"><span>Nett Pay</span><span>{{ formatCurrency(report.totals.nett_pay) }}</span></div>
+          <div class="total-row grand"><span>Grand Total (All Heads)</span><span>{{ formatCurrency(report.totals.grand_total) }}</span></div>
+        </div>
+      }
+    </div>
+  </div>
+}

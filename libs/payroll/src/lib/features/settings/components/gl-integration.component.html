@@ -32,63 +32,153 @@
     <button class="tab-btn" [class.active]="activeTab === 'COMPANY_CONTRIBUTION'" (click)="switchTab('COMPANY_CONTRIBUTION')">
       Company Contributions <span class="tab-count">{{ tabCounts['COMPANY_CONTRIBUTION'] }}</span>
     </button>
+    <button class="tab-btn" [class.active]="activeTab === 'SCOA_STRUCTURE'" (click)="activeTab = 'SCOA_STRUCTURE'; onScoaTabActivated()">
+      SCOA Structure <span class="tab-count">{{ scoaSyncStatus.total }}</span>
+    </button>
   </div>
 
-  <div class="search-bar">
-    <input type="text" class="search-input" [(ngModel)]="searchTerm" (ngModelChange)="filterItems()" placeholder="Search by ID or name..." />
-  </div>
-
-  @if (loading) {
-    <div class="loading-state">Loading salary transactions...</div>
-  } @else if (filteredItems.length === 0) {
-    <div class="empty-state">No salary transactions found for this category.</div>
-  } @else {
-    <div class="table-container">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th class="col-id">Id</th>
-            <th class="col-name">Name</th>
-            <th class="col-type">Type</th>
-            <th class="col-scoa">SCOA Debit Item</th>
-            <th class="col-scoa">SCOA Credit Item</th>
-            <th class="col-status">GL Status</th>
-            <th class="col-action">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (item of pagedItems; track item.id) {
-            <tr class="table-row" (click)="openDetail(item)">
-              <td class="cell-id">{{ item.id }}</td>
-              <td>{{ item.name }}</td>
-              <td><span class="type-badge" [ngClass]="getTypeBadge(item.transaction_type)">{{ getTypeLabel(item.transaction_type) }}</span></td>
-              <td class="cell-scoa">{{ item.suspense_scoa_item_id || 'Not Configured' }}</td>
-              <td class="cell-scoa">{{ item.suspense_scoa_item_credit_id || 'Not Configured' }}</td>
-              <td>
-                @if (isConfigured(item)) {
-                  <span class="gl-badge gl-configured">Configured</span>
-                } @else if (isPartiallyConfigured(item)) {
-                  <span class="gl-badge gl-partial">Partial</span>
-                } @else {
-                  <span class="gl-badge gl-not-configured">Not Configured</span>
-                }
-              </td>
-              <td>
-                <button class="btn-configure" (click)="openDetail(item); $event.stopPropagation()">Configure</button>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
+  @if (activeTab !== 'SCOA_STRUCTURE') {
+    <div class="search-bar">
+      <input type="text" class="search-input" [(ngModel)]="searchTerm" (ngModelChange)="filterItems()" placeholder="Search by ID or name..." />
     </div>
 
-    @if (totalPages > 1) {
-      <div class="pagination">
-        <button class="page-btn" [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">Previous</button>
-        <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
-        <button class="page-btn" [disabled]="currentPage === totalPages" (click)="goToPage(currentPage + 1)">Next</button>
+    @if (loading) {
+      <div class="loading-state">Loading salary transactions...</div>
+    } @else if (filteredItems.length === 0) {
+      <div class="empty-state">No salary transactions found for this category.</div>
+    } @else {
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th class="col-id">Id</th>
+              <th class="col-name">Name</th>
+              <th class="col-type">Type</th>
+              <th class="col-scoa">SCOA Debit Item</th>
+              <th class="col-scoa">SCOA Credit Item</th>
+              <th class="col-status">GL Status</th>
+              <th class="col-action">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of pagedItems; track item.id) {
+              <tr class="table-row" (click)="openDetail(item)">
+                <td class="cell-id">{{ item.id }}</td>
+                <td>{{ item.name }}</td>
+                <td><span class="type-badge" [ngClass]="getTypeBadge(item.transaction_type)">{{ getTypeLabel(item.transaction_type) }}</span></td>
+                <td class="cell-scoa">{{ item.suspense_scoa_item_id || 'Not Configured' }}</td>
+                <td class="cell-scoa">{{ item.suspense_scoa_item_credit_id || 'Not Configured' }}</td>
+                <td>
+                  @if (isConfigured(item)) {
+                    <span class="gl-badge gl-configured">Configured</span>
+                  } @else if (isPartiallyConfigured(item)) {
+                    <span class="gl-badge gl-partial">Partial</span>
+                  } @else {
+                    <span class="gl-badge gl-not-configured">Not Configured</span>
+                  }
+                </td>
+                <td>
+                  <button class="btn-configure" (click)="openDetail(item); $event.stopPropagation()">Configure</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
       </div>
+
+      @if (totalPages > 1) {
+        <div class="pagination">
+          <button class="page-btn" [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">Previous</button>
+          <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
+          <button class="page-btn" [disabled]="currentPage === totalPages" (click)="goToPage(currentPage + 1)">Next</button>
+        </div>
+      }
     }
+  }
+
+  @if (activeTab === 'SCOA_STRUCTURE') {
+    <div class="scoa-sync-panel">
+      <div class="scoa-sync-header">
+        <div class="scoa-sync-info">
+          <div class="scoa-sync-stat">
+            <span class="scoa-sync-label">Total Records</span>
+            <span class="scoa-sync-value">{{ scoaSyncStatus.total | number }}</span>
+          </div>
+          <div class="scoa-sync-stat">
+            <span class="scoa-sync-label">Last Synced</span>
+            <span class="scoa-sync-value">{{ scoaSyncStatus.last_synced ? (scoaSyncStatus.last_synced | date:'medium') : 'Never' }}</span>
+          </div>
+        </div>
+        <button class="btn-sync" (click)="syncScoaStructure()" [disabled]="scoaSyncing">
+          @if (scoaSyncing) {
+            <div class="spinner-sm"></div> Syncing...
+          } @else {
+            Sync SCOA Structure
+          }
+        </button>
+      </div>
+
+      <div class="search-bar">
+        <input type="text" class="search-input" [(ngModel)]="scoaSearch" (ngModelChange)="onScoaSearch()" placeholder="Search by ID, code or description..." />
+      </div>
+
+      @if (scoaSyncLoading) {
+        <div class="loading-state">Loading SCOA items...</div>
+      } @else if (scoaSyncItems.length === 0) {
+        <div class="empty-state">No SCOA items found. Click "Sync SCOA Structure" to fetch data from the external system.</div>
+      } @else {
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:80px">SCOA ID</th>
+                <th>SCOA Code</th>
+                <th>Short Description</th>
+                <th>Description</th>
+                <th style="width:90px;text-align:center">Parent ID</th>
+                <th style="width:70px;text-align:center">Level</th>
+                <th style="width:80px;text-align:center">Posting</th>
+                <th style="width:70px;text-align:center">Enabled</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of scoaSyncItems; track item.scoa_id) {
+                <tr class="table-row">
+                  <td class="cell-id">{{ item.scoa_id }}</td>
+                  <td><span style="font-family: monospace; font-size: 11px;">{{ item.scoa_code }}</span></td>
+                  <td>{{ item.scoa_short_desc }}</td>
+                  <td>{{ item.scoa_desc }}</td>
+                  <td style="text-align:center;font-size:11px;color:#6b7280">{{ item.scoa_parent_id ?? '—' }}</td>
+                  <td style="text-align:center;font-size:11px;color:#6b7280">{{ item.level_id ?? '—' }}</td>
+                  <td style="text-align:center">
+                    @if (item.posting_level) {
+                      <span class="status-badge status-approved" style="font-size:10px">Yes</span>
+                    } @else {
+                      <span style="font-size:10px;color:#9ca3af">No</span>
+                    }
+                  </td>
+                  <td style="text-align:center">
+                    @if (item.enabled === false) {
+                      <span class="status-badge status-rejected" style="font-size:10px">No</span>
+                    } @else {
+                      <span class="status-badge status-approved" style="font-size:10px">Yes</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        @if (scoaTotalPages > 1) {
+          <div class="pagination">
+            <button class="page-btn" [disabled]="scoaPage === 1" (click)="scoaPageChange(scoaPage - 1)">Previous</button>
+            <span class="page-info">Page {{ scoaPage }} of {{ scoaTotalPages }} ({{ scoaTotal | number }} records)</span>
+            <button class="page-btn" [disabled]="scoaPage === scoaTotalPages" (click)="scoaPageChange(scoaPage + 1)">Next</button>
+          </div>
+        }
+      }
+    </div>
   }
 </div>
 }
@@ -235,15 +325,21 @@
             <div class="field-row">
               <label class="field-label">Plan Project Item <span class="required">*</span></label>
               <div class="field-value">
-                @if (revenuePlanProjectItemsLoading) {
-                  <select class="form-input" disabled><option>Loading plan project items...</option></select>
-                } @else if (revenuePlanProjectItems.length > 0) {
-                  <select class="form-input" [ngModel]="toStr(glForm.plan_project_item_id)" (ngModelChange)="glForm.plan_project_item_id = $event; onRevenuePlanProjectItemChange()">
-                    <option value="">-- Select --</option>
-                    @for (ppi of revenuePlanProjectItems; track ppi.planProjectItemId) {
-                      <option [value]="toStr(ppi.planProjectItemId)">{{ ppi.planProjectItemId }} | {{ ppi.projectDesc }} | {{ ppi.fund }} | {{ ppi.scoaFunction }} | {{ ppi.region }} | {{ ppi.cost }}</option>
-                    }
-                  </select>
+                @if (glForm.scoa_item_id) {
+                  <app-searchable-picker
+                    [items]="revenuePlanProjectItems"
+                    [value]="toStr(glForm.plan_project_item_id)"
+                    [loading]="revenuePlanProjectItemsLoading"
+                    idField="planProjectItemId"
+                    [primaryText]="planProjectItemPrimary"
+                    [secondaryText]="planProjectItemSecondary"
+                    [searchableFields]="planProjectItemSearchFields"
+                    placeholder="-- Select --"
+                    emptyText="No plan project items available"
+                    [showCount]="true"
+                    countNoun="plan project items"
+                    (valueChange)="glForm.plan_project_item_id = $event; onRevenuePlanProjectItemChange()"
+                  ></app-searchable-picker>
                 } @else {
                   <input type="text" class="form-input" value="Select a SCOA Item first" disabled />
                 }
@@ -391,16 +487,20 @@
         <div class="field-row">
           <label class="field-label">Plan Project Item <span class="required">*</span></label>
           <div class="field-value">
-            @if (planProjectItemsLoading) {
-              <select class="form-input" disabled><option>Loading plan project items...</option></select>
-            } @else {
-              <select class="form-input" [ngModel]="toStr(glForm.plan_project_item_id)" (ngModelChange)="glForm.plan_project_item_id = $event; onPlanProjectItemChange()">
-                <option value="">-- Select --</option>
-                @for (ppi of planProjectItems; track ppi.planProjectItemId) {
-                  <option [value]="toStr(ppi.planProjectItemId)">{{ ppi.planProjectItemId }} | {{ ppi.projectDesc }} | {{ ppi.fund }} | {{ ppi.scoaFunction }} | {{ ppi.region }} | {{ ppi.cost }}</option>
-                }
-              </select>
-            }
+            <app-searchable-picker
+              [items]="planProjectItems"
+              [value]="toStr(glForm.plan_project_item_id)"
+              [loading]="planProjectItemsLoading"
+              idField="planProjectItemId"
+              [primaryText]="planProjectItemPrimary"
+              [secondaryText]="planProjectItemSecondary"
+              [searchableFields]="planProjectItemSearchFields"
+              placeholder="-- Select --"
+              emptyText="No plan project items available"
+              [showCount]="true"
+              countNoun="plan project items"
+              (valueChange)="glForm.plan_project_item_id = $event; onPlanProjectItemChange()"
+            ></app-searchable-picker>
           </div>
         </div>
 

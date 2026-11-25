@@ -1,157 +1,82 @@
-<div class="page-header">
-  <div>
-    <h1 class="page-title">Wages Capture</h1>
-    <p class="page-subtitle">Capture and manage wage transactions for Rate Based employees</p>
+@if (view === 'list') {
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Wages</h1>
+      <p class="page-subtitle">Capture and manage wage transactions for Rate Based employees</p>
+    </div>
+    <button class="btn btn-primary" (click)="openAddForm()"><app-icon name="plus" [size]="14"></app-icon> Add Wages</button>
   </div>
-</div>
 
-<div class="wages-toolbar">
-  <div class="toolbar-left">
-    <div class="form-group toolbar-field">
-      <label>Payroll Cycle</label>
-      <select class="form-control" [(ngModel)]="selectedCycleId" (ngModelChange)="onCycleChange()">
-        <option value="">— Select Cycle —</option>
-        @for (c of cycles; track c.id) {
-          <option [value]="c.id">{{ c.name }} ({{ c.cycle_type }})</option>
+  <div class="tabs-bar">
+    <button class="tab-btn" [class.active]="activeTab === 'current'" (click)="switchTab('current')">Current Wages</button>
+    <button class="tab-btn" [class.active]="activeTab === 'processed'" (click)="switchTab('processed')">Processed Wages</button>
+  </div>
+
+  @if (activeTab === 'current') {
+    <div class="filters-bar">
+      <select class="form-control filter-select" [(ngModel)]="listCycleId" (ngModelChange)="onListCycleChange()">
+        <option value="">All Cycles</option>
+        @for (c of listCycles; track c.id) {
+          <option [value]="c.id">{{ c.name }}</option>
         }
       </select>
+      <select class="form-control filter-select" [(ngModel)]="statusFilter" (ngModelChange)="onFilterChange()">
+        <option value="">All Statuses</option>
+        <option value="PENDING">Pending</option>
+        <option value="APPROVED">Approved</option>
+        <option value="REJECTED">Rejected</option>
+        <option value="RETURNED">Returned</option>
+      </select>
+      <select class="form-control filter-select" [(ngModel)]="departmentFilter" (ngModelChange)="onDepartmentFilterChange()">
+        <option value="">All Departments</option>
+        @for (dept of departments; track dept.id) {
+          <option [value]="dept.id">{{ dept.name }}</option>
+        }
+      </select>
+      <select class="form-control filter-select" [(ngModel)]="divisionFilter" (ngModelChange)="onClientFilterChange()" [disabled]="!departmentFilter">
+        <option value="">All Divisions</option>
+        @for (div of filteredDivisions; track div.id) {
+          <option [value]="div.id">{{ div.name }}</option>
+        }
+      </select>
+      <div class="employee-filter-wrap">
+        <input class="form-control filter-input" type="text" placeholder="Search employee..." [(ngModel)]="filterEmployeeSearch" (input)="searchFilterEmployees()" />
+        @if (employeeFilterId) {
+          <button class="btn btn-sm btn-outline clear-filter-btn" (click)="clearEmployeeFilter()">&#x2715;</button>
+        }
+        @if (filterEmployees.length > 0) {
+          <div class="employee-dropdown filter-dropdown">
+            @for (emp of filterEmployees; track emp.id) {
+              <div class="employee-option" (click)="selectFilterEmployee(emp)">{{ emp.id }} | {{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</div>
+            }
+          </div>
+        }
+      </div>
     </div>
-    @if (currentPeriod) {
-      <div class="period-badge">
+
+    @if (!listCycleId) {
+      <div class="period-info-bar">
         <app-icon name="calendar" [size]="14"></app-icon>
-        {{ getPeriodLabel() }}
-        <span class="period-status" [class]="'ps-' + (currentPeriod.status || '').toLowerCase()">{{ currentPeriod.status }}</span>
+        <span>Showing all current wage transactions across all cycles</span>
+      </div>
+    } @else if (listPeriodId && listCycleId) {
+      <div class="period-info-bar">
+        <app-icon name="calendar" [size]="14"></app-icon>
+        <span>Showing wages for the current open period</span>
+      </div>
+    } @else if (listCycleId && !loading) {
+      <div class="period-info-bar period-info-warning">
+        <app-icon name="alertTriangle" [size]="14"></app-icon>
+        <span>No open period found for this cycle. Generate periods first.</span>
       </div>
     }
-  </div>
-</div>
 
-@if (selectedCycleId && currentPeriod) {
-  <div class="wages-add-section">
-    <div class="section-heading">Add a new Wages (* ID to be generated)</div>
-    <div class="add-form-grid">
-      <div class="add-form-left">
-        <div class="form-row-inline">
-          <div class="form-group employee-search-group">
-            <label>Employee<span class="required">*</span></label>
-            <div class="employee-search-wrap">
-              <input class="form-control" type="text"
-                [(ngModel)]="employeeSearchText"
-                (input)="onEmployeeSearchInput()"
-                (focus)="onEmployeeSearchFocus()"
-                (blur)="onEmployeeSearchBlur()"
-                placeholder="Type ID, code, name or surname..."
-                autocomplete="off">
-              @if (employeeDropdownOpen && filteredEmployees.length > 0) {
-                <div class="employee-dropdown">
-                  @for (emp of filteredEmployees; track emp.id) {
-                    <div class="employee-dropdown-item" [class.selected]="selectedEmployee?.id === emp.id" (mousedown)="selectEmployee(emp)">
-                      <span class="emp-dd-id">{{ emp.id }}</span>
-                      <span class="emp-dd-code">{{ emp.employee_code }}</span>
-                      <span class="emp-dd-name">{{ emp.first_name }} {{ emp.surname }}</span>
-                    </div>
-                  }
-                </div>
-              }
-              @if (employeeDropdownOpen && employeeSearchText && filteredEmployees.length === 0) {
-                <div class="employee-dropdown">
-                  <div class="employee-dropdown-empty">No matching employees</div>
-                </div>
-              }
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Payroll Period<span class="required">*</span></label>
-            <input class="form-control readonly-field" [value]="getPeriodLabel()" readonly>
-          </div>
-        </div>
-        <div class="form-row-inline">
-          <div class="form-group">
-            <label>Employee Code<span class="required">*</span></label>
-            <input class="form-control readonly-field" [value]="selectedEmployee?.employee_code || ''" readonly>
-          </div>
-          <div class="form-group">
-            <label>Salary Transaction<span class="required">*</span></label>
-            <select class="form-control" [(ngModel)]="addForm.salary_head_id" [disabled]="!selectedEmployee || employeeSalaryHeadsLoading">
-              <option value="">{{ employeeSalaryHeadsLoading ? 'Loading...' : '— Select —' }}</option>
-              @for (h of employeeSalaryHeads; track h.id) {
-                <option [value]="h.id">{{ h.name }} ({{ h.code }})</option>
-              }
-            </select>
-          </div>
-        </div>
-        <div class="form-row-inline">
-          <div class="form-group">
-            <label>ID Number<span class="required">*</span></label>
-            <input class="form-control readonly-field" [value]="selectedEmployee?.id_number || ''" readonly>
-          </div>
-          <div class="form-group">
-            <label>{{ unitLabel }}<span class="required">*</span></label>
-            <input class="form-control" type="number" [(ngModel)]="addForm.unit" step="0.5" min="0">
-          </div>
-        </div>
-        <div class="form-row-inline">
-          <div class="form-group">
-            <label>First Name<span class="required">*</span></label>
-            <input class="form-control readonly-field" [value]="selectedEmployee?.first_name || ''" readonly>
-          </div>
-          <div class="form-group">
-            <label>{{ addRateLabel }}</label>
-            <input class="form-control readonly-field" [value]="addRate | number:'1.2-4'" readonly>
-          </div>
-        </div>
-        <div class="form-row-inline">
-          <div class="form-group">
-            <label>Last Name<span class="required">*</span></label>
-            <input class="form-control readonly-field" [value]="selectedEmployee?.surname || ''" readonly>
-          </div>
-          <div class="form-group">
-            <label>Total</label>
-            <input class="form-control readonly-field" [value]="addTotal | number:'1.2-2'" readonly>
-          </div>
-        </div>
-        <div class="form-row-inline">
-          <div class="form-group">
-            <label>Cycle<span class="required">*</span></label>
-            <input class="form-control readonly-field" [value]="currentCycle?.name || ''" readonly>
-          </div>
-          <div class="form-group"></div>
-        </div>
-      </div>
-    </div>
-    <div class="add-form-actions">
-      <button class="btn btn-primary" (click)="submitAdd()" [disabled]="addLoading">
-        @if (addLoading) { Saving... } @else { Submit }
-      </button>
-      <button class="btn btn-secondary" (click)="cancelAdd()">Cancel</button>
-    </div>
-  </div>
-
-  <div class="wages-grid-section">
-    <div class="wages-actions-bar">
-      <div class="filter-group">
-        <select class="form-control form-control-sm" [(ngModel)]="statusFilter" (ngModelChange)="loadTransactions()">
-          <option value="">All Statuses</option>
-          <option value="PENDING">Pending</option>
-          <option value="APPROVED">Approved</option>
-          <option value="REJECTED">Rejected</option>
-          <option value="PROCESSED">Processed</option>
-        </select>
-      </div>
-      @if (selectedCount > 0) {
-        <div class="bulk-actions">
-          <span class="selected-label">{{ selectedCount }} selected</span>
-          <button class="btn btn-sm btn-approve" (click)="approveSelected()"><app-icon name="check" [size]="12"></app-icon> Approve</button>
-          <button class="btn btn-sm btn-reject" (click)="rejectSelected()"><app-icon name="x" [size]="12"></app-icon> Reject</button>
-        </div>
-      }
-    </div>
-
-    @if (txLoading) {
-      <div class="loading">Loading transactions...</div>
+    @if (loading) {
+      <div class="loading"><div class="spinner"></div>Loading wages...</div>
     } @else if (transactions.length === 0) {
       <div class="empty-state">
-        <p>No records to display.</p>
+        <h3>No wages found</h3>
+        <p>Click "Add Wages" to capture a new wage transaction</p>
       </div>
     } @else {
       <div class="table-card">
@@ -159,45 +84,68 @@
           <table class="wages-table">
             <thead>
               <tr>
-                <th style="width: 36px;"><input type="checkbox" (change)="toggleSelectAll($event)"></th>
-                <th>Id</th>
-                <th>Employee Number</th>
-                <th>Employee Code</th>
-                <th>First Name</th>
-                <th>Last Name</th>
-                <th>Cycle</th>
-                <th>Payroll Period</th>
+                <th style="width:40px">
+                  <input type="checkbox" [checked]="allPendingSelected" (change)="toggleSelectAll()" title="Select all pending">
+                </th>
+                <th>Employee</th>
                 <th>Salary Transaction</th>
                 <th class="text-right">Unit</th>
                 <th class="text-right">Rate</th>
-                <th class="text-right">Total</th>
+                <th class="text-right">Amount</th>
                 <th>Status</th>
-                <th style="width: 100px;">Action</th>
+                <th style="width: 140px;">Actions</th>
               </tr>
             </thead>
             <tbody>
               @for (tx of transactions; track tx.id) {
-                <tr>
-                  <td><input type="checkbox" [(ngModel)]="tx._selected" [disabled]="tx.status !== 'PENDING'"></td>
-                  <td>{{ tx.id }}</td>
-                  <td>{{ tx.employee_id }}</td>
-                  <td>{{ tx.employee_code }}</td>
-                  <td>{{ tx.first_name }}</td>
-                  <td>{{ tx.surname }}</td>
-                  <td>{{ currentCycle?.name || '' }}</td>
-                  <td>{{ getPeriodLabel() }}</td>
+                <tr [class.row-selected]="selectedWageIds.has(tx.id)">
                   <td>
-                    <span class="head-name">{{ tx.head_name }}</span>
+                    @if (tx.status === 'PENDING' && canApprove) {
+                      <input type="checkbox" [checked]="selectedWageIds.has(tx.id)" (change)="toggleWageSelection(tx.id)">
+                    }
                   </td>
+                  <td>
+                    <div class="emp-cell">
+                      <span class="emp-cell-name">{{ tx.employee_id }} | {{ tx.employee_code }} - {{ tx.first_name }} {{ tx.surname }}</span>
+                    </div>
+                  </td>
+                  <td><span class="head-name">{{ tx.head_name }}</span></td>
                   <td class="text-right">{{ getTxUnit(tx) | number:'1.2-2' }}</td>
                   <td class="text-right">{{ getTxRate(tx) | number:'1.2-4' }}</td>
-                  <td class="text-right">{{ getTxTotal(tx) | number:'1.2-2' }}</td>
-                  <td><span class="status-pill" [ngClass]="getStatusClass(tx.status)">{{ tx.status }}</span></td>
+                  <td class="text-right amount-cell">{{ formatCurrency(getTxTotal(tx)) }}</td>
                   <td>
-                    @if (tx.status === 'PENDING') {
-                      <button class="btn btn-sm btn-action-edit" (click)="openEditTransaction(tx)" title="Edit">Edit</button>
-                      <button class="btn btn-sm btn-action-delete" (click)="deleteTx(tx)" title="Delete">Delete</button>
+                    <app-status-badge [status]="tx.status"></app-status-badge>
+                    @if (tx.status === 'PENDING' && tx.workflow_level) {
+                      <span class="workflow-level">L{{ tx.workflow_level }}/{{ tx.workflow_total }}</span>
                     }
+                  </td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn btn-sm btn-view" (click)="viewWage(tx)" title="View Details">
+                        <app-icon name="eye" [size]="12"></app-icon>
+                      </button>
+                      @if (tx.status === 'PENDING' && canApprove) {
+                        <button class="btn btn-sm btn-approve" (click)="approveWage(tx)" title="Approve">
+                          <app-icon name="check" [size]="12"></app-icon>
+                        </button>
+                        <button class="btn btn-sm btn-return" (click)="returnWage(tx)" title="Return for Correction">
+                          <app-icon name="chevronLeft" [size]="12"></app-icon>
+                        </button>
+                        <button class="btn btn-sm btn-reject" (click)="rejectWage(tx)" title="Reject">
+                          <app-icon name="x" [size]="12"></app-icon>
+                        </button>
+                      }
+                      @if (tx.status === 'PENDING') {
+                        <button class="btn btn-sm btn-edit" (click)="editWage(tx)" title="Edit">
+                          <app-icon name="edit" [size]="12"></app-icon>
+                        </button>
+                      }
+                      @if (tx.status === 'RETURNED') {
+                        <button class="btn btn-sm btn-resubmit" (click)="editAndResubmit(tx)" title="Edit & Resubmit">
+                          <app-icon name="edit" [size]="12"></app-icon>
+                        </button>
+                      }
+                    </div>
                   </td>
                 </tr>
               }
@@ -205,64 +153,485 @@
           </table>
         </div>
       </div>
+
+      <app-pagination [page]="page" [limit]="limit" [total]="total" (pageChange)="onPageChange($event)"></app-pagination>
     }
+
+    @if (selectedCount > 0 && canApprove) {
+      <div class="bulk-action-bar">
+        <div class="bulk-info">
+          <strong>{{ selectedCount }}</strong> transaction(s) selected — Total: <strong>{{ formatCurrency(selectedTotal) }}</strong>
+        </div>
+        <div class="bulk-buttons">
+          <button class="btn btn-approve-bulk" (click)="bulkApprove()" [disabled]="bulkProcessing">
+            <app-icon name="check" [size]="14"></app-icon> Approve All
+          </button>
+          <button class="btn btn-return-bulk" (click)="bulkReturn()" [disabled]="bulkProcessing">
+            <app-icon name="chevronLeft" [size]="14"></app-icon> Return All
+          </button>
+          <button class="btn btn-reject-bulk" (click)="bulkReject()" [disabled]="bulkProcessing">
+            <app-icon name="x" [size]="14"></app-icon> Reject All
+          </button>
+          @if (bulkProcessing) {
+            <span class="bulk-processing">Processing...</span>
+          }
+        </div>
+      </div>
+    }
+  }
+
+  @if (activeTab === 'processed') {
+    <div class="filters-bar">
+      <select class="form-control filter-select" disabled>
+        <option>Processed</option>
+      </select>
+      <select class="form-control filter-select" [(ngModel)]="processedCycleFilter" (ngModelChange)="onProcessedFilterChange()">
+        <option value="">All Cycles</option>
+        @for (c of cycles; track c.id) {
+          <option [value]="c.id">{{ c.name }}</option>
+        }
+      </select>
+      <div class="employee-filter-wrap">
+        <input class="form-control filter-input" type="text" placeholder="Search employee..." [(ngModel)]="processedFilterEmployeeSearch" (input)="searchProcessedFilterEmployees()" />
+        @if (processedEmployeeFilterId) {
+          <button class="btn btn-sm btn-outline clear-filter-btn" (click)="clearProcessedEmployeeFilter()">&#x2715;</button>
+        }
+        @if (processedFilterEmployees.length > 0) {
+          <div class="employee-dropdown filter-dropdown">
+            @for (emp of processedFilterEmployees; track emp.id) {
+              <div class="employee-option" (click)="selectProcessedFilterEmployee(emp)">{{ emp.id }} | {{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    @if (processedLoading) {
+      <div class="loading"><div class="spinner"></div>Loading processed wages...</div>
+    } @else if (processedWages.length === 0) {
+      <div class="empty-state">
+        <h3>No processed wages</h3>
+        <p>Wages will appear here once they have been processed through a payroll run</p>
+      </div>
+    } @else {
+      <div class="table-card">
+        <div class="table-wrap">
+          <table class="wages-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Salary Transaction</th>
+                <th class="text-right">Unit</th>
+                <th class="text-right">Rate</th>
+                <th class="text-right">Amount</th>
+                <th>Period</th>
+                <th>Cycle</th>
+                <th>Reference</th>
+                <th>Status</th>
+                <th style="width: 60px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (tx of processedWages; track tx.id) {
+                <tr>
+                  <td>
+                    <div class="emp-cell">
+                      <span class="emp-cell-name">{{ tx.employee_id }} | {{ tx.employee_code }} - {{ tx.first_name }} {{ tx.surname }}</span>
+                    </div>
+                  </td>
+                  <td><span class="head-name">{{ tx.head_name }}</span></td>
+                  <td class="text-right">{{ getTxUnit(tx) | number:'1.2-2' }}</td>
+                  <td class="text-right">{{ getTxRate(tx) | number:'1.2-4' }}</td>
+                  <td class="text-right amount-cell">{{ formatCurrency(getTxTotal(tx)) }}</td>
+                  <td><span class="period-badge">{{ getProcessedPeriodLabel(tx) }}</span></td>
+                  <td>{{ tx.cycle_name || '-' }}</td>
+                  <td>{{ tx.reference_no || '-' }}</td>
+                  <td><app-status-badge [status]="tx.status || 'PROCESSED'"></app-status-badge></td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn btn-sm btn-view" (click)="viewWage(tx)" title="View Details">
+                        <app-icon name="eye" [size]="12"></app-icon>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <app-pagination [page]="processedPage" [limit]="processedLimit" [total]="processedTotal" (pageChange)="onProcessedPageChange($event)"></app-pagination>
+    }
+  }
+}
+
+@if (view === 'form') {
+  <div class="page-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="btn" (click)="backToList()"><app-icon name="chevronLeft" [size]="14"></app-icon> Back</button>
+      <div>
+        <h1 class="page-title">{{ editingWageId ? 'Edit Wage Transaction' : 'Add Wage Transaction' }}</h1>
+        <p class="page-subtitle">{{ editingWageId ? 'Edit and resubmit wage transaction #' + editingWageId : 'Capture a new wage transaction for a Rate Based employee' }}</p>
+      </div>
+    </div>
+    <button class="btn btn-primary" (click)="submitAdd()" [disabled]="formLoading || formIsLocked">
+      @if (formLoading) { Submitting... } @else { <app-icon name="check" [size]="14"></app-icon> {{ editingWageId ? 'Update' : 'Submit' }} }
+    </button>
   </div>
-} @else if (selectedCycleId && !currentPeriod) {
-  <div class="empty-state" style="margin-top: 40px;">
-    <h3>No open period</h3>
-    <p>There is no open or trial period for this payroll cycle. Generate periods first.</p>
-  </div>
-} @else {
-  <div class="empty-state" style="margin-top: 40px;">
-    <h3>Select a payroll cycle</h3>
-    <p>Choose a payroll cycle above to start capturing wages</p>
+
+  @if (formIsLocked) {
+    <div style="background:#fff8e1;border:1px solid #f59e0b;border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:10px;margin-bottom:12px;color:#92400e;font-size:13px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <span><strong>Payroll locked</strong> — This cycle is in Trial Lockdown. Unlock the Trial Run before capturing wage transactions.</span>
+    </div>
+  }
+
+  <div class="detail-form">
+    <div class="form-two-col">
+      <div class="form-column">
+        <div class="form-section-title"><app-icon name="calendar" [size]="16"></app-icon> Cycle & Period</div>
+
+        <div class="form-group">
+          <label>Payroll Cycle <span class="required">*</span></label>
+          <select class="form-control" [(ngModel)]="selectedCycleId" (ngModelChange)="onCycleChange()" [disabled]="!!editingWageId">
+            <option value="">-- Select Cycle --</option>
+            @for (c of cycles; track c.id) {
+              <option [value]="c.id">{{ c.name }} ({{ c.cycle_type }})</option>
+            }
+          </select>
+        </div>
+
+        @if (currentPeriod) {
+          <div class="form-group">
+            <label>Payroll Period</label>
+            <input class="form-control readonly-field" [value]="getPeriodLabel()" readonly>
+          </div>
+        } @else if (selectedCycleId && !employeesLoading) {
+          <div class="info-box info-box-warning">
+            <app-icon name="alertTriangle" [size]="14"></app-icon>
+            No open period found for this cycle. Generate periods first.
+          </div>
+        }
+
+        @if (employeesLoading) {
+          <div class="info-box">Loading employees...</div>
+        }
+
+        <div class="form-section-title" style="margin-top:16px"><app-icon name="user" [size]="16"></app-icon> Employee Details</div>
+
+        <div class="form-group">
+          <label>Employee <span class="required">*</span></label>
+          <div class="employee-lookup">
+            <input class="form-control" type="text"
+              [(ngModel)]="employeeSearchText"
+              (input)="onEmployeeSearchInput()"
+              (focus)="onEmployeeSearchFocus()"
+              (blur)="onEmployeeSearchBlur()"
+              placeholder="Search by ID, code or name..."
+              autocomplete="off"
+              [disabled]="!selectedCycleId || !currentPeriod || formIsLocked">
+            @if (selectedEmployee) {
+              <button class="clear-btn" (click)="clearFormEmployee()">&times;</button>
+            }
+            @if (employeeDropdownOpen && filteredEmployees.length > 0) {
+              <div class="dropdown-list">
+                @for (emp of filteredEmployees; track emp.id) {
+                  <div class="dropdown-item" (mousedown)="selectFormEmployee(emp)">
+                    <span class="dropdown-item-name">{{ emp.id }} | {{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</span>
+                    <span class="dropdown-item-sub">{{ emp.salary_based_on === 'RATE_PER_HOUR' ? 'Hourly' : emp.salary_based_on === 'RATE_PER_DAY' ? 'Daily' : 'Captured Value' }} &bull; Rate: {{ emp.wage_rate || 0 }}</span>
+                  </div>
+                }
+              </div>
+            }
+            @if (employeeDropdownOpen && employeeSearchText && filteredEmployees.length === 0 && !employeesLoading) {
+              <div class="dropdown-list">
+                <div class="dropdown-item" style="color:var(--text-muted);cursor:default">No matching Rate Based employees</div>
+              </div>
+            }
+          </div>
+        </div>
+
+        @if (selectedEmployee) {
+          <div class="form-group">
+            <label>Full Name</label>
+            <input class="form-control readonly-field" [value]="selectedEmployee.first_name + ' ' + selectedEmployee.surname" readonly>
+          </div>
+          <div class="form-group">
+            <label>Employee Code</label>
+            <input class="form-control readonly-field" [value]="selectedEmployee.employee_code || '-'" readonly>
+          </div>
+          <div class="form-group">
+            <label>Pay Type</label>
+            <input class="form-control readonly-field" [value]="selectedEmployee.salary_based_on === 'RATE_PER_HOUR' ? 'Hourly (Rate Per Hour)' : selectedEmployee.salary_based_on === 'RATE_PER_DAY' ? 'Daily (Rate Per Day)' : 'Captured Value'" readonly>
+          </div>
+        }
+      </div>
+
+      <div class="form-column">
+        <div class="form-section-title"><app-icon name="dollar" [size]="16"></app-icon> Transaction Details</div>
+
+        <div class="form-group">
+          <label>Salary Transaction <span class="required">*</span></label>
+          <select class="form-control" [(ngModel)]="addForm.salary_head_id" [disabled]="!selectedEmployee || employeeSalaryHeadsLoading || formIsLocked">
+            <option value="">{{ employeeSalaryHeadsLoading ? 'Loading...' : '-- Select Transaction --' }}</option>
+            @for (h of employeeSalaryHeads; track h.id) {
+              <option [value]="h.id">{{ h.name }} ({{ h.code }})</option>
+            }
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>{{ unitLabel }} <span class="required">*</span></label>
+          <input class="form-control" type="number" [(ngModel)]="addForm.unit" step="0.5" min="0" placeholder="Enter {{ unitLabel | lowercase }}" [disabled]="formIsLocked">
+          @if (addForm.unit > 0 && selectedEmployee) {
+            <span class="field-hint">{{ addForm.unit }} {{ unitLabel | lowercase }} &times; {{ formatCurrency(addRate) }}</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label>{{ addRateLabel }}</label>
+          <input class="form-control readonly-field" [value]="addRate > 0 ? formatCurrency(addRate) : '-'" readonly>
+        </div>
+
+        <div class="form-group">
+          <label>Total Amount</label>
+          <input class="form-control readonly-field claim-value" [value]="addTotal > 0 ? formatCurrency(addTotal) : '-'" readonly>
+        </div>
+
+        <div class="form-group">
+          <label>Reference No</label>
+          <input class="form-control" [(ngModel)]="addForm.reference_no" placeholder="Optional reference number" [disabled]="formIsLocked">
+        </div>
+
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea class="form-control" [(ngModel)]="addForm.notes" placeholder="Optional notes" rows="3" [disabled]="formIsLocked"></textarea>
+        </div>
+      </div>
+    </div>
   </div>
 }
 
-@if (showEditModal) {
-  <div class="modal-overlay visible" (click)="closeEditModal()">
-    <div class="modal" (click)="$event.stopPropagation()">
+@if (view === 'detail' && detailWage) {
+  <div class="page-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="btn" (click)="backToList()"><app-icon name="chevronLeft" [size]="14"></app-icon> Back</button>
+      <div>
+        <h1 class="page-title">Wage Transaction #{{ detailWage.id }}</h1>
+        <p class="page-subtitle">{{ detailWage.head_name || 'Wage' }} for {{ detailWage.first_name }} {{ detailWage.surname }}</p>
+      </div>
+    </div>
+    <div class="detail-header-actions">
+      @if (detailWage.status === 'PENDING' && canApprove) {
+        <button class="btn btn-sm btn-approve" (click)="approveWage(detailWage)">
+          <app-icon name="check" [size]="14"></app-icon> Approve
+        </button>
+        <button class="btn btn-sm btn-return" (click)="returnWage(detailWage)">
+          <app-icon name="chevronLeft" [size]="14"></app-icon> Return
+        </button>
+        <button class="btn btn-sm btn-reject" (click)="rejectWage(detailWage)">
+          <app-icon name="x" [size]="14"></app-icon> Reject
+        </button>
+      }
+      @if (detailWage.status === 'RETURNED') {
+        <button class="btn btn-sm btn-resubmit" (click)="editAndResubmit(detailWage)">
+          <app-icon name="edit" [size]="14"></app-icon> Edit & Resubmit
+        </button>
+      }
+      @if (detailWage.status === 'PENDING') {
+        <button class="btn btn-sm btn-edit" (click)="editWage(detailWage)">
+          <app-icon name="edit" [size]="14"></app-icon> Edit
+        </button>
+        <button class="btn btn-sm btn-reject" (click)="deleteTx(detailWage)">
+          <app-icon name="trash" [size]="14"></app-icon> Delete
+        </button>
+      }
+      <app-status-badge [status]="detailWage.status"></app-status-badge>
+      @if (detailWage.status === 'PENDING' && detailWage.workflow_level) {
+        <span class="workflow-level">L{{ detailWage.workflow_level }}/{{ detailWage.workflow_total }}</span>
+      }
+    </div>
+  </div>
+
+  <div class="detail-form">
+    <div class="form-two-col">
+      <div class="form-column">
+        <div class="form-section-title"><app-icon name="user" [size]="16"></app-icon> Employee Details</div>
+        <div class="detail-row">
+          <span class="detail-label">Employee</span>
+          <span class="detail-value">{{ detailWage.employee_id }} | {{ detailWage.employee_code }} - {{ detailWage.first_name }} {{ detailWage.surname }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Employee ID</span>
+          <span class="detail-value">{{ detailWage.employee_id }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Employee Code</span>
+          <span class="detail-value">{{ detailWage.employee_code || '-' }}</span>
+        </div>
+        @if (detailWage.department_name) {
+          <div class="detail-row">
+            <span class="detail-label">Department</span>
+            <span class="detail-value">{{ detailWage.department_name }}</span>
+          </div>
+        }
+
+        <div class="form-section-title" style="margin-top:16px"><app-icon name="calendar" [size]="16"></app-icon> Period Details</div>
+        <div class="detail-row">
+          <span class="detail-label">Cycle</span>
+          <span class="detail-value">{{ detailWage.cycle_name || '-' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Period</span>
+          <span class="detail-value">{{ getTxPeriodLabel(detailWage) }}</span>
+        </div>
+      </div>
+
+      <div class="form-column">
+        <div class="form-section-title"><app-icon name="dollar" [size]="16"></app-icon> Transaction Details</div>
+        <div class="detail-row">
+          <span class="detail-label">Salary Transaction</span>
+          <span class="detail-value">{{ detailWage.head_name || '-' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Unit (Hours/Days)</span>
+          <span class="detail-value">{{ getTxUnit(detailWage) | number:'1.2-2' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Rate</span>
+          <span class="detail-value">{{ formatCurrency(getTxRate(detailWage)) }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Amount</span>
+          <span class="detail-value detail-amount">{{ formatCurrency(getTxTotal(detailWage)) }}</span>
+        </div>
+        @if (detailWage.reference_no) {
+          <div class="detail-row">
+            <span class="detail-label">Reference No</span>
+            <span class="detail-value">{{ detailWage.reference_no }}</span>
+          </div>
+        }
+        @if (detailWage.notes) {
+          <div class="detail-row">
+            <span class="detail-label">Notes</span>
+            <span class="detail-value">{{ detailWage.notes }}</span>
+          </div>
+        }
+
+        <div class="form-section-title" style="margin-top:16px"><app-icon name="clock" [size]="16"></app-icon> Audit Trail</div>
+
+        @if (historyLoading) {
+          <div class="loading" style="padding:20px"><div class="spinner"></div>Loading history...</div>
+        } @else if (wageHistory.length === 0) {
+          <div class="history-empty">No history records found</div>
+        } @else {
+          <div class="history-timeline">
+            @for (entry of wageHistory; track entry.id) {
+              <div class="timeline-item">
+                <div class="timeline-connector">
+                  <div class="timeline-dot" [style.background]="getActionColor(entry.action)">
+                    <app-icon [name]="getActionIcon(entry.action)" [size]="10"></app-icon>
+                  </div>
+                  <div class="timeline-line"></div>
+                </div>
+                <div class="timeline-content">
+                  <div class="timeline-header">
+                    <span class="timeline-action" [style.color]="getActionColor(entry.action)">{{ entry.action }}</span>
+                    <span class="timeline-date">{{ entry.performed_at | dateTimeSa }}</span>
+                  </div>
+                  <div class="timeline-actor">by {{ entry.performed_by_name }}</div>
+                  @if (entry.comments) {
+                    <div class="timeline-comments">{{ entry.comments }}</div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (showRejectModal) {
+  <div class="modal-overlay visible" (click)="cancelReject()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h3>Edit Wage Transaction</h3>
-        <button class="modal-close" (click)="closeEditModal()">&times;</button>
+        <h3>Reject Wage Transaction</h3>
+        <button class="modal-close" (click)="cancelReject()">&times;</button>
       </div>
       <div class="modal-body">
-        <div class="form-grid">
-          <div class="form-group" style="grid-column: 1 / -1;">
-            <label>SALARY TRANSACTION <span class="required">*</span></label>
-            <select class="form-control" [(ngModel)]="editForm.salary_head_id">
-              @for (h of editEmployeeSalaryHeads; track h.id) {
-                <option [value]="h.id">{{ h.name }} ({{ h.code }})</option>
-              }
-            </select>
-          </div>
-          <div class="form-group">
-            <label>{{ editUnitLabel }} <span class="required">*</span></label>
-            <input class="form-control" type="number" [(ngModel)]="editForm.unit" step="0.5" min="0">
-          </div>
-          <div class="form-group">
-            <label>{{ editRateLabel }}</label>
-            <input class="form-control readonly-field" [value]="editRate | number:'1.2-4'" readonly>
-          </div>
-          <div class="form-group">
-            <label>TOTAL</label>
-            <input class="form-control readonly-field" [value]="editTotal | number:'1.2-2'" readonly>
-          </div>
-          <div class="form-group">
-            <label>REFERENCE</label>
-            <input class="form-control" [(ngModel)]="editForm.reference_no" placeholder="Optional ref number">
-          </div>
-          <div class="form-group" style="grid-column: 1 / -1;">
-            <label>NOTES</label>
-            <input class="form-control" [(ngModel)]="editForm.notes" placeholder="Optional notes">
-          </div>
+        <p>This wage transaction will be permanently rejected. Please provide a reason.</p>
+        <div class="form-group">
+          <label>Reason for Rejection <span class="required">*</span></label>
+          <textarea class="form-control" [(ngModel)]="rejectComment" placeholder="Provide a reason for rejection..." rows="4"></textarea>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-primary" (click)="submitEdit()" [disabled]="editLoading">
-          @if (editLoading) { Saving... } @else { <app-icon name="check" [size]="14"></app-icon> Update }
-        </button>
-        <button class="btn" (click)="closeEditModal()">Cancel</button>
+        <button class="btn" (click)="cancelReject()">Cancel</button>
+        <button class="btn btn-danger" (click)="confirmReject()">Reject Transaction</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showFailedModal) {
+  <div class="modal-overlay visible" (click)="closeFailedModal()">
+    <div class="modal-content failed-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ failedModalTitle }}</h3>
+        <button class="modal-close" (click)="closeFailedModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="failed-modal-summary">The following {{ failedTransactions.length }} transaction(s) could not be processed. Click a transaction to view its details.</p>
+        <div class="failed-list">
+          @for (ft of failedTransactions; track ft.id) {
+            <div class="failed-item" [class.failed-item-clickable]="ft._tx" (click)="viewFailedTransaction(ft)">
+              <div class="failed-item-left">
+                <span class="failed-item-id">#{{ ft.id }}</span>
+                <span class="failed-item-name">{{ ft.employee_name }}</span>
+                @if (ft.employee_code) {
+                  <span class="failed-item-code">({{ ft.employee_code }})</span>
+                }
+              </div>
+              <div class="failed-item-right">
+                @if (ft.head_name) {
+                  <span class="failed-item-head">{{ ft.head_name }}</span>
+                }
+                <span class="failed-item-amount">{{ formatCurrency(ft.amount) }}</span>
+                @if (ft._tx) {
+                  <app-icon name="chevronRight" [size]="12"></app-icon>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="closeFailedModal()">Close</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showReturnModal) {
+  <div class="modal-overlay visible" (click)="cancelReturn()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ returnIsBulk ? 'Return All Selected Wages' : 'Return Wage for Correction' }}</h3>
+        <button class="modal-close" (click)="cancelReturn()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>{{ returnIsBulk ? selectedCount + ' wage transaction(s) will be returned to the capturer for correction. Please provide a reason.' : 'This wage transaction will be returned to the capturer for correction. Please provide a reason.' }}</p>
+        <div class="form-group">
+          <label>Reason for Return <span class="required">*</span></label>
+          <textarea class="form-control" [(ngModel)]="returnComment" placeholder="Describe what needs to be corrected..." rows="4"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="cancelReturn()">Cancel</button>
+        <button class="btn btn-return-confirm" (click)="confirmReturn()">Return for Correction</button>
       </div>
     </div>
   </div>

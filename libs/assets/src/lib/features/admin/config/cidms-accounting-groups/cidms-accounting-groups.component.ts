@@ -20,7 +20,7 @@ export class CidmsAccountingGroupsComponent implements OnInit {
   loading = signal(true);
   showForm = signal(false);
   editingId = signal<number | null>(null);
-  formData = { assetAccountGroupDesc: '' };
+  formData = { assetAccountGroupDesc: '', enabled: 1 };
   showImport = signal(false);
   importFile = signal<File | null>(null);
   importing = signal(false);
@@ -42,21 +42,24 @@ export class CidmsAccountingGroupsComponent implements OnInit {
   }
 
   openAdd(): void {
-    this.formData = { assetAccountGroupDesc: '' };
+    this.formData = { assetAccountGroupDesc: '', enabled: 1 };
     this.editingId.set(null);
     this.showForm.set(true);
   }
 
   openEdit(item: any): void {
-    this.formData = { assetAccountGroupDesc: item.assetAccountGroupDesc };
+    this.formData = { assetAccountGroupDesc: item.assetAccountGroupDesc, enabled: item.enabled ?? 1 };
     this.editingId.set(item.assetAccountGroupID);
     this.showForm.set(true);
   }
 
   cancelForm(): void {
+
     this.showForm.set(false);
     this.editingId.set(null);
   }
+
+  onEnabledChange(event: Event): void { this.formData.enabled = (event.target as HTMLInputElement).checked ? 1 : 0; }
 
   save(): void {
     const id = this.editingId();
@@ -135,6 +138,12 @@ export class CidmsAccountingGroupsComponent implements OnInit {
         a.click();
         URL.revokeObjectURL(url);
       }
+    });
+  }
+
+  exportToExcel(): void {
+    this.api.exportCidmsAccountingGroups().subscribe({
+      next: (blob: Blob) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'cidms_accounting_groups_export.xlsx'; a.click(); URL.revokeObjectURL(url); }
     });
   }
 }

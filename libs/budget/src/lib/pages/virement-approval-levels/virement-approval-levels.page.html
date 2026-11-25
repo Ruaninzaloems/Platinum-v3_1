@@ -1,0 +1,205 @@
+<div class="page-container">
+
+  <div class="page-header">
+    <div>
+      <h1>Virement Approval Levels</h1>
+      <p class="subtitle">Configure amount ranges and approval levels for the virement workflow</p>
+    </div>
+    <div class="header-actions">
+      <span class="lock-badge" [class.locked]="isLocked">
+        <mat-icon>{{ isLocked ? 'lock' : 'lock_open' }}</mat-icon>
+        {{ isLocked ? 'Locked' : 'Unlocked' }}
+      </span>
+      <button class="btn-lock" [class.btn-unlock]="isLocked" (click)="toggleLock()">
+        {{ isLocked ? 'Unlock' : 'Lock' }} Configuration
+      </button>
+    </div>
+  </div>
+
+  @if (successMsg) {
+    <div class="alert alert-success">{{ successMsg }}</div>
+  }
+  @if (errorMsg) {
+    <div class="alert alert-error">{{ errorMsg }}</div>
+  }
+
+  <div class="main-card">
+
+    <!-- ── Ranges section header ── -->
+    <div class="section-header">
+      <span>Amount Ranges</span>
+      @if (!isLocked) {
+        <button class="btn-add" (click)="openAddRange()" [disabled]="showAddRange">
+          <mat-icon>add</mat-icon> Add Range
+        </button>
+      }
+    </div>
+
+    <!-- ── Add Range form ── -->
+    @if (showAddRange && !isLocked) {
+      <div class="add-range-form">
+        <div class="form-row">
+          <div class="form-field">
+            <label>Minimum Amount (R)</label>
+            <input type="number" [(ngModel)]="newMin" min="0" step="0.01" placeholder="0.00" class="num-input">
+          </div>
+          <div class="form-field">
+            <label>Maximum Amount (R)</label>
+            <input type="number" [(ngModel)]="newMax" min="0" step="0.01" placeholder="0.00" class="num-input">
+          </div>
+          <div class="form-btns">
+            <button class="btn-save" (click)="saveRange()" [disabled]="savingRange">
+              {{ savingRange ? 'Saving…' : 'Save' }}
+            </button>
+            <button class="btn-cancel" (click)="cancelAddRange()">Cancel</button>
+          </div>
+        </div>
+        @if (rangeFormError) {
+          <div class="inline-error">{{ rangeFormError }}</div>
+        }
+      </div>
+    }
+
+    <!-- ── Ranges table ── -->
+    @if (loading) {
+      <div class="loading-row">Loading…</div>
+    } @else if (ranges.length === 0) {
+      <div class="empty-row">No ranges configured yet. Click "Add Range" to begin.</div>
+    } @else {
+      <div class="table-wrapper">
+        <table class="ranges-table">
+          <thead>
+            <tr>
+              <th class="col-min">Minimum Amount</th>
+              <th class="col-max">Maximum Amount</th>
+              <th class="col-approvers">Approvers</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of ranges; track r.rangeId) {
+              <tr class="range-row" [class.selected]="selectedRange?.rangeId === r.rangeId">
+
+                <!-- Inline edit mode -->
+                @if (editingRangeId === r.rangeId) {
+                  <td>
+                    <input type="number" [(ngModel)]="editMin" class="num-input-sm" step="0.01">
+                  </td>
+                  <td>
+                    <input type="number" [(ngModel)]="editMax" class="num-input-sm" step="0.01">
+                    @if (editError) { <div class="inline-error">{{ editError }}</div> }
+                  </td>
+                  <td></td>
+                  <td class="actions-cell">
+                    <button class="btn-icon btn-save-sm" (click)="saveEdit(r)" title="Save">
+                      <mat-icon>check</mat-icon>
+                    </button>
+                    <button class="btn-icon btn-cancel-sm" (click)="cancelEdit()" title="Cancel">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </td>
+                } @else {
+                  <td class="amount-cell" (click)="selectRange(r)">{{ formatCurrency(r.minAmount) }}</td>
+                  <td class="amount-cell" (click)="selectRange(r)">{{ formatCurrency(r.maxAmount) }}</td>
+                  <td (click)="selectRange(r)">
+                    <span class="approver-count">{{ r.approvers.length }}</span>
+                    <mat-icon class="expand-icon" [class.rotated]="r.expanded">expand_more</mat-icon>
+                  </td>
+                  <td class="actions-cell">
+                    @if (!isLocked) {
+                      <button class="btn-icon btn-edit" (click)="startEdit(r)" title="Edit range">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                      <button class="btn-icon btn-delete" (click)="deleteRange(r)" title="Delete range">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    }
+                  </td>
+                }
+              </tr>
+
+              <!-- ── Approvers panel ── -->
+              @if (r.expanded) {
+                <tr class="approvers-panel-row">
+                  <td colspan="4">
+                    <div class="approvers-panel">
+                      <div class="approvers-panel-header">
+                        Approvers for range {{ formatCurrency(r.minAmount) }} – {{ formatCurrency(r.maxAmount) }}
+                      </div>
+
+                      <!-- Add approver form -->
+                      @if (!isLocked) {
+                        <div class="add-approver-form">
+                          <div class="form-row">
+                            <div class="form-field-sm">
+                              <label>Level</label>
+                              <select [(ngModel)]="newApproverLevelId" class="select-sm">
+                                <option [ngValue]="null">-- Select Level --</option>
+                                @for (l of levels; track l) {
+                                  <option [value]="l">Level {{ l }}</option>
+                                }
+                              </select>
+                            </div>
+                            <div class="form-field-lg">
+                              <label>Approver</label>
+                              <select [(ngModel)]="newApproverUserId" class="select-sm">
+                                <option [ngValue]="null">-- Select Approver --</option>
+                                @for (u of approverUsers; track u.userId) {
+                                  <option [value]="u.userId">{{ u.label }}</option>
+                                }
+                              </select>
+                            </div>
+                            <div class="form-btns-sm">
+                              <button class="btn-save-sm-btn" (click)="addApprover()" [disabled]="savingApprover">
+                                <mat-icon>person_add</mat-icon>
+                                {{ savingApprover ? 'Adding…' : 'Add Approver' }}
+                              </button>
+                            </div>
+                          </div>
+                          @if (approverError) {
+                            <div class="inline-error">{{ approverError }}</div>
+                          }
+                        </div>
+                      }
+
+                      <!-- Approvers by level -->
+                      @if (r.approvers.length === 0) {
+                        <div class="no-approvers">No approvers assigned yet.</div>
+                      } @else {
+                        <table class="approvers-table">
+                          <thead>
+                            <tr>
+                              <th class="col-level">Level</th>
+                              <th class="col-approver-name">Approver</th>
+                              @if (!isLocked) { <th class="col-remove"></th> }
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (a of r.approvers; track a.approverId) {
+                              <tr>
+                                <td><span class="level-badge">Level {{ a.levelId }}</span></td>
+                                <td>{{ a.approverName }}</td>
+                                @if (!isLocked) {
+                                  <td>
+                                    <button class="btn-icon btn-delete" (click)="removeApprover(a)" title="Remove approver">
+                                      <mat-icon>person_remove</mat-icon>
+                                    </button>
+                                  </td>
+                                }
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+  </div><!-- /main-card -->
+</div>

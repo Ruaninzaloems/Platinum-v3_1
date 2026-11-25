@@ -25,22 +25,8 @@ function isUrl(input: RequestInfo | URL): input is URL {
   return typeof URL !== "undefined" && input instanceof URL;
 }
 
-function getApiBase(): string {
-  try {
-    const base = (typeof import.meta !== "undefined" && import.meta.env?.BASE_URL) || "";
-    return base.replace(/\/$/, "");
-  } catch {
-    return "";
-  }
-}
-
 function resolveUrl(input: RequestInfo | URL): string {
-  if (typeof input === "string") {
-    if (input.startsWith("/api/") || input === "/api") {
-      return `${getApiBase()}${input}`;
-    }
-    return input;
-  }
+  if (typeof input === "string") return input;
   if (isUrl(input)) return input.toString();
   return input.url;
 }
@@ -311,13 +297,9 @@ export async function customFetch<T = unknown>(
     headers.set("accept", DEFAULT_JSON_ACCEPT);
   }
 
-  const resolvedInput = typeof input === "string" && (input.startsWith("/api/") || input === "/api")
-    ? `${getApiBase()}${input}`
-    : input;
+  const requestInfo = { method, url: resolveUrl(input) };
 
-  const requestInfo = { method, url: resolveUrl(resolvedInput) };
-
-  const response = await fetch(resolvedInput, { ...init, method, headers });
+  const response = await fetch(input, { ...init, method, headers });
 
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);

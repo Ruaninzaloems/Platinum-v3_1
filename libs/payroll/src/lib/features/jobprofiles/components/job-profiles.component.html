@@ -90,34 +90,40 @@
 }
 
 @if (view === 'detail') {
-  <div class="detail-header">
-    <div class="detail-header-left">
-      <button class="btn btn-sm" (click)="goBack()" title="Back to list"><app-icon name="arrow-left" [size]="14"></app-icon> Back</button>
-      <div class="detail-title-block">
-        <h1 class="page-title" style="margin: 0;">{{ pageTitle }}</h1>
+  <div class="detail-hero">
+    <div class="detail-hero-top">
+      <button class="btn btn-outline-back" (click)="goBack()"><app-icon name="arrow-left" [size]="14"></app-icon> Back</button>
+      <div class="detail-hero-actions">
+        @if (mode === 'view') {
+          <button class="btn btn-primary" (click)="enterEdit()"><app-icon name="edit" [size]="14"></app-icon> Edit</button>
+        }
+        @if (isEditable) {
+          <button class="btn btn-primary" (click)="save()"><app-icon name="check" [size]="14"></app-icon> Save</button>
+          <button class="btn btn-outline-cancel" (click)="mode === 'create' ? goBack() : mode = 'view'">Cancel</button>
+        }
+      </div>
+    </div>
+    <div class="detail-hero-body">
+      <div class="detail-hero-info">
+        <h1 class="detail-hero-title">{{ pageTitle }}</h1>
         @if (profile.id) {
-          <div class="detail-meta">
-            <span class="text-muted">ID: {{ profile.id }}</span>
-            <span class="text-muted">Code: {{ profile.job_description_code || '-' }}</span>
+          <div class="detail-hero-meta">
+            <span class="meta-chip"><app-icon name="hash" [size]="12"></app-icon> {{ profile.id }}</span>
+            <span class="meta-chip"><app-icon name="file-text" [size]="12"></app-icon> {{ profile.job_description_code || '-' }}</span>
             <app-status-badge [status]="profile.is_active !== false && profile.enabled ? 'Active' : 'Inactive'"></app-status-badge>
           </div>
         }
       </div>
-    </div>
-    <div class="detail-header-right">
-      <div class="detail-nav">
-        <input class="form-control" style="width: 180px; font-size: 13px;" placeholder="Search ID or title..."
-               [(ngModel)]="headerSearch" (keyup.enter)="searchHeader()">
-        <button class="btn btn-sm" [disabled]="currentIndex <= 0" (click)="navigatePrev()" title="Previous"><app-icon name="chevron-left" [size]="14"></app-icon></button>
-        <span class="text-muted" style="font-size: 12px;">{{ currentIndex + 1 }} / {{ profiles.length }}</span>
-        <button class="btn btn-sm" [disabled]="currentIndex >= profiles.length - 1" (click)="navigateNext()" title="Next"><app-icon name="chevron-right" [size]="14"></app-icon></button>
-      </div>
-      @if (mode === 'view') {
-        <button class="btn btn-primary" (click)="enterEdit()"><app-icon name="edit" [size]="14"></app-icon> Edit</button>
-      }
-      @if (isEditable) {
-        <button class="btn btn-primary" (click)="save()"><app-icon name="check" [size]="14"></app-icon> Submit</button>
-        <button class="btn" (click)="mode === 'create' ? goBack() : mode = 'view'">Cancel</button>
+      @if (profile.id) {
+        <div class="detail-hero-nav">
+          <input class="nav-search" placeholder="Search ID or title..."
+                 [(ngModel)]="headerSearch" (keyup.enter)="searchHeader()">
+          <div class="nav-pager">
+            <button class="btn-pager" [disabled]="currentIndex <= 0" (click)="navigatePrev()"><app-icon name="chevron-left" [size]="14"></app-icon></button>
+            <span class="nav-counter">{{ currentIndex + 1 }} / {{ profiles.length }}</span>
+            <button class="btn-pager" [disabled]="currentIndex >= profiles.length - 1" (click)="navigateNext()"><app-icon name="chevron-right" [size]="14"></app-icon></button>
+          </div>
+        </div>
       }
     </div>
   </div>
@@ -394,7 +400,7 @@
               }
             </div>
             <div class="form-group">
-              <label>Employment Code <span class="required">*</span></label>
+              <label>Employment Code</label>
               @if (isEditable) {
                 <select class="form-control" [(ngModel)]="profile.employment_code_id">
                   <option [ngValue]="null">-- Select --</option>
@@ -425,8 +431,8 @@
 
     @if (activeTab === 'duties') {
       <div class="card detail-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <div class="section-title" style="margin: 0;">Duties and Responsibilities</div>
+        <div class="duties-header">
+          <div class="section-title" style="margin: 0; border: none; padding: 0;">Duties and Responsibilities</div>
           @if (isEditable || mode === 'view') {
             <button class="btn btn-primary btn-sm" (click)="openDutyForm()"><app-icon name="plus" [size]="12"></app-icon> Add Duty</button>
           }
@@ -434,20 +440,20 @@
 
         @if (showDutyForm) {
           <div class="duty-form">
-            <div class="form-row">
-              <div class="form-group" style="flex: 3;">
+            <div class="form-row" style="grid-template-columns: 1fr 100px 80px;">
+              <div class="form-group">
                 <label>Duty Description <span class="required">*</span></label>
                 <textarea class="form-control" [(ngModel)]="dutyForm.duty_description" rows="2" placeholder="Describe the duty..."></textarea>
               </div>
-              <div class="form-group" style="flex: 0 0 100px;">
+              <div class="form-group">
                 <label>Sequence</label>
                 <input class="form-control" type="number" [(ngModel)]="dutyForm.sequence">
               </div>
-              <div class="form-group" style="flex: 0 0 80px; align-self: flex-end;">
+              <div class="form-group" style="align-self: center; padding-top: 20px;">
                 <label class="checkbox-label"><input type="checkbox" [(ngModel)]="dutyForm.is_active"> Active</label>
               </div>
             </div>
-            <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <div class="duty-form-actions">
               <button class="btn btn-primary btn-sm" (click)="saveDuty()">{{ editingDuty ? 'Update' : 'Add' }}</button>
               <button class="btn btn-sm" (click)="cancelDutyForm()">Cancel</button>
             </div>
@@ -455,34 +461,37 @@
         }
 
         @if (duties.length === 0) {
-          <div class="empty-state" style="padding: 32px 0;"><p>No duties defined yet</p></div>
+          <div class="empty-state" style="padding: 40px 0;">
+            <app-icon name="clipboard" [size]="32" style="color: #cbd5e1; margin-bottom: 8px;"></app-icon>
+            <p>No duties defined yet</p>
+          </div>
         } @else {
-          <div style="overflow-x: auto;">
-            <table>
+          <div class="table-wrap">
+            <table class="jp-table">
               <thead>
                 <tr>
-                  <th style="width: 60px;">#</th>
+                  <th style="width: 50px;">#</th>
                   <th>Duty Description</th>
-                  <th style="width: 80px;">Seq</th>
+                  <th style="width: 70px;">Seq</th>
                   <th style="width: 80px;">Active</th>
-                  <th style="width: 100px;">Created</th>
-                  <th style="width: 100px;">Modified</th>
-                  <th style="width: 100px;">Actions</th>
+                  <th style="width: 110px;">Created</th>
+                  <th style="width: 110px;">Modified</th>
+                  <th style="width: 90px;">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 @for (d of duties; track d.id; let i = $index) {
                   <tr>
                     <td>{{ i + 1 }}</td>
-                    <td>{{ d.duty_description }}</td>
-                    <td>{{ d.sequence }}</td>
+                    <td class="duty-desc-cell">{{ d.duty_description }}</td>
+                    <td style="text-align: center;">{{ d.sequence }}</td>
                     <td><app-status-badge [status]="d.is_active ? 'Active' : 'Inactive'"></app-status-badge></td>
-                    <td>{{ d.created_at | dateSa }}</td>
-                    <td>{{ d.updated_at | dateSa }}</td>
+                    <td class="date-cell">{{ d.created_at | dateSa }}</td>
+                    <td class="date-cell">{{ d.updated_at | dateSa }}</td>
                     <td>
-                      <div style="display: flex; gap: 4px;">
-                        <button class="btn btn-sm" (click)="openDutyForm(d)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
-                        <button class="btn btn-sm" (click)="deleteDuty(d)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                      <div class="action-btns">
+                        <button class="btn btn-sm btn-icon" (click)="openDutyForm(d)" title="Edit"><app-icon name="edit" [size]="13"></app-icon></button>
+                        <button class="btn btn-sm btn-icon btn-icon-danger" (click)="deleteDuty(d)" title="Delete"><app-icon name="trash" [size]="13"></app-icon></button>
                       </div>
                     </td>
                   </tr>
@@ -561,16 +570,16 @@
                 </tr>
               </thead>
               <tbody>
-                @for (p of linkedPositions; track p.id) {
+                @for (pos of linkedPositions; track pos.id) {
                   <tr>
-                    <td><span class="code-badge">{{ p.position_code }}</span></td>
-                    <td><span class="title-text">{{ p.title }}</span></td>
-                    <td>{{ p.department_name || '-' }}</td>
-                    <td>{{ p.grade_name || '-' }}</td>
-                    <td><app-status-badge [status]="p.status"></app-status-badge></td>
+                    <td><span class="code-badge">{{ pos.position_code || '-' }}</span></td>
+                    <td>{{ pos.job_title || '-' }}</td>
+                    <td>{{ pos.department_name || '-' }}</td>
+                    <td>{{ pos.grade_name || '-' }}</td>
+                    <td><app-status-badge [status]="pos.status || 'Unknown'"></app-status-badge></td>
                     <td>
-                      @if (p.first_name) {
-                        <span class="incumbent-name"><app-icon name="user" [size]="13"></app-icon> {{ p.first_name }} {{ p.surname }}</span>
+                      @if (pos.incumbent_name) {
+                        <span class="incumbent-name"><app-icon name="user" [size]="13"></app-icon> {{ pos.incumbent_name }}</span>
                       } @else {
                         <span class="vacant-text">Vacant</span>
                       }

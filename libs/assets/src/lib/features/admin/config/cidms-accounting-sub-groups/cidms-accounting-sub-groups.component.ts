@@ -50,22 +50,24 @@ export class CidmsAccountingSubGroupsComponent implements OnInit {
   }
 
   openAdd(): void {
-    this.formData = { assetAccountSubGroupDesc: '', assetAccountGroupID: null };
+    this.formData = { assetAccountSubGroupDesc: '', assetAccountGroupID: null, enabled: 1 };
     this.editingId.set(null);
     this.showForm.set(true);
   }
 
   openEdit(item: any): void {
-    this.formData = { assetAccountSubGroupDesc: item.assetAccountSubGroupDesc, assetAccountGroupID: item.assetAccountGroupID };
+    this.formData = { assetAccountSubGroupDesc: item.assetAccountSubGroupDesc, assetAccountGroupID: item.assetAccountGroupID, enabled: item.enabled ?? 1 };
     this.editingId.set(item.assetAccountSubGroupID);
     this.showForm.set(true);
   }
 
   cancelForm(): void { this.showForm.set(false); this.editingId.set(null); }
 
+  onEnabledChange(event: Event): void { this.formData.enabled = (event.target as HTMLInputElement).checked ? 1 : 0; }
+
   save(): void {
     const id = this.editingId();
-    const payload = { assetAccountSubGroupDesc: this.formData.assetAccountSubGroupDesc, assetAccountGroupID: this.formData.assetAccountGroupID ? Number(this.formData.assetAccountGroupID) : null };
+    const payload = { assetAccountSubGroupDesc: this.formData.assetAccountSubGroupDesc, assetAccountGroupID: this.formData.assetAccountGroupID ? Number(this.formData.assetAccountGroupID) : null, enabled: this.formData.enabled };
     const obs = id ? this.api.updateCidmsAccountingSubGroup(id, payload) : this.api.createCidmsAccountingSubGroup(payload);
     obs.subscribe({
       next: function(this: CidmsAccountingSubGroupsComponent) { this.showForm.set(false); this.loadData(); this.snackBar.open(id ? 'Updated' : 'Created', 'OK', { duration: 3000 }); }.bind(this),
@@ -99,6 +101,12 @@ export class CidmsAccountingSubGroupsComponent implements OnInit {
   downloadTemplate(): void {
     this.api.downloadCidmsAccountingSubGroupTemplate().subscribe({
       next: function(blob: Blob) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'cidms_accounting_sub_groups_template.xlsx'; a.click(); URL.revokeObjectURL(url); }
+    });
+  }
+
+  exportToExcel(): void {
+    this.api.exportCidmsAccountingSubGroups().subscribe({
+      next: (blob: Blob) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'cidms_accounting_sub_groups_export.xlsx'; a.click(); URL.revokeObjectURL(url); }
     });
   }
 }

@@ -50,9 +50,25 @@ export class ApiService {
       .pipe(map(res => res.data));
   }
 
+  patchRaw<T>(endpoint: string, body: any): Observable<any> {
+    return this.http.patch<any>(`${this.baseUrl}${endpoint}`, body);
+  }
+
+  postRaw<T>(endpoint: string, body: any): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}${endpoint}`, body);
+  }
+
   postFormData<T>(endpoint: string, formData: FormData): Observable<T> {
     return this.http.post<ApiResponse<T>>(`${this.baseUrl}${endpoint}`, formData)
       .pipe(map(res => res.data));
+  }
+
+  getBlob(endpoint: string, params?: Record<string, any>): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}${endpoint}`, { params: this.buildParams(params), responseType: 'blob' });
+  }
+
+  postBlob(endpoint: string, body: any): Observable<Blob> {
+    return this.http.post(`${this.baseUrl}${endpoint}`, body, { responseType: 'blob' });
   }
 
   delete(endpoint: string): Observable<any> {

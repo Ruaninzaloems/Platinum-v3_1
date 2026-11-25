@@ -397,7 +397,9 @@ router.get('/job-profiles/:id/history', authenticate, async (req, res, next) => 
 router.get('/job-profiles/:id/linked-positions', authenticate, async (req, res, next) => {
   try {
     const result = await dbQuery(
-      `SELECT p.id, p.position_code, p.title, p.status, p.funded, p.capacity,
+      `SELECT p.id, p.position_code, p.title,
+              CASE WHEN e.id IS NOT NULL THEN 'FILLED' WHEN p.status IN ('FROZEN','ABOLISHED') THEN p.status ELSE 'VACANT' END AS status,
+              p.funded, p.capacity,
               tg.grade_code, tg.grade_name,
               e.id AS employee_id, e.first_name, e.surname, e.employee_code
        FROM positions p
@@ -509,13 +511,18 @@ router.get('/organogram', authenticate, async (req, res, next) => {
       params.push(parseInt(department_id, 10));
     }
     const result = await dbQuery(
-      `SELECT p.id, p.position_code, p.title, p.status, p.parent_position_id,
+      `SELECT p.id, p.position_code, p.title,
+              CASE WHEN e.id IS NOT NULL THEN 'FILLED' WHEN p.status IN ('FROZEN','ABOLISHED') THEN p.status ELSE 'VACANT' END AS status,
+              p.parent_position_id,
               p.department_id,
               p.division_id,
               p.is_hod, p.funded, p.capacity,
               tg.grade_code, tg.grade_name,
               jp.job_title AS profile_title,
-              e.id AS employee_id, e.first_name, e.surname, e.employee_code,
+              e.id AS employee_id,
+              e.first_name, e.surname,
+              CASE WHEN e.id IS NOT NULL THEN TRIM(COALESCE(e.first_name,'') || ' ' || COALESCE(e.surname,'')) ELSE NULL END AS employee_name,
+              e.employee_code,
               e.email_address, e.cell_number, e.photo_url, e.joining_date,
               e.annual_salary, e.gender, e.race
        FROM positions p
@@ -611,6 +618,33 @@ async function snapshotPositionHistory(positionId, changeType, userId) {
   await dbQuery(`INSERT INTO position_history_snapshots (${allCols.join(',')}) VALUES (${ph})`, vals);
 }
 
+router.get('/scoa-expense-items', authenticate, async (req, res, next) => {
+  try {
+    const { employee_type_id } = req.query;
+    const typeId = parseInt(employee_type_id, 10);
+    const ROOT_DESCS = {
+      2: 'Expenditure:Employee Related Cost:Senior Management',
+      3: 'Expenditure:Remuneration of Councillors',
+      7: 'Expenditure:Employee Related Cost:Board Members of Entities',
+    };
+    const rootDesc = ROOT_DESCS[typeId];
+    if (!rootDesc) {
+      return res.json({ success: true, data: [] });
+    }
+    const result = await dbQuery(
+      `SELECT c.scoa_id AS id, c.scoa_code AS code, c.scoa_short_desc AS name, c.scoa_desc AS description
+       FROM scoa_structure_sync root
+       JOIN scoa_structure_sync c ON c.scoa_parent_id = root.scoa_id
+       WHERE root.scoa_desc = $1
+         AND (c.enabled IS NULL OR c.enabled = TRUE)
+         AND c.posting_level = TRUE
+       ORDER BY c.scoa_code`,
+      [rootDesc]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (err) { next(err); }
+});
+
 router.get('/lookups/positions-all', authenticate, async (req, res, next) => {
   try {
     const { getDivisions } = require('./department.routes');
@@ -664,7 +698,8 @@ router.get('/', authenticate, paginationMiddleware, async (req, res, next) => {
     const result = await dbQuery(
       `SELECT p.*, tg.grade_code, tg.grade_name,
               jp.job_title, et.name AS employee_type_name,
-              e.id AS incumbent_id, e.first_name AS incumbent_first_name, e.surname AS incumbent_surname
+              e.id AS incumbent_id, e.first_name AS incumbent_first_name, e.surname AS incumbent_surname,
+              CASE WHEN e.id IS NOT NULL THEN 'FILLED' WHEN p.status IN ('FROZEN','ABOLISHED') THEN p.status ELSE 'VACANT' END AS status
        FROM positions p
        LEFT JOIN task_grades tg ON p.task_grade_id = tg.id
        LEFT JOIN job_profiles jp ON p.job_profile_id = jp.id
@@ -697,7 +732,8 @@ router.get('/:id', authenticate, async (req, res, next) => {
               et.name AS employee_type_name, es.name AS employee_subtype_name,
               cos.name AS condition_of_service_name,
               stg.name AS salary_transaction_group_name, stg.code AS salary_transaction_group_code,
-              e.id AS incumbent_id, e.first_name AS incumbent_first_name, e.surname AS incumbent_surname, e.employee_code AS incumbent_code
+              e.id AS incumbent_id, e.first_name AS incumbent_first_name, e.surname AS incumbent_surname, e.employee_code AS incumbent_code,
+              CASE WHEN e.id IS NOT NULL THEN 'FILLED' WHEN p.status IN ('FROZEN','ABOLISHED') THEN p.status ELSE 'VACANT' END AS status
        FROM positions p
        LEFT JOIN task_grades tg ON p.task_grade_id = tg.id
        LEFT JOIN job_profiles jp ON p.job_profile_id = jp.id
@@ -714,6 +750,82 @@ router.get('/:id', authenticate, async (req, res, next) => {
     }
     await enrichSingle(result.rows[0]);
     res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/bulk', authenticate, async (req, res, next) => {
+  try {
+    const {
+      quantity,
+      position_code, title, department_id, division_id, job_profile_id,
+      parent_position_id, task_grade_id, employee_type_id, employee_subtype_id,
+      condition_of_service_id, is_hod, funded, capacity,
+      scoa_item_id, scoa_fund_id, scoa_function_id, scoa_function_meta, scoa_project_id,
+      scoa_region_id, scoa_costing_id, start_date, end_date,
+      unique_identifier, hierarchy_code, advert_ref, circular_number,
+      non_employee, performance_assessment, lock_fields, salary_transaction_group_id, manager_type,
+      upper_limit_value_type
+    } = req.body;
+
+    const qty = parseInt(quantity, 10);
+    if (!qty || qty < 1 || qty > 99) {
+      return res.status(400).json({ success: false, error: { message: 'Quantity must be between 1 and 99' } });
+    }
+
+    const params = [
+      position_code, title, department_id, division_id, job_profile_id,
+      parent_position_id, task_grade_id, employee_type_id, employee_subtype_id,
+      condition_of_service_id, is_hod || false, funded !== false, capacity || 1.00,
+      scoa_item_id, scoa_fund_id, scoa_function_id,
+      scoa_function_meta ? JSON.stringify(scoa_function_meta) : null, scoa_project_id,
+      scoa_region_id, scoa_costing_id, start_date || '1900-01-01', end_date || '9999-12-31',
+      unique_identifier || null, hierarchy_code || null, advert_ref || null, circular_number || null,
+      non_employee || false, performance_assessment || false, lock_fields || false,
+      salary_transaction_group_id || null, manager_type || 0,
+      upper_limit_value_type || null,
+      req.user?.id || 1
+    ];
+
+    const client = await (require('../config/database').pool.connect());
+    try {
+      await client.query('BEGIN');
+      const created = [];
+      for (let i = 0; i < qty; i++) {
+        const seq = String(i + 1).padStart(3, '0');
+        const rowCode = qty === 1 ? position_code : `${position_code}-${seq}`;
+        const rowParams = [rowCode, ...params.slice(1)];
+        const ins = await client.query(
+          `INSERT INTO positions (
+            position_code, title, department_id, division_id, job_profile_id,
+            parent_position_id, task_grade_id, employee_type_id, employee_subtype_id,
+            condition_of_service_id, is_hod, funded, capacity,
+            scoa_item_id, scoa_fund_id, scoa_function_id, scoa_function_meta, scoa_project_id,
+            scoa_region_id, scoa_costing_id, start_date, end_date,
+            unique_identifier, hierarchy_code, advert_ref, circular_number,
+            non_employee, performance_assessment, lock_fields, salary_transaction_group_id, manager_type,
+            upper_limit_value_type, created_by, updated_by
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$33) RETURNING *`,
+          rowParams
+        );
+        const pos = ins.rows[0];
+        const titledTitle = `${title} (${pos.id})`;
+        await client.query('UPDATE positions SET title = $1 WHERE id = $2', [titledTitle, pos.id]);
+        pos.title = titledTitle;
+        created.push(pos);
+      }
+      await client.query('COMMIT');
+      for (const pos of created) {
+        await snapshotPositionHistory(pos.id, 'CREATE', req.user?.id || 1);
+      }
+      res.status(201).json({ success: true, data: created });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     next(err);
   }
@@ -793,6 +905,28 @@ router.put('/:id', authenticate, auditLog('UPDATE', 'position'), async (req, res
     }
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ success: false, error: { code: 'NO_FIELDS', message: 'No valid fields to update' } });
+    }
+
+    if (updates.parent_position_id != null) {
+      const newParentId = Number(updates.parent_position_id);
+      const currentId = Number(req.params.id);
+      if (newParentId === currentId) {
+        return res.status(400).json({ success: false, error: { code: 'CIRCULAR_CHAIN', message: 'A position cannot report to itself' } });
+      }
+      const cycleCheck = await dbQuery(
+        `WITH RECURSIVE ancestors AS (
+           SELECT id, parent_position_id FROM positions WHERE id = $1
+           UNION ALL
+           SELECT p.id, p.parent_position_id
+           FROM positions p
+           INNER JOIN ancestors a ON p.id = a.parent_position_id
+         )
+         SELECT 1 FROM ancestors WHERE id = $2 LIMIT 1`,
+        [newParentId, currentId]
+      );
+      if (cycleCheck.rows.length > 0) {
+        return res.status(400).json({ success: false, error: { code: 'CIRCULAR_CHAIN', message: 'This selection would create a circular reporting chain' } });
+      }
     }
 
     const historyInserts = [];

@@ -1,0 +1,821 @@
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:12px">
+    <button mat-icon-button (click)="goBack()"><mat-icon>arrow_back</mat-icon></button>
+    @if (wo()) {
+      <div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <h1>{{wo().workOrderNumber || ('WO-' + woId)}}</h1>
+          <span class="status-badge" [class]="getStatusClass(wo().workOrderStatusId)">{{wo().workOrderStatusName || '—'}}</span>
+          @if (wo().priority) {
+            <span class="priority-badge" [class]="getPriorityClass(wo().priority)">{{wo().priority}}</span>
+          }
+        </div>
+        <p class="subtitle">{{wo().workOrderDesc}}</p>
+      </div>
+    } @else {
+      <h1>Work Order</h1>
+    }
+  </div>
+  @if (wo() && wo().workOrderStatusId !== 8) {
+    <div class="lifecycle-actions">
+      @if (wo().workOrderStatusId === 1) {
+        <button class="btn-action btn-submit" (click)="doSubmit()" [disabled]="lifecycleWorking()">
+          <mat-icon>send</mat-icon> Submit
+        </button>
+      }
+      @if (wo().workOrderStatusId === 2) {
+        <button class="btn-action btn-approve" (click)="openApproveDialog()" [disabled]="lifecycleWorking()">
+          <mat-icon>check_circle</mat-icon> Approve
+        </button>
+        <button class="btn-action btn-reject" (click)="openRejectDialog()" [disabled]="lifecycleWorking()">
+          <mat-icon>cancel</mat-icon> Reject
+        </button>
+      }
+      @if (wo().workOrderStatusId === 3 || wo().workOrderStatusId === 4) {
+        <button class="btn-action btn-start" (click)="doStart()" [disabled]="lifecycleWorking()">
+          <mat-icon>play_arrow</mat-icon> Start
+        </button>
+      }
+      @if (wo().workOrderStatusId === 5) {
+        <button class="btn-action btn-complete" (click)="openCompletePanel()" [disabled]="lifecycleWorking()">
+          <mat-icon>task_alt</mat-icon> Complete
+        </button>
+      }
+      @if (wo().workOrderStatusId === 6) {
+        <button class="btn-action btn-close" (click)="doClose()" [disabled]="lifecycleWorking()">
+          <mat-icon>lock</mat-icon> Close
+        </button>
+      }
+      @if (wo().workOrderStatusId !== 8 && wo().workOrderStatusId !== 7) {
+        <button class="btn-action btn-cancel" (click)="openCancelDialog()" [disabled]="lifecycleWorking()">
+          <mat-icon>block</mat-icon> Cancel
+        </button>
+      }
+    </div>
+  }
+</div>
+
+@if (loading()) {
+  <div class="loading-container">
+    <mat-spinner diameter="40"></mat-spinner>
+    <span>Loading work order...</span>
+  </div>
+} @else if (!wo()) {
+  <div class="empty-state">
+    <mat-icon>error_outline</mat-icon>
+    <h3>Work Order Not Found</h3>
+  </div>
+} @else {
+
+  <!-- Status Step Bar -->
+  @if (wo().workOrderStatusId !== 8) {
+    <div class="step-bar">
+      @for (stepId of STEP_ORDER; track stepId) {
+        <div class="step" [class]="getStepStatus(stepId)">
+          <div class="step-circle">
+            @if (getStepStatus(stepId) === 'done') {
+              <mat-icon>check</mat-icon>
+            } @else {
+              <span>{{$index + 1}}</span>
+            }
+          </div>
+          <span class="step-label">{{STATUS_ID_TO_NAME[stepId]}}</span>
+        </div>
+        @if ($index < STEP_ORDER.length - 1) {
+          <div class="step-connector" [class.done]="getStepStatus(stepId) === 'done'"></div>
+        }
+      }
+    </div>
+  } @else {
+    <div class="cancelled-bar"><mat-icon>block</mat-icon> CANCELLED — {{wo().cancelledReason}}</div>
+  }
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn" [class.active]="activeTab() === 'details'" (click)="setTab('details')">
+      <mat-icon>description</mat-icon> Details
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'scheduling'" (click)="setTab('scheduling')">
+      <mat-icon>schedule</mat-icon> Scheduling
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'financial'" (click)="setTab('financial')">
+      <mat-icon>account_balance</mat-icon> Financial / mSCOA
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'risk'" (click)="setTab('risk')">
+      <mat-icon>warning</mat-icon> Risk &amp; Compliance
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'lines'" (click)="setTab('lines')">
+      <mat-icon>list</mat-icon> Work Order Lines
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'assignments'" (click)="setTab('assignments')">
+      <mat-icon>people</mat-icon> Assignments
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'approvals'" (click)="setTab('approvals')">
+      <mat-icon>approval</mat-icon> Approvals
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'audit'" (click)="setTab('audit')">
+      <mat-icon>history</mat-icon> Audit Trail
+    </button>
+  </div>
+
+  <!-- ─── TAB: Details ────────────────────────────────── -->
+  @if (activeTab() === 'details') {
+    <div class="section-card">
+      <div class="section-title"><mat-icon>description</mat-icon> Core Details</div>
+      <div class="form-grid">
+
+        <!-- Asset Picker -->
+        <div class="form-group full-width">
+          <label>Linked Asset <span style="color:#c0392b;font-weight:700">*</span></label>
+          @if (wo().linkedPlanId) {
+            <!-- Plan-linked WO: restrict to plan assets only -->
+            @if (wo().assetRegisterItemId && !showPlanAssetPicker()) {
+              <div class="asset-chip-row">
+                <div class="asset-chip">
+                  <mat-icon style="font-size:16px;width:16px;height:16px">inventory_2</mat-icon>
+                  <span><strong>#{{wo().assetRegisterItemId}}</strong>
+                    @if (wo().assetDescription) { — {{wo().assetDescription}} }
+                    @if (wo().assetBarcode) { <em style="color:#888">[{{wo().assetBarcode}}]</em> }
+                  </span>
+                </div>
+                @if (wo().workOrderStatusId === 1) {
+                  <button class="btn-sm-link" (click)="showPlanAssetPicker.set(true)"><mat-icon>swap_horiz</mat-icon> Change</button>
+                }
+              </div>
+            }
+            @if (!wo().assetRegisterItemId || showPlanAssetPicker()) {
+              <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+                <select style="flex:1;padding:10px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" (change)="onPlanAssetSelect($event)" [disabled]="wo().workOrderStatusId !== 1">
+                  <option value="">— Select asset from plan —</option>
+                  @for (a of planAssets(); track a.assetRegisterItemId) {
+                    <option [value]="a.assetRegisterItemId" [selected]="a.assetRegisterItemId === wo().assetRegisterItemId">
+                      {{a.barcode ? a.barcode + ' — ' : ''}}{{a.description}}
+                    </option>
+                  }
+                </select>
+                @if (showPlanAssetPicker() && wo().assetRegisterItemId) {
+                  <button class="btn-sm-link" (click)="showPlanAssetPicker.set(false)">Cancel</button>
+                }
+              </div>
+              @if (wo().workOrderStatusId !== 1) {
+                <span style="font-size:12px;color:#888">Asset can only be changed in Draft status.</span>
+              } @else {
+                <span style="font-size:12px;color:#64748b">Only assets linked to the maintenance plan are available.</span>
+              }
+            }
+          } @else {
+            <!-- Non-plan WO: free-text all-asset search -->
+            @if (wo().assetRegisterItemId) {
+              <div class="asset-chip-row">
+                <div class="asset-chip">
+                  <mat-icon style="font-size:16px;width:16px;height:16px">inventory_2</mat-icon>
+                  <span><strong>#{{wo().assetRegisterItemId}}</strong>
+                    @if (wo().assetDescription) { — {{wo().assetDescription}} }
+                    @if (wo().assetBarcode) { <em style="color:#888">[{{wo().assetBarcode}}]</em> }
+                  </span>
+                </div>
+                @if (wo().workOrderStatusId === 1) {
+                  <button class="btn-sm-link" (click)="clearAsset()"><mat-icon>close</mat-icon> Change</button>
+                }
+              </div>
+            } @else {
+              <div class="asset-search-wrap" style="position:relative">
+                <input type="text" [(ngModel)]="assetSearch" (ngModelChange)="onAssetSearchChange()" placeholder="Type asset ID, barcode or description to search…" [disabled]="wo().workOrderStatusId !== 1">
+                @if (assetSearching()) {
+                  <div class="asset-dropdown"><div class="asset-option-loading"><mat-spinner diameter="14" style="display:inline-block"></mat-spinner> Searching…</div></div>
+                } @else if (showAssetResults() && assetResults().length > 0) {
+                  <div class="asset-dropdown">
+                    @for (a of assetResults(); track a.assetRegisterId || a.assetId) {
+                      <div class="asset-option" (click)="selectAsset(a)">
+                        <strong>#{{a.assetRegisterId || a.assetId}}</strong>
+                        @if (a.description || a.assetDescription) { — {{a.description || a.assetDescription}} }
+                        @if (a.barcode || a.assetBarcode) { <span style="color:#888;font-size:11px">[{{a.barcode || a.assetBarcode}}]</span> }
+                      </div>
+                    }
+                  </div>
+                } @else if (showAssetResults() && !assetSearching() && assetResults().length === 0) {
+                  <div class="asset-dropdown"><div class="asset-option-loading">No assets found.</div></div>
+                }
+              </div>
+              @if (wo().workOrderStatusId !== 1) {
+                <span style="font-size:12px;color:#888">Asset can only be changed in Draft status.</span>
+              }
+            }
+          }
+        </div>
+
+        <div class="form-group full-width">
+          <label>Description</label>
+          <textarea rows="2" [(ngModel)]="form.workOrderDesc"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Work Order Type</label>
+          <select [(ngModel)]="form.workOrderTypeId">
+            <option value="">Select type</option>
+            @for (t of woTypes(); track t.workOrderTypeId) {
+              <option [value]="t.workOrderTypeId">{{t.workOrderTypeDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Priority</label>
+          <select [(ngModel)]="form.priority">
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+            <option value="Critical">Critical</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Funding Segment</label>
+          <input type="text" [(ngModel)]="form.fundingSegment" placeholder="e.g. Operating / Capital">
+        </div>
+        <div class="form-group">
+          <label>Cost Centre</label>
+          <input type="text" [(ngModel)]="form.costCentre" placeholder="e.g. IDP-2024-A">
+        </div>
+      </div>
+
+      @if (wo().workOrderStatusId === 6 || wo().workOrderStatusId === 7) {
+        <div class="section-title mt-section"><mat-icon>task_alt</mat-icon> Completion Details</div>
+        <div class="form-grid">
+          <div class="form-group full-width">
+            <label>Completion Notes</label>
+            <textarea rows="2" [(ngModel)]="form.completionNotes" [readonly]="wo().workOrderStatusId === 7"></textarea>
+          </div>
+          <div class="form-group full-width">
+            <label>Root Cause</label>
+            <textarea rows="2" [(ngModel)]="form.rootCause" [readonly]="wo().workOrderStatusId === 7"></textarea>
+          </div>
+          <div class="form-group full-width">
+            <label>Recommendations</label>
+            <textarea rows="2" [(ngModel)]="form.recommendations" [readonly]="wo().workOrderStatusId === 7"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Actual Cost (R)</label>
+            <input type="number" [(ngModel)]="form.actualCost" [readonly]="wo().workOrderStatusId === 7">
+          </div>
+        </div>
+      }
+
+      <div class="form-actions">
+        <button class="btn-primary" (click)="saveDetails()" [disabled]="saving() || wo().workOrderStatusId === 7 || wo().workOrderStatusId === 8">
+          @if (saving()) { <mat-spinner diameter="16" style="display:inline-block"></mat-spinner> } Save Changes
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- ─── TAB: Scheduling ──────────────────────────── -->
+  @if (activeTab() === 'scheduling') {
+    <div class="section-card">
+      <div class="section-title"><mat-icon>schedule</mat-icon> Scheduling Information</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Planned Start Date</label>
+          <input type="date" [(ngModel)]="form.plannedStartDate">
+        </div>
+        <div class="form-group">
+          <label>Planned End Date</label>
+          <input type="date" [(ngModel)]="form.plannedEndDate">
+        </div>
+        <div class="form-group">
+          <label>Actual Start Date</label>
+          <input type="date" [(ngModel)]="form.actualStartDate" [readonly]="wo().workOrderStatusId < 5">
+        </div>
+        <div class="form-group">
+          <label>Actual End Date</label>
+          <input type="date" [(ngModel)]="form.actualEndDate" [readonly]="wo().workOrderStatusId < 6">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-primary" (click)="saveDetails()" [disabled]="saving() || wo().workOrderStatusId === 7 || wo().workOrderStatusId === 8">
+          @if (saving()) { <mat-spinner diameter="16" style="display:inline-block"></mat-spinner> } Save Dates
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- ─── TAB: Financial / mSCOA ───────────────────── -->
+  @if (activeTab() === 'financial') {
+    <div class="section-card">
+      <div class="section-title"><mat-icon>account_balance</mat-icon> Financial / mSCOA</div>
+      <div class="form-grid">
+        <div class="form-group full-width scoa-label"><strong>Debit Side</strong></div>
+        <div class="scoa-pair">
+          <div class="form-group">
+            <label>Debit Project</label>
+            <select [(ngModel)]="form.debitProjectId" (change)="onDebitProjectChange()">
+              <option [ngValue]="null">Select project</option>
+              @for (p of planProjects(); track p.projectId) {
+                <option [value]="p.projectId">{{p.projectCode}} — {{p.projectName}}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Debit SCOA Item</label>
+            <select [(ngModel)]="form.debitPlanProjectItemId">
+              <option [ngValue]="null">Select SCOA item</option>
+              @for (si of debitScoaItems(); track si.planProjectItemId) {
+                <option [value]="si.planProjectItemId">{{si.scoaDesc}}</option>
+              }
+            </select>
+          </div>
+        </div>
+        <div class="form-group full-width scoa-label"><strong>Credit Side</strong></div>
+        <div class="scoa-pair">
+          <div class="form-group">
+            <label>Credit Project</label>
+            <select [(ngModel)]="form.creditProjectId" (change)="onCreditProjectChange()">
+              <option [ngValue]="null">Select project</option>
+              @for (p of planProjects(); track p.projectId) {
+                <option [value]="p.projectId">{{p.projectCode}} — {{p.projectName}}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Credit SCOA Item</label>
+            <select [(ngModel)]="form.creditPlanProjectItemId">
+              <option [ngValue]="null">Select SCOA item</option>
+              @for (si of creditScoaItems(); track si.planProjectItemId) {
+                <option [value]="si.planProjectItemId">{{si.scoaDesc}}</option>
+              }
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-primary" (click)="saveDetails()" [disabled]="saving() || wo().workOrderStatusId === 7 || wo().workOrderStatusId === 8">
+          @if (saving()) { <mat-spinner diameter="16" style="display:inline-block"></mat-spinner> } Save Financial
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- ─── TAB: Risk & Compliance ───────────────────── -->
+  @if (activeTab() === 'risk') {
+    <div class="section-card">
+      <div class="section-title"><mat-icon>warning</mat-icon> Risk &amp; Compliance</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Risk Level</label>
+          <select [(ngModel)]="form.riskLevel">
+            <option value="">Select risk level</option>
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+            <option value="Critical">Critical</option>
+          </select>
+        </div>
+        <div class="form-group full-width">
+          <label>Safety Requirements</label>
+          <textarea rows="3" [(ngModel)]="form.safetyRequirements" placeholder="PPE requirements, lockout/tagout procedures, etc."></textarea>
+        </div>
+        <div class="form-group full-width">
+          <label>Environmental Impact</label>
+          <textarea rows="3" [(ngModel)]="form.environmentalImpact" placeholder="Potential environmental impacts and mitigations..."></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-primary" (click)="saveDetails()" [disabled]="saving() || wo().workOrderStatusId === 7 || wo().workOrderStatusId === 8">
+          @if (saving()) { <mat-spinner diameter="16" style="display:inline-block"></mat-spinner> } Save Risk Info
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- ─── TAB: Work Order Lines ─────────────────────── -->
+  @if (activeTab() === 'lines') {
+    <div class="section-card">
+      <div class="section-header-row">
+        <div class="section-title"><mat-icon>list</mat-icon> Work Order Lines</div>
+        @if (wo().workOrderStatusId < 7 && wo().workOrderStatusId !== 8) {
+          <div style="display:flex;gap:6px">
+            <button class="btn-type btn-labour" (click)="openAddDetail('Labour')"><mat-icon>person</mat-icon> + Labour</button>
+            <button class="btn-type btn-material" (click)="openAddDetail('Material')"><mat-icon>inventory_2</mat-icon> + Material</button>
+            <button class="btn-type btn-contractor" (click)="openAddDetail('Contractor')"><mat-icon>construction</mat-icon> + Contractor</button>
+          </div>
+        }
+      </div>
+
+      @if (showDetailForm()) {
+        <div class="inline-form">
+          <div class="inline-form-title">
+            @if (addingItemType === 'Labour') { <mat-icon>person</mat-icon> }
+            @if (addingItemType === 'Material') { <mat-icon>inventory_2</mat-icon> }
+            @if (addingItemType === 'Contractor') { <mat-icon>construction</mat-icon> }
+            {{editingDetail() ? 'Edit' : 'Add'}} {{addingItemType}} Line
+          </div>
+          <div class="form-grid">
+            <div class="form-group" style="display:none">
+              <label>Type</label>
+              <select [(ngModel)]="detailForm.itemType">
+                <option value="Labour">Labour</option>
+                <option value="Material">Material</option>
+                <option value="Contractor">Contractor / Service</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Description</label>
+              <input type="text" [(ngModel)]="detailForm.description" placeholder="Line item description">
+            </div>
+            <div class="form-group">
+              <label>Qty</label>
+              <input type="number" [(ngModel)]="detailForm.quantityOrdered" min="1">
+            </div>
+            <div class="form-group">
+              <label>Unit Cost (R)</label>
+              <input type="number" [(ngModel)]="detailForm.unitCost" step="0.01" placeholder="0.00">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn-secondary btn-sm" (click)="cancelDetailForm()">Cancel</button>
+            <button class="btn-primary btn-sm" (click)="saveDetail()">{{editingDetail() ? 'Update' : 'Add Line'}}</button>
+          </div>
+        </div>
+      }
+
+      @if (detailsLoading()) {
+        <div class="loading-sm"><mat-spinner diameter="24"></mat-spinner></div>
+      } @else if (details().length === 0) {
+        <div class="empty-inline"><mat-icon>list</mat-icon> No line items yet. Add Labour, Material or Service lines.</div>
+      } @else {
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Description</th>
+              <th style="text-align:right">Qty</th>
+              <th style="text-align:right">Unit Cost</th>
+              <th style="text-align:right">Total Cost</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (d of details(); track d.maintenanceWorksOrderDetailsId) {
+              <tr>
+                <td><span class="type-badge type-{{(d.itemType||'').toLowerCase().replace(' / contractor','').replace('service','service')}}">{{d.itemType}}</span></td>
+                <td>{{d.description || d.itemDesc || '—'}}</td>
+                <td style="text-align:right">{{d.quantityOrdered ?? '—'}}</td>
+                <td style="text-align:right">{{d.unitCost != null ? 'R ' + (d.unitCost | number:'1.2-2') : '—'}}</td>
+                <td style="text-align:right;font-weight:600">R {{detailTotal(d) | number:'1.2-2'}}</td>
+                <td>
+                  @if (wo().workOrderStatusId < 7 && wo().workOrderStatusId !== 8) {
+                    <button mat-icon-button class="action-btn-sm" (click)="editDetail(d)"><mat-icon>edit</mat-icon></button>
+                    <button mat-icon-button class="action-btn-sm danger" (click)="deleteDetail(d)"><mat-icon>delete</mat-icon></button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+          <tfoot>
+            @if (detailsLabourTotal > 0) {
+              <tr class="subtotal-row">
+                <td colspan="4" style="text-align:right;padding:6px 16px;font-size:12px;color:#64748b">Labour Subtotal</td>
+                <td style="text-align:right;padding:6px 16px;font-size:12px;color:#64748b">R {{detailsLabourTotal | number:'1.2-2'}}</td>
+                <td></td>
+              </tr>
+            }
+            @if (detailsMaterialTotal > 0) {
+              <tr class="subtotal-row">
+                <td colspan="4" style="text-align:right;padding:6px 16px;font-size:12px;color:#64748b">Material Subtotal</td>
+                <td style="text-align:right;padding:6px 16px;font-size:12px;color:#64748b">R {{detailsMaterialTotal | number:'1.2-2'}}</td>
+                <td></td>
+              </tr>
+            }
+            @if (detailsContractorTotal > 0) {
+              <tr class="subtotal-row">
+                <td colspan="4" style="text-align:right;padding:6px 16px;font-size:12px;color:#64748b">Contractor Subtotal</td>
+                <td style="text-align:right;padding:6px 16px;font-size:12px;color:#64748b">R {{detailsContractorTotal | number:'1.2-2'}}</td>
+                <td></td>
+              </tr>
+            }
+            <tr>
+              <td colspan="4" style="text-align:right;font-weight:600;padding:12px 16px;font-size:13px;border-top:2px solid #e2e8f0">Grand Total</td>
+              <td style="text-align:right;font-weight:700;color:#2563eb;padding:12px 16px;border-top:2px solid #e2e8f0">R {{detailsGrandTotal | number:'1.2-2'}}</td>
+              <td style="border-top:2px solid #e2e8f0"></td>
+            </tr>
+          </tfoot>
+        </table>
+      }
+    </div>
+  }
+
+  <!-- ─── TAB: Assignments ──────────────────────────── -->
+  @if (activeTab() === 'assignments') {
+    <div class="section-card">
+      <div class="section-header-row">
+        <div class="section-title"><mat-icon>people</mat-icon> Resource Assignments</div>
+        @if (wo().workOrderStatusId < 7 && wo().workOrderStatusId !== 8) {
+          <button class="btn-primary btn-sm" (click)="openAddAssignment()"><mat-icon>person_add</mat-icon> Add Assignment</button>
+        }
+      </div>
+
+      @if (showAssignmentForm()) {
+        <div class="inline-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Assignment Type</label>
+              <select [(ngModel)]="assignmentForm.assignmentType" (change)="assignmentForm.employeeId = null; assignmentForm.vendorId = null; assignmentForm.vendorName = ''">
+                <option value="Employee">Internal Employee</option>
+                <option value="Vendor">External Vendor / Contractor</option>
+              </select>
+            </div>
+            @if (assignmentForm.assignmentType === 'Employee') {
+              <div class="form-group full-width">
+                <label>Select Employee</label>
+                <app-employee-select
+                  [(ngModel)]="assignmentForm.employeeId"
+                  placeholder="-- Select Employee --"
+                ></app-employee-select>
+              </div>
+            } @else {
+              <div class="form-group">
+                <label>Vendor</label>
+                <select [(ngModel)]="assignmentForm.vendorId" (change)="onVendorSelect()">
+                  <option [ngValue]="null">Select vendor or enter below</option>
+                  @for (v of vendors(); track v.vendorId) {
+                    <option [value]="v.vendorId">{{v.vendorName}}</option>
+                  }
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Vendor Name (free text)</label>
+                <input type="text" [(ngModel)]="assignmentForm.vendorName" placeholder="Or type company / contractor name">
+              </div>
+            }
+            <div class="form-group">
+              <label>Role / Trade</label>
+              <input type="text" [(ngModel)]="assignmentForm.role" placeholder="e.g. Electrician, Plumber">
+            </div>
+            <div class="form-group">
+              <label>Hours Assigned</label>
+              <input type="number" [(ngModel)]="assignmentForm.hoursAssigned" step="0.5" placeholder="0">
+            </div>
+            <div class="form-group">
+              <label>Hours Worked</label>
+              <input type="number" [(ngModel)]="assignmentForm.hoursWorked" step="0.5" placeholder="0">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn-secondary btn-sm" (click)="cancelAssignmentForm()" [disabled]="assignmentSaving()">Cancel</button>
+            <button class="btn-primary btn-sm" (click)="saveAssignment()" [disabled]="assignmentSaving()">
+              @if (assignmentSaving()) { <mat-spinner diameter="14" style="display:inline-block"></mat-spinner> }
+              {{editingAssignment() ? 'Update' : 'Assign'}}
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (assignmentsLoading()) {
+        <div class="loading-sm"><mat-spinner diameter="24"></mat-spinner></div>
+      } @else if (assignments().length === 0) {
+        <div class="empty-inline"><mat-icon>people</mat-icon> No assignments yet. Assign employees or vendors to this work order.</div>
+      } @else {
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Name / ID</th>
+              <th>Role</th>
+              <th style="text-align:right">Hours Assigned</th>
+              <th style="text-align:right">Hours Worked</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (a of assignments(); track a.assignmentId) {
+              <tr>
+                <td><span class="type-badge type-{{a.employeeId ? 'labour' : 'service'}}">{{a.employeeId ? 'Employee' : 'Vendor'}}</span></td>
+                <td>{{a.employeeId ? employeeDisplayName(a.employeeId) : a.vendorName || '—'}}</td>
+                <td>{{a.role || '—'}}</td>
+                <td style="text-align:right">{{a.hoursAssigned ?? '—'}}</td>
+                <td style="text-align:right">{{a.hoursWorked ?? '—'}}</td>
+                <td>
+                  @if (wo().workOrderStatusId < 7 && wo().workOrderStatusId !== 8) {
+                    <button mat-icon-button class="action-btn-sm" (click)="editAssignment(a)"><mat-icon>edit</mat-icon></button>
+                    <button mat-icon-button class="action-btn-sm danger" (click)="deleteAssignment(a)"><mat-icon>delete</mat-icon></button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  }
+
+  <!-- ─── TAB: Approvals ────────────────────────────── -->
+  @if (activeTab() === 'approvals') {
+    <div class="section-card">
+      <div class="section-header-row">
+        <div class="section-title"><mat-icon>approval</mat-icon> Approvals Timeline</div>
+        @if (wo().workOrderStatusId === 2) {
+          <div style="display:flex;gap:8px">
+            <button class="btn-action btn-approve" (click)="openApproveDialog()"><mat-icon>check_circle</mat-icon> Approve</button>
+            <button class="btn-action btn-reject" (click)="openRejectDialog()"><mat-icon>cancel</mat-icon> Reject</button>
+          </div>
+        }
+      </div>
+
+      @if (approvalsLoading()) {
+        <div class="loading-sm"><mat-spinner diameter="24"></mat-spinner></div>
+      } @else if (approvals().length === 0) {
+        <div class="empty-inline"><mat-icon>approval</mat-icon> No approval records yet.</div>
+      } @else {
+        <div class="timeline">
+          @for (a of approvals(); track a.approvalId) {
+            <div class="timeline-item">
+              <div class="timeline-dot" [class]="getApprovalClass(a.approvalStatus)"></div>
+              <div class="timeline-content">
+                <div class="timeline-header">
+                  <span class="approval-level-badge">Level {{a.approvalLevel}}</span>
+                  @if (a.approverRole) {
+                    <span class="approval-role-badge">{{a.approverRole}}</span>
+                  }
+                  <span class="approval-status-badge" [class]="getApprovalClass(a.approvalStatus)">{{a.approvalStatus}}</span>
+                  <span class="timeline-date">{{formatDateTime(a.approvalDate)}}</span>
+                </div>
+                @if (a.approvedBy || a.approverName) {
+                  <p class="timeline-approver"><mat-icon style="font-size:13px;width:13px;height:13px;vertical-align:middle">person</mat-icon> {{a.approvedBy || a.approverName}}</p>
+                }
+                @if (a.comments) {
+                  <p class="timeline-comments">"{{a.comments}}"</p>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ─── TAB: Audit Trail ──────────────────────────── -->
+  @if (activeTab() === 'audit') {
+    <div class="section-card">
+      <div class="section-title"><mat-icon>history</mat-icon> Audit Trail</div>
+      @if (auditLoading()) {
+        <div class="loading-sm"><mat-spinner diameter="24"></mat-spinner></div>
+      } @else if (auditTrail().length === 0) {
+        <div class="empty-inline"><mat-icon>history</mat-icon> No audit records.</div>
+      } @else {
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Changed By</th>
+              <th>Action</th>
+              <th>Field</th>
+              <th>Old Value</th>
+              <th>New Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (a of auditTrail(); track a.auditId) {
+              <tr>
+                <td class="audit-ts">{{formatDateTime(a.changedAt)}}</td>
+                <td>{{a.changedBy || a.modifiedBy || a.userName || '—'}}</td>
+                <td><span class="audit-action">{{a.action}}</span></td>
+                <td>{{a.fieldName || '—'}}</td>
+                <td class="old-val">{{a.oldValue || '—'}}</td>
+                <td class="new-val">{{a.newValue || '—'}}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  }
+
+  <!-- ─── Complete Panel (modal) ───────────────────── -->
+  @if (showCompletePanel()) {
+    <div class="modal-backdrop" (click)="showCompletePanel.set(false)"></div>
+    <div class="modal-panel">
+      <div class="modal-header">
+        <h3><mat-icon>task_alt</mat-icon> Complete Work Order</h3>
+        <button mat-icon-button (click)="showCompletePanel.set(false)"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group full-width">
+          <label>Completion Notes *</label>
+          <textarea rows="3" [(ngModel)]="completionForm.completionNotes" placeholder="Describe what was done..."></textarea>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label>Completion Date</label>
+            <input type="date" [(ngModel)]="completionForm.completionDate">
+          </div>
+          <div class="form-group">
+            <label>Actual Cost (R)</label>
+            <input type="number" [(ngModel)]="completionForm.actualCost" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+        <div class="form-group full-width">
+          <label>Root Cause</label>
+          <textarea rows="2" [(ngModel)]="completionForm.rootCause" placeholder="What caused the issue?"></textarea>
+        </div>
+        <div class="form-group full-width">
+          <label>Recommendations</label>
+          <textarea rows="2" [(ngModel)]="completionForm.recommendations" placeholder="Preventive actions or follow-up recommendations..."></textarea>
+        </div>
+        <div class="form-group">
+          <label style="flex-direction:row;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" [(ngModel)]="completionForm.followUpRequired"> Follow-up Required
+          </label>
+        </div>
+        @if (completionForm.followUpRequired) {
+          <div class="form-group full-width">
+            <label>Follow-up Description *</label>
+            <textarea rows="2" [(ngModel)]="completionForm.followUpDescription" placeholder="Describe the required follow-up action..."></textarea>
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" (click)="showCompletePanel.set(false)" [disabled]="completingSaving()">Cancel</button>
+        <button class="btn-primary" (click)="submitCompletion()" [disabled]="completingSaving()">
+          @if (completingSaving()) { <mat-spinner diameter="16" style="display:inline-block"></mat-spinner> } Mark as Completed
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- ─── Approve Dialog ────────────────────────────── -->
+  @if (showApproveDialog()) {
+    <div class="modal-backdrop" (click)="showApproveDialog.set(false)"></div>
+    <div class="modal-panel modal-sm">
+      <div class="modal-header">
+        <h3><mat-icon>check_circle</mat-icon> Approve Work Order</h3>
+        <button mat-icon-button (click)="showApproveDialog.set(false)"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="modal-body">
+        <div class="approval-level-info">
+          <mat-icon>verified</mat-icon>
+          Approving at <strong>Level {{approvalForm.approvalLevel}}</strong>
+          <span class="level-hint">(next required level)</span>
+        </div>
+        <div class="form-group">
+          <label>Comments (optional)</label>
+          <textarea rows="2" [(ngModel)]="approvalForm.comments"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" (click)="showApproveDialog.set(false)" [disabled]="approvalSaving()">Cancel</button>
+        <button class="btn-action btn-approve" (click)="submitApproval()" [disabled]="approvalSaving()">
+          @if (approvalSaving()) { <mat-spinner diameter="14" style="display:inline-block"></mat-spinner> } Approve
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- ─── Reject Dialog ─────────────────────────────── -->
+  @if (showRejectDialog()) {
+    <div class="modal-backdrop" (click)="showRejectDialog.set(false)"></div>
+    <div class="modal-panel modal-sm">
+      <div class="modal-header">
+        <h3><mat-icon>cancel</mat-icon> Reject Work Order</h3>
+        <button mat-icon-button (click)="showRejectDialog.set(false)"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="modal-body">
+        <div class="approval-level-info">
+          <mat-icon>cancel</mat-icon>
+          Rejecting at <strong>Level {{approvalForm.approvalLevel}}</strong>
+          <span class="level-hint">(next required level)</span>
+        </div>
+        <div class="form-group">
+          <label>Rejection Reason *</label>
+          <textarea rows="3" [(ngModel)]="approvalForm.comments" placeholder="Explain why this work order is being rejected..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" (click)="showRejectDialog.set(false)" [disabled]="approvalSaving()">Cancel</button>
+        <button class="btn-action btn-reject" (click)="submitRejection()" [disabled]="approvalSaving()">
+          @if (approvalSaving()) { <mat-spinner diameter="14" style="display:inline-block"></mat-spinner> } Reject
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- ─── Cancel Dialog ─────────────────────────────── -->
+  @if (showCancelDialog()) {
+    <div class="modal-backdrop" (click)="showCancelDialog.set(false)"></div>
+    <div class="modal-panel modal-sm">
+      <div class="modal-header">
+        <h3><mat-icon>block</mat-icon> Cancel Work Order</h3>
+        <button mat-icon-button (click)="showCancelDialog.set(false)"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Cancellation Reason *</label>
+          <textarea rows="3" [(ngModel)]="cancelForm.cancelledReason" placeholder="Why is this work order being cancelled?"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" (click)="showCancelDialog.set(false)" [disabled]="cancellingSaving()">Cancel</button>
+        <button class="btn-action btn-cancel" (click)="submitCancel()" [disabled]="cancellingSaving()">
+          @if (cancellingSaving()) { <mat-spinner diameter="14" style="display:inline-block"></mat-spinner> } Confirm Cancel
+        </button>
+      </div>
+    </div>
+  }
+
+}

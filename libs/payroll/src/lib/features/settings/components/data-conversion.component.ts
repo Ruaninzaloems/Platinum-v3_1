@@ -8,6 +8,7 @@ import { UiService } from '../../../core/services/ui.service';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './data-conversion.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './data-conversion.component.css'
 })
 export class DataConversionComponent implements OnInit {

@@ -39,85 +39,44 @@
           <div class="form-card">
             <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
               <mat-icon style="color:#3b82f6;font-size:20px">business</mat-icon> Municipality Details
-              @if (!editingSettings()) {
-                <button mat-stroked-button style="margin-left:auto;font-size:12px;min-height:30px;padding:0 12px" (click)="startEditSettings()">
-                  <mat-icon style="font-size:16px;margin-right:4px">edit</mat-icon> Edit
-                </button>
-              }
             </h3>
-            @if (!editingSettings()) {
-              <div class="detail-grid">
-                <div class="detail-field"><label>Municipality</label><span>{{settings().municipality_name}}</span></div>
-                <div class="detail-field"><label>Financial Year</label><span>{{settings().financial_year}}</span></div>
-                <div class="detail-field"><label>Current Period</label><span class="status-badge status-active">Period {{getCurrentPeriodMonth()}} ({{getCurrentPeriodMonthName()}})</span></div>
-                <div class="detail-field"><label>mSCOA Enabled</label><span class="status-badge status-active">{{settings().mscoa_enabled ? 'Yes' : 'No'}}</span></div>
-                <div class="detail-field"><label>Measurement Model</label><span>{{settings().measurement_model || 'Cost'}} Model</span></div>
-                <div class="detail-field"><label>Approval Method</label><span class="status-badge" [class]="settings().approval_method === 'Automated' ? 'status-approved' : 'status-active'">{{settings().approval_method || 'Manual'}}</span></div>
-              </div>
-            } @else {
-              <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                <div class="form-field">
-                  <label>Municipality Name</label>
-                  <input type="text" [(ngModel)]="settingsForm.municipality_name" class="form-input">
-                </div>
-                <div class="form-field">
-                  <label>Financial Year</label>
-                  <select [(ngModel)]="settingsForm.financial_year" class="form-input">
-                    @for (fy of financialYearOptions; track fy) {
-                      <option [value]="fy">{{fy}}</option>
-                    }
-                  </select>
-                </div>
-                <div class="form-field">
-                  <label>Current Period (Month in FY)</label>
-                  <select [(ngModel)]="settingsForm.current_period_month" class="form-input">
-                    @for (pm of periodMonths; track pm.value) {
-                      <option [value]="pm.value">Period {{pm.value}} — {{pm.label}}</option>
-                    }
-                  </select>
-                </div>
-                <div class="form-field">
-                  <label>Measurement Model</label>
-                  <select [(ngModel)]="settingsForm.measurement_model" class="form-input">
-                    <option value="Cost">Cost Model</option>
-                    <option value="Revaluation">Revaluation Model</option>
-                    <option value="Mixed">Mixed Model</option>
-                  </select>
-                </div>
-                <div class="form-field">
-                  <label>mSCOA Enabled</label>
-                  <select [(ngModel)]="settingsForm.mscoa_enabled" class="form-input">
-                    <option [ngValue]="true">Yes</option>
-                    <option [ngValue]="false">No</option>
-                  </select>
-                </div>
-                <div class="form-field">
-                  <label>Approval Method</label>
-                  <select [(ngModel)]="settingsForm.approval_method" class="form-input">
-                    <option value="Manual">Manual — User approves each transaction</option>
-                    <option value="Automated">Automated — Month-End bulk processing</option>
-                  </select>
-                </div>
-              </div>
-              <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
-                <button mat-stroked-button (click)="editingSettings.set(false)" style="font-size:13px">Cancel</button>
-                <button mat-flat-button color="primary" (click)="saveSettings()" [disabled]="savingSettings()" style="font-size:13px">
-                  @if (savingSettings()) { Saving... } @else { Save Changes }
-                </button>
-              </div>
-              @if (settingsSaved()) {
-                <div style="margin-top:12px;padding:8px 12px;background:#f0fdf4;color:#16a34a;border-radius:6px;font-size:13px;display:flex;align-items:center;gap:6px">
-                  <mat-icon style="font-size:16px">check_circle</mat-icon> Settings saved successfully
-                </div>
-              }
-            }
+            <div class="detail-grid">
+              <div class="detail-field"><label>Municipality</label><span>{{settings().municipality_name}}</span></div>
+              <div class="detail-field"><label>Financial Year</label><span>{{settings().financial_year}}</span></div>
+              <div class="detail-field"><label>Current Period</label><span class="status-badge status-active">Period {{getCurrentPeriodMonth()}} ({{getCurrentPeriodMonthName()}})</span></div>
+              <div class="detail-field"><label>mSCOA Enabled</label><span class="status-badge status-active">{{settings().mscoa_enabled ? 'Yes' : 'No'}}</span></div>
+              <div class="detail-field"><label>Measurement Model</label><span>{{settings().measurement_model || 'Cost'}} Model</span></div>
+              <div class="detail-field"><label>Approval Method</label><span class="status-badge" [class]="settings().approval_method === 'Automated' ? 'status-approved' : 'status-active'">{{settings().approval_method || 'Manual'}}</span></div>
+              <div class="detail-field"><label>GL Use Inbox</label><span class="status-badge" [class]="glUseInbox() ? 'status-active' : 'status-pending'">{{glUseInbox() ? 'Yes — Write via Outbox' : 'No — Direct to SQL Server'}}</span></div>
+            </div>
           </div>
           <div class="form-card">
             <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
               <mat-icon style="color:#10b981;font-size:20px">settings</mat-icon> Configuration
             </h3>
             <div class="detail-grid">
-              <div class="detail-field"><label>Measurement Model</label><span class="status-badge status-active">{{settings().measurement_model || 'Mixed'}}</span></div>
+              <div class="detail-field" style="grid-column:1/-1">
+                <label>Measurement Model</label>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <select [ngModel]="measurementModel()" (ngModelChange)="measurementModel.set($event)" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;background:#fff;cursor:pointer">
+                    <option value="Cost">Cost Model</option>
+                    <option value="Revaluation">Revaluation Model</option>
+                    <option value="Mixed">Mixed Model</option>
+                  </select>
+                  <button mat-stroked-button color="primary" (click)="saveMeasurementModel()" [disabled]="savingMeasurementModel()" style="font-size:12px;height:32px;line-height:32px">
+                    @if (savingMeasurementModel()) { <span>Saving…</span> } @else { <span>Save</span> }
+                  </button>
+                  @if (measurementModelSaved()) { <span style="color:#16a34a;font-size:12px">Saved</span> }
+                  @if (measurementModelError()) {
+                    <span style="color:#dc2626;font-size:12px">{{measurementModelError()}}</span>
+                  }
+                  @if (pendingTargetModel()) {
+                    <button mat-stroked-button (click)="openBulkFix()" style="font-size:12px;height:28px;line-height:28px;color:#b45309;border-color:#fbbf24;background:#fffbeb;margin-left:4px">
+                      <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">build</mat-icon> Review &amp; Fix
+                    </button>
+                  }
+                </div>
+              </div>
               @if (settings().settings) {
                 <div class="detail-field"><label>Province</label><span>{{settings().settings.province}}</span></div>
                 <div class="detail-field"><label>Municipality Code</label><span>{{settings().settings.municipality_code}}</span></div>
@@ -186,80 +145,148 @@
   <mat-tab label="Data Sources">
     <div style="padding:20px">
 
-      @if (dbToggle.activeBackend() === 'postgresql') {
-        <div style="margin-bottom:20px;padding:12px 16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;display:flex;align-items:flex-start;gap:10px">
-          <mat-icon style="color:#2563eb;font-size:20px;margin-top:1px">info</mat-icon>
-          <span style="font-size:13px;color:#1e40af">
-            These settings only apply when the global database mode is SQL Server. In PostgreSQL mode all tables are served from the PostgreSQL API.
-          </span>
-        </div>
-      }
-
-      <div style="margin-bottom:24px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
+      <div style="margin-bottom:20px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
         <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 4px;display:flex;align-items:center;gap:8px">
-          <mat-icon style="color:#3b82f6;font-size:20px">storage</mat-icon> Global Data Source
+          <mat-icon style="color:#3b82f6;font-size:20px">storage</mat-icon> Database Mode
         </h3>
-        <p style="font-size:13px;color:#64748b;margin:0 0 14px">Select the default database backend for all shared tables. Individual tables can override this setting below when SQL Server mode is active.</p>
-        <div style="display:flex;gap:10px;align-items:center">
+        <p style="font-size:13px;color:#64748b;margin:0 0 14px">Choose how API calls are routed. PostgreSQL and SQL Server use a single backend exclusively. Hybrid uses SQL Server by default with optional per-table overrides.</p>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <button mat-flat-button
-            [style]="dbToggle.activeBackend() === 'postgresql' ? 'background:#16a34a;color:white;min-width:160px' : 'background:#e2e8f0;color:#475569;min-width:160px'"
+            [style]="dbToggle.activeBackend() === 'postgresql' ? 'background:#16a34a;color:white;min-width:140px' : 'background:#e2e8f0;color:#475569;min-width:140px'"
             (click)="setGlobalBackend('postgresql')">
             <mat-icon>dataset</mat-icon> PostgreSQL
           </button>
           <button mat-flat-button
-            [style]="dbToggle.activeBackend() === 'sqlserver' ? 'background:#0f2b46;color:white;min-width:160px' : 'background:#e2e8f0;color:#475569;min-width:160px'"
+            [style]="dbToggle.activeBackend() === 'sqlserver' ? 'background:#0f2b46;color:white;min-width:140px' : 'background:#e2e8f0;color:#475569;min-width:140px'"
             (click)="setGlobalBackend('sqlserver')">
             <mat-icon>dns</mat-icon> SQL Server
           </button>
-          <span style="font-size:13px;color:#64748b;margin-left:8px">
-            Active: <strong>{{dbToggle.activeBackend() === 'postgresql' ? 'PostgreSQL (PSQL API)' : 'SQL Server (ASSETS-API)'}}</strong>
+          <button mat-flat-button
+            [style]="dbToggle.activeBackend() === 'hybrid' ? 'background:#92400e;color:white;min-width:140px' : 'background:#e2e8f0;color:#475569;min-width:140px'"
+            (click)="setGlobalBackend('hybrid')">
+            <mat-icon>merge_type</mat-icon> Hybrid
+          </button>
+          <span style="font-size:13px;color:#64748b;margin-left:4px">
+            @if (dbToggle.activeBackend() === 'postgresql') { Active: <strong>PostgreSQL — all calls use /api</strong> }
+            @else if (dbToggle.activeBackend() === 'sqlserver') { Active: <strong>SQL Server — all calls use /ASSETS-API</strong> }
+            @else { Active: <strong>Hybrid — SQL Server default, per-table overrides apply</strong> }
           </span>
         </div>
       </div>
 
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <div>
-          <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 2px">Per-Table Data Source</h3>
-          <p style="font-size:13px;color:#64748b;margin:0">When SQL Server mode is active, individual tables can be routed to PostgreSQL or SQL Server.</p>
+      <div style="margin-bottom:20px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
+        <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 12px;display:flex;align-items:center;gap:8px">
+          <mat-icon style="color:#10b981;font-size:20px">account_balance</mat-icon> GL Settings
+        </h3>
+        <div style="margin-bottom:12px;padding:12px 16px;background:white;border:1px solid #e2e8f0;border-radius:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:2px">GL Use Inbox</div>
+            <div style="font-size:12px;color:#64748b">When disabled, general ledger entries post directly to SQL Server <code style="font-size:11px;background:#f1f5f9;padding:1px 4px;border-radius:3px">Led_GeneralLedger</code>, bypassing the outbox queue.</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <select
+              [ngModel]="glUseInbox()"
+              (ngModelChange)="glUseInbox.set($event)"
+              style="font-size:12px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;color:#374151;background:white">
+              <option [ngValue]="true">Yes — Write via GL Outbox (recommended)</option>
+              <option [ngValue]="false">No — Post directly to Led_GeneralLedger</option>
+            </select>
+            <button mat-flat-button color="primary" (click)="saveGlUseInbox()" [disabled]="savingGlUseInbox()" style="font-size:12px;min-height:32px;padding:0 12px">
+              @if (savingGlUseInbox()) { Saving... } @else { Save }
+            </button>
+            @if (glUseInboxSaved()) {
+              <span style="font-size:12px;color:#16a34a;display:flex;align-items:center;gap:4px">
+                <mat-icon style="font-size:14px;width:14px;height:14px">check_circle</mat-icon> Saved
+              </span>
+            }
+          </div>
         </div>
-        @if (dbToggle.activeBackend() === 'sqlserver') {
+        <div style="padding:12px 16px;background:white;border:1px solid #e2e8f0;border-radius:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:2px">GL Led Target</div>
+            <div style="font-size:12px;color:#64748b">Choose where GL journal entries are written: PostgreSQL <code style="font-size:11px;background:#f1f5f9;padding:1px 4px;border-radius:3px">Led_GeneralLedger</code>, SQL Server, or both simultaneously.</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <select
+              [ngModel]="glLedTarget()"
+              (ngModelChange)="glLedTarget.set($event)"
+              style="font-size:12px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;color:#374151;background:white">
+              <option value="postgresql">PostgreSQL only</option>
+              <option value="sqlserver">SQL Server only</option>
+              <option value="both">Both (PostgreSQL + SQL Server)</option>
+            </select>
+            <button mat-flat-button color="primary" (click)="saveGlLedTarget()" [disabled]="savingGlLedTarget()" style="font-size:12px;min-height:32px;padding:0 12px">
+              @if (savingGlLedTarget()) { Saving... } @else { Save }
+            </button>
+            @if (glLedTargetSaved()) {
+              <span style="font-size:12px;color:#16a34a;display:flex;align-items:center;gap:4px">
+                <mat-icon style="font-size:14px;width:14px;height:14px">check_circle</mat-icon> Saved
+              </span>
+            }
+          </div>
+        </div>
+        <div style="padding:12px 16px;background:white;border:1px solid #e2e8f0;border-radius:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px">
+          <div style="flex:1;min-width:200px">
+            <div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:2px">mSCOA Use Department / Division</div>
+            <div style="font-size:12px;color:#64748b">When enabled, mSCOA configuration, depreciation lookups, GL validation, and the mSCOA config screen all filter by Department and Division. Disable to remove Department/Division from all mSCOA logic.</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <select
+              [ngModel]="mscoaUseDeptDivision()"
+              (ngModelChange)="mscoaUseDeptDivision.set($event)"
+              style="font-size:12px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;color:#374151;background:white">
+              <option [ngValue]="true">Yes — Include Department &amp; Division</option>
+              <option [ngValue]="false">No — Exclude Department &amp; Division</option>
+            </select>
+            <button mat-flat-button color="primary" (click)="saveMscoaUseDeptDivision()" [disabled]="savingMscoaUseDeptDivision()" style="font-size:12px;min-height:32px;padding:0 12px">
+              @if (savingMscoaUseDeptDivision()) { Saving... } @else { Save }
+            </button>
+            @if (mscoaUseDeptDivisionSaved()) {
+              <span style="font-size:12px;color:#16a34a;display:flex;align-items:center;gap:4px">
+                <mat-icon style="font-size:14px;width:14px;height:14px">check_circle</mat-icon> Saved
+              </span>
+            }
+          </div>
+        </div>
+      </div>
+
+      @if (dbToggle.activeBackend() === 'hybrid') {
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div>
+            <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 2px">Per-Table Data Source Overrides</h3>
+            <p style="font-size:13px;color:#64748b;margin:0">In Hybrid mode, individual tables can be routed to PostgreSQL or SQL Server independently.</p>
+          </div>
           <button mat-stroked-button (click)="resetAllTableSources()" style="font-size:12px;color:#dc2626;border-color:#fecaca">
             <mat-icon style="font-size:16px">refresh</mat-icon> Reset All
           </button>
-        }
-      </div>
+        </div>
 
-      @for (category of tableCategories; track category) {
-        <div style="margin-bottom:20px">
-          <h4 style="font-size:13px;font-weight:600;color:#64748b;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px">
-            <span style="width:6px;height:6px;border-radius:50%;background:#94a3b8;display:inline-block"></span>
-            {{category}}
-          </h4>
-          <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
-            <table style="width:100%;border-collapse:collapse">
-              <thead>
-                <tr style="background:#f8fafc">
-                  <th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0">Table</th>
-                  <th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0">Description</th>
-                  <th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0">Data Source</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (table of getTablesInCategory(category); track table.key) {
-                  <tr [style]="(dbToggle.activeBackend() === 'sqlserver' && hasOverride(table.key)) ? 'background:#fefce8;border-bottom:1px solid #f1f5f9' : 'background:white;border-bottom:1px solid #f1f5f9'">
-                    <td style="padding:10px 12px;font-size:12px;color:#64748b;font-family:monospace">{{table.sqlTable}}</td>
-                    <td style="padding:10px 12px">
-                      <span style="font-size:13px;font-weight:500;color:#1e293b">{{table.label}}</span>
-                      @if (dbToggle.activeBackend() === 'sqlserver' && hasOverride(table.key)) {
-                        <span style="margin-left:6px;font-size:10px;background:#fef08a;color:#854d0e;padding:1px 6px;border-radius:4px;font-weight:600">OVERRIDE</span>
-                      }
-                    </td>
-                    <td style="padding:10px 12px">
-                      @if (dbToggle.activeBackend() === 'postgresql') {
-                        <span style="font-size:12px;padding:2px 10px;background:#dcfce7;color:#16a34a;border-radius:12px;font-weight:500;display:inline-flex;align-items:center;gap:4px">
-                          <mat-icon style="font-size:14px;width:14px;height:14px">lock</mat-icon> PostgreSQL (global)
-                        </span>
-                      } @else {
+        @for (category of tableCategories; track category) {
+          <div style="margin-bottom:20px">
+            <h4 style="font-size:13px;font-weight:600;color:#64748b;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px">
+              <span style="width:6px;height:6px;border-radius:50%;background:#94a3b8;display:inline-block"></span>
+              {{category}}
+            </h4>
+            <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+              <table style="width:100%;border-collapse:collapse">
+                <thead>
+                  <tr style="background:#f8fafc">
+                    <th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0">Table</th>
+                    <th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0">Description</th>
+                    <th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0">Data Source</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (table of getTablesInCategory(category); track table.key) {
+                    <tr [style]="hasOverride(table.key) ? 'background:#fefce8;border-bottom:1px solid #f1f5f9' : 'background:white;border-bottom:1px solid #f1f5f9'">
+                      <td style="padding:10px 12px;font-size:12px;color:#64748b;font-family:monospace">{{table.sqlTable}}</td>
+                      <td style="padding:10px 12px">
+                        <span style="font-size:13px;font-weight:500;color:#1e293b">{{table.label}}</span>
+                        @if (hasOverride(table.key)) {
+                          <span style="margin-left:6px;font-size:10px;background:#fef08a;color:#854d0e;padding:1px 6px;border-radius:4px;font-weight:600">OVERRIDE</span>
+                        }
+                      </td>
+                      <td style="padding:10px 12px">
                         <select
                           [ngModel]="hasOverride(table.key) ? getEffectiveBackend(table.key) : 'inherit'"
                           (ngModelChange)="setTableSource(table.key, $event)"
@@ -268,16 +295,300 @@
                           <option value="postgresql">PostgreSQL</option>
                           <option value="sqlserver">SQL Server</option>
                         </select>
-                      }
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
           </div>
+        }
+      } @else {
+        <div style="padding:16px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;display:flex;align-items:flex-start;gap:10px">
+          <mat-icon style="color:#64748b;font-size:20px;margin-top:1px">info</mat-icon>
+          <span style="font-size:13px;color:#475569">
+            Per-table data source overrides are only available in <strong>Hybrid</strong> mode. Switch to Hybrid to configure individual table routing.
+          </span>
         </div>
       }
     </div>
   </mat-tab>
 
+  <mat-tab label="Email Settings">
+    <div style="padding:20px">
+      <div style="margin-bottom:20px">
+        <h3 style="font-size:16px;font-weight:600;color:#1e293b;margin:0 0 4px;display:flex;align-items:center;gap:8px">
+          <mat-icon style="color:#0f2b46;font-size:20px">email</mat-icon> SMTP Configuration
+        </h3>
+        <p style="font-size:13px;color:#64748b;margin:0 0 16px">Configure the outgoing mail server for approval notification emails.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">SMTP Host</label>
+            <input [ngModel]="emailSettingsForm.smtp_host" (ngModelChange)="emailSettingsForm.smtp_host = $event" placeholder="smtp.example.com" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box" />
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">SMTP Port</label>
+            <input type="number" [ngModel]="emailSettingsForm.smtp_port" (ngModelChange)="emailSettingsForm.smtp_port = $event" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box" />
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">From Name</label>
+            <input [ngModel]="emailSettingsForm.from_name" (ngModelChange)="emailSettingsForm.from_name = $event" placeholder="Asset Management System" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box" />
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">From Email</label>
+            <input [ngModel]="emailSettingsForm.from_email" (ngModelChange)="emailSettingsForm.from_email = $event" placeholder="noreply@municipality.gov.za" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box" />
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">SMTP Username</label>
+            <input [ngModel]="emailSettingsForm.smtp_username" (ngModelChange)="emailSettingsForm.smtp_username = $event" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box" />
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">SMTP Password</label>
+            <input type="password" [ngModel]="emailSettingsForm.smtp_password" (ngModelChange)="emailSettingsForm.smtp_password = $event" placeholder="Leave blank to keep current" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box" />
+          </div>
+        </div>
+        <div style="margin-top:14px;display:flex;align-items:center;gap:8px">
+          <mat-slide-toggle [checked]="emailSettingsForm.use_tls === 1" (change)="emailSettingsForm.use_tls = $event.checked ? 1 : 0">
+            Use TLS / SSL
+          </mat-slide-toggle>
+        </div>
+        <div style="margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button mat-flat-button color="primary" (click)="saveEmailSettings()" [disabled]="savingEmailSettings()" style="font-size:13px">
+            <mat-icon style="font-size:16px;margin-right:4px">save</mat-icon>
+            @if (savingEmailSettings()) { Saving... } @else { Save Settings }
+          </button>
+          @if (emailSettingsSaved()) {
+            <span style="font-size:12px;color:#16a34a;display:flex;align-items:center;gap:4px">
+              <mat-icon style="font-size:14px;width:14px;height:14px">check_circle</mat-icon> Saved
+            </span>
+          }
+          @if (emailSettingsError()) {
+            <span style="font-size:12px;color:#dc2626">{{emailSettingsError()}}</span>
+          }
+        </div>
+      </div>
+
+      <div style="padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
+        <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 8px;display:flex;align-items:center;gap:8px">
+          <mat-icon style="color:#3b82f6;font-size:20px">send</mat-icon> Test Connection
+        </h3>
+        <p style="font-size:13px;color:#64748b;margin:0 0 12px">Send a test email to verify your SMTP settings are working correctly.</p>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <input [ngModel]="testEmailAddr()" (ngModelChange)="testEmailAddr.set($event)" placeholder="test@example.com" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:260px" />
+          <button mat-flat-button color="accent" (click)="testEmailSettings()" [disabled]="testingEmail() || !testEmailAddr()" style="font-size:13px">
+            <mat-icon style="font-size:16px;margin-right:4px">send</mat-icon>
+            @if (testingEmail()) { Sending... } @else { Send Test }
+          </button>
+          @if (testEmailResult()) {
+            <span style="font-size:12px;color:#16a34a;display:flex;align-items:center;gap:4px">
+              <mat-icon style="font-size:14px;width:14px;height:14px">check_circle</mat-icon> {{testEmailResult()}}
+            </span>
+          }
+          @if (testEmailError()) {
+            <span style="font-size:12px;color:#dc2626">{{testEmailError()}}</span>
+          }
+        </div>
+      </div>
+
+      <div style="margin-top:16px;padding:12px 16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;display:flex;align-items:flex-start;gap:10px">
+        <mat-icon style="color:#3b82f6;font-size:18px;margin-top:1px">info</mat-icon>
+        <span style="font-size:13px;color:#1e40af">
+          To configure <strong>email notification templates</strong> for specific transaction types (Depreciation, Disposal, etc.), go to
+          <strong>Configuration → Email Templates</strong>.
+        </span>
+      </div>
+    </div>
+  </mat-tab>
+
+  <mat-tab label="Data Maintenance">
+    <div style="padding:20px">
+      <div style="margin-bottom:20px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
+        <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 4px;display:flex;align-items:center;gap:8px">
+          <mat-icon style="color:#8b5cf6;font-size:20px">summarize</mat-icon> Transaction Summary
+        </h3>
+        <p style="font-size:13px;color:#64748b;margin:0 0 16px">
+          The dashboard monthly depreciation chart reads from <code style="font-size:11px;background:#f1f5f9;padding:1px 4px;border-radius:3px">Asset_Transaction_Summary</code>.
+          Run this after importing assets or completing depreciation runs to refresh chart data. Uses the current financial year and period from Organisation Settings.
+        </p>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          @if (settings()) {
+            <span style="font-size:12px;color:#64748b;background:#f1f5f9;padding:4px 10px;border-radius:6px">
+              FY {{settings().financial_year}} · Period {{settings().current_period_month || settings().current_period || '—'}}
+            </span>
+          }
+          <input
+            type="number"
+            [(ngModel)]="populateSummaryAssetId"
+            placeholder="Asset ID (optional)"
+            min="1"
+            style="width:160px;font-size:12px;padding:4px 8px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#1e293b;outline:none"
+            title="Enter an AssetRegisterItem_ID to rebuild only that asset. Leave blank to rebuild all assets."
+          />
+          @if (populatingSummary()) {
+            <div style="display:flex;flex-direction:column;gap:6px;min-width:260px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <mat-spinner diameter="14"></mat-spinner>
+                <span style="font-size:13px;color:#475569">
+                  @if (populateProgress()) {
+                    Processing {{populateProgress()!.done}} / {{populateProgress()!.total}} assets ({{populateProgress()!.percent}}%)
+                  } @else {
+                    Starting...
+                  }
+                </span>
+              </div>
+              @if (populateProgress()) {
+                <div style="height:6px;background:#e2e8f0;border-radius:4px;overflow:hidden">
+                  <div [style]="'height:100%;background:#6366f1;border-radius:4px;transition:width 0.4s ease;width:' + populateProgress()!.percent + '%'"></div>
+                </div>
+              }
+            </div>
+          } @else {
+            <button mat-flat-button color="primary" (click)="populateSummary()" style="font-size:13px">
+              <mat-icon style="font-size:16px;margin-right:4px">refresh</mat-icon> Populate Transaction Summary
+            </button>
+          }
+          @if (populateSummaryResult()) {
+            <span style="font-size:12px;color:#16a34a;display:flex;align-items:center;gap:4px">
+              <mat-icon style="font-size:14px;width:14px;height:14px">check_circle</mat-icon>
+              {{populateSummaryResult().message}}
+            </span>
+          }
+          @if (populateSummaryError()) {
+            <span style="font-size:12px;color:#dc2626">{{populateSummaryError()}}</span>
+          }
+        </div>
+        @if (populateSummaryResult() && populateSummaryResult().assetsProcessed !== undefined) {
+          <div style="margin-top:12px;display:flex;gap:12px">
+            <div style="background:#f0fdf4;padding:10px 16px;border-radius:8px;text-align:center;min-width:100px">
+              <div style="font-size:20px;font-weight:700;color:#16a34a">{{populateSummaryResult().assetsProcessed}}</div>
+              <div style="font-size:11px;color:#64748b">Assets updated</div>
+            </div>
+            @if (populateSummaryResult().assetsErrored > 0) {
+              <div style="background:#fef2f2;padding:10px 16px;border-radius:8px;text-align:center;min-width:100px">
+                <div style="font-size:20px;font-weight:700;color:#dc2626">{{populateSummaryResult().assetsErrored}}</div>
+                <div style="font-size:11px;color:#64748b">Errors</div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <div style="padding:14px 16px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;display:flex;align-items:flex-start;gap:10px">
+        <mat-icon style="color:#d97706;font-size:20px;margin-top:1px">info</mat-icon>
+        <div style="font-size:13px;color:#92400e">
+          <strong>When to run:</strong> After bulk asset imports, after approving depreciation runs, or when the monthly depreciation chart shows zeros.
+          The system also automatically refreshes the summary when a depreciation run is approved.
+        </div>
+      </div>
+    </div>
+  </mat-tab>
+
 </mat-tab-group>
+
+@if (showBulkFixModal()) {
+  <div style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px">
+    <div style="background:white;border-radius:12px;width:100%;max-width:720px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+      <div style="padding:20px 24px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <h2 style="font-size:17px;font-weight:700;color:#1e293b;margin:0 0 2px">Bulk Measurement Type Fix</h2>
+          <p style="font-size:13px;color:#64748b;margin:0">
+            Switch to <strong>{{bulkFixTargetModel()}} Model</strong> — reassign conflicting assets to a compatible measurement type
+          </p>
+        </div>
+        <button mat-icon-button (click)="closeBulkFix()" style="color:#64748b"><mat-icon>close</mat-icon></button>
+      </div>
+
+      <div style="padding:20px 24px;overflow-y:auto;flex:1">
+        @if (bulkFixLoading()) {
+          <div style="display:flex;align-items:center;justify-content:center;padding:40px;gap:12px">
+            <mat-spinner diameter="24"></mat-spinner>
+            <span style="font-size:14px;color:#64748b">Loading conflict data…</span>
+          </div>
+        } @else {
+          @if (bulkFixError()) {
+            <div style="padding:12px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#dc2626;font-size:13px;margin-bottom:16px">
+              {{bulkFixError()}}
+            </div>
+          }
+
+          @if (bulkFixCompatibleTypes().length === 0 && !bulkFixError()) {
+            <div style="padding:12px 16px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;color:#92400e;font-size:13px;margin-bottom:16px">
+              No compatible measurement types found for the {{bulkFixTargetModel()}} Model. Please create one first in Measurement Types configuration.
+            </div>
+          } @else if (!bulkFixError()) {
+            <div style="margin-bottom:20px;padding:14px 16px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px">
+              <div style="font-size:13px;font-weight:600;color:#0369a1;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+                <mat-icon style="font-size:16px;width:16px;height:16px">assignment</mat-icon>
+                Select replacement measurement type
+              </div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <select
+                  [ngModel]="bulkFixSelectedTypeId()"
+                  (ngModelChange)="bulkFixSelectedTypeId.set(+$event)"
+                  style="flex:1;padding:8px 10px;border:1px solid #bae6fd;border-radius:6px;font-size:13px;background:#fff;color:#1e293b">
+                  @for (t of bulkFixCompatibleTypes(); track t.measurementTypeId) {
+                    <option [value]="t.measurementTypeId">{{t.measurementTypeDesc}}</option>
+                  }
+                </select>
+                <span style="font-size:12px;color:#0369a1;white-space:nowrap">compatible with {{bulkFixTargetModel()}} Model</span>
+              </div>
+            </div>
+
+            <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+              <h3 style="font-size:14px;font-weight:600;color:#1e293b;margin:0">
+                Conflicting Assets
+                <span style="font-size:12px;font-weight:500;color:#64748b;margin-left:6px">({{bulkFixConflicts().length}} asset{{bulkFixConflicts().length === 1 ? '' : 's'}})</span>
+              </h3>
+            </div>
+
+            @if (bulkFixConflicts().length === 0) {
+              <div style="padding:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;color:#15803d;font-size:13px;text-align:center">
+                No conflicting assets found. The model switch should now succeed.
+              </div>
+            } @else {
+              <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;max-height:280px;overflow-y:auto">
+                <table style="width:100%;border-collapse:collapse">
+                  <thead style="position:sticky;top:0;z-index:1">
+                    <tr style="background:#f8fafc">
+                      <th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0">Asset Number</th>
+                      <th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0">Description</th>
+                      <th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0">Current Measurement Type</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (asset of bulkFixConflicts(); track asset.assetId) {
+                      <tr style="border-bottom:1px solid #f1f5f9">
+                        <td style="padding:8px 12px;font-size:12px;font-family:monospace;color:#475569">{{asset.assetNumber || '—'}}</td>
+                        <td style="padding:8px 12px;font-size:13px;color:#1e293b">{{asset.assetDescription || '—'}}</td>
+                        <td style="padding:8px 12px">
+                          <span style="font-size:11px;background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:4px;font-weight:500">{{asset.currentMeasurementTypeName}}</span>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+        }
+      </div>
+
+      <div style="padding:16px 24px;border-top:1px solid #e2e8f0;display:flex;align-items:center;justify-content:flex-end;gap:10px">
+        <button mat-stroked-button (click)="closeBulkFix()" [disabled]="bulkFixApplying()" style="font-size:13px">Cancel</button>
+        @if (!bulkFixLoading() && bulkFixCompatibleTypes().length > 0 && bulkFixConflicts().length > 0) {
+          <button mat-flat-button (click)="applyBulkFix()" [disabled]="bulkFixApplying() || !bulkFixSelectedTypeId()" style="background:#0f2b46;color:white;font-size:13px">
+            @if (bulkFixApplying()) {
+              <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
+              <span>Applying…</span>
+            } @else {
+              <ng-container>
+                <mat-icon style="font-size:16px;width:16px;height:16px;vertical-align:middle">check</mat-icon>
+                <span>Apply &amp; Switch to {{bulkFixTargetModel()}} Model</span>
+              </ng-container>
+            }
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+}

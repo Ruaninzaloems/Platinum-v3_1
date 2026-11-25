@@ -2,13 +2,17 @@ import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../../core/services/api.service';
+import { NavigationEnd, Router } from '@angular/router';
+import { Subscription, filter } from 'rxjs';
 import { UiService } from '../../../../core/services/ui.service';
 import { CurrencyZarPipe } from '../../../../shared/pipes/currency-zar.pipe';
+import { EntityTypeBadgePipe } from '../../../../shared/pipes/entity-type-badge.pipe';
 
 @Component({
   selector: 'app-payroll-run',
   standalone: true,
-  imports: [CommonModule, FormsModule, CurrencyZarPipe],
+  host: { 'data-accent': 'payroll' },
+  imports: [CommonModule, FormsModule, CurrencyZarPipe, EntityTypeBadgePipe],
   templateUrl: './payroll-run.component.html',
   styleUrls: ['./payroll-run.component.css']
 })
@@ -28,7 +32,8 @@ export class PayrollRunComponent implements OnInit, OnDestroy {
   cyclesLoading = false;
 
   showProgress = false;
-  progressData: any = { percent: 0, processed: 0, total: 0, status: '', currentEmployee: '', errors: 0 };
+  progressData: any = { percent: 0, processed: 0, total: 0, status: '', currentEmployee: '', stage: 'PREPARING', stageMessage: 'Preparing run...', errors: 0 };
+  private progressPollCount = 0;
   private progressInterval: any = null;
   progressStartTime: number = 0;
 
@@ -57,16 +62,136 @@ export class PayrollRunComponent implements OnInit, OnDestroy {
   glFilters: any = { employee_code: '', head_code: '', transaction_type: '' };
   private glLedgerRunId: number | null = null;
 
+  // Outstanding-approvals inline panel (Task #183)
+  blockers: any[] = [];
+  blockersCounts: { CLAIM: number; WAGE: number; OVERTIME: number; INSTALLMENT: number } = { CLAIM: 0, WAGE: 0, OVERTIME: 0, INSTALLMENT: 0 };
+  blockersTotal = 0;
+  blockersLoading = false;
+  blockersExpanded = true;
+  private routerSub?: Subscription;
+
   Math = Math;
 
-  constructor(private api: ApiService, private ui: UiService, private cdr: ChangeDetectorRef) {}
+  constructor(private api: ApiService, private ui: UiService, private cdr: ChangeDetectorRef, private router: Router) {}
+
+  /** Detect & handle the OUTSTANDING_APPROVALS pre-flight error from the
+   * payroll-run gate. Loads the inline blockers panel (Task #183), then shows
+   * a confirm dialog offering to jump to My Approvals. Returns true when
+   * handled. */
+  private async handleApprovalBlock(err: any): Promise<boolean> {
+    const e = err?.error?.error;
+    if (!e || e.code !== 'OUTSTANDING_APPROVALS') return false;
+    const c = e.counts || {};
+    this.blockersCounts = {
+      CLAIM: c.CLAIM || 0, WAGE: c.WAGE || 0,
+      OVERTIME: c.OVERTIME || 0, INSTALLMENT: c.INSTALLMENT || 0
+    };
+    this.blockersTotal = e.total || 0;
+    this.blockersExpanded = true;
+    this.loadBlockers();
+    const parts: string[] = [];
+    if (c.CLAIM)       parts.push(`${c.CLAIM} claim(s)`);
+    if (c.WAGE)        parts.push(`${c.WAGE} wage(s)`);
+    if (c.OVERTIME)    parts.push(`${c.OVERTIME} overtime`);
+    if (c.INSTALLMENT) parts.push(`${c.INSTALLMENT} installment(s)`);
+    const breakdown = parts.length ? parts.join(', ') : `${e.total || 0} transaction(s)`;
+    const go = await this.ui.confirm({
+      title: 'Outstanding Approvals',
+      message: `Payroll cannot run while transactions are awaiting approval: ${breakdown}. Open My Approvals now?`,
+      confirmText: 'Go to My Approvals',
+      danger: false
+    });
+    if (go) this.router.navigate(['/payroll/approvals']);
+    return true;
+  }
+
+  /** Load the hydrated list of in-period transactions still blocking this
+   * payroll run. Called after the gate trips and again when the component is
+   * re-entered (e.g. after returning from /approvals). */
+  loadBlockers(): void {
+    if (!this.currentRun) {
+      this.blockers = [];
+      this.blockersTotal = 0;
+      this.blockersCounts = { CLAIM: 0, WAGE: 0, OVERTIME: 0, INSTALLMENT: 0 };
+      return;
+    }
+    this.blockersLoading = true;
+    this.cdr.detectChanges();
+    this.api.get<any>(`/payroll/runs/${this.currentRun.id}/approval-blockers`, { _t: Date.now() }).subscribe({
+      next: (data: any) => {
+        const items = data?.items || { CLAIM: [], WAGE: [], OVERTIME: [], INSTALLMENT: [] };
+        const flat = [
+          ...(items.CLAIM || []),
+          ...(items.WAGE || []),
+          ...(items.OVERTIME || []),
+          ...(items.INSTALLMENT || [])
+        ];
+        this.blockers = flat;
+        this.blockersCounts = {
+          CLAIM: data?.counts?.CLAIM || 0,
+          WAGE: data?.counts?.WAGE || 0,
+          OVERTIME: data?.counts?.OVERTIME || 0,
+          INSTALLMENT: data?.counts?.INSTALLMENT || 0
+        };
+        this.blockersTotal = data?.total || flat.length;
+        this.blockersLoading = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.blockersLoading = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  /** Build the deep-link URL for a single blocker row. */
+  blockerLink(row: any): any[] {
+    switch (row?.entity_type) {
+      case 'CLAIM':       return ['/payroll/claims'];
+      case 'WAGE':        return ['/payroll/wages'];
+      case 'OVERTIME':    return ['/payroll/overtime'];
+      case 'INSTALLMENT': return ['/payroll/installments'];
+      default:            return ['/approvals'];
+    }
+  }
+
+  goToBlocker(row: any): void {
+    this.router.navigate(this.blockerLink(row), { queryParams: { focus: row.entity_id } });
+  }
+
+  toggleBlockers(): void {
+    this.blockersExpanded = !this.blockersExpanded;
+  }
+
+  goToApprovals(): void {
+    this.router.navigate(['/payroll/approvals']);
+  }
+
+  formatBlockerType(t: string): string {
+    if (t === 'CLAIM') return 'Claim';
+    if (t === 'WAGE') return 'Wage';
+    if (t === 'OVERTIME') return 'Overtime';
+    if (t === 'INSTALLMENT') return 'Installment';
+    return t || '';
+  }
 
   ngOnInit(): void {
     this.loadCycles();
+    // Auto-refresh blockers when the user navigates back to this route from
+    // /approvals (the component instance can be retained when the parent
+    // outlet keeps it alive).
+    this.routerSub = this.router.events.pipe(
+      filter((evt: any) => evt instanceof NavigationEnd)
+    ).subscribe((evt: NavigationEnd) => {
+      if ((evt.urlAfterRedirects || evt.url || '').startsWith('/payroll/run') && this.currentRun) {
+        this.loadBlockers();
+      }
+    });
   }
 
   ngOnDestroy(): void {
     this.stopProgressPolling();
+    this.routerSub?.unsubscribe();
   }
 
   loadCycles(): void {
@@ -91,15 +216,19 @@ export class PayrollRunComponent implements OnInit, OnDestroy {
   }
 
   onCycleChange(): void {
+    this.blockers = [];
+    this.blockersTotal = 0;
+    this.blockersCounts = { CLAIM: 0, WAGE: 0, OVERTIME: 0, INSTALLMENT: 0 };
+    this.blockersLoading = false;
+    this.currentRun = null;
+    this.results = [];
+    this.showTrialResults = false;
+    this.currentStep = 0;
+    this.resetGlState();
     if (!this.selectedCycleId) {
       this.fromDate = '';
       this.toDate = '';
       this.activePeriod = null;
-      this.currentRun = null;
-      this.results = [];
-      this.showTrialResults = false;
-      this.currentStep = 0;
-      this.resetGlState();
       return;
     }
     this.loading = true;
@@ -138,16 +267,21 @@ export class PayrollRunComponent implements OnInit, OnDestroy {
           if (this.currentRun.status === 'PROCESSING') {
             this.showProgress = true;
             this.startProgressPolling();
-          } else if (['COMPLETED', 'LOCKED', 'APPROVED'].includes(this.currentRun.status)) {
+          } else if (['LOCKED', 'APPROVED'].includes(this.currentRun.status)) {
             this.showTrialResults = true;
             this.loadResults();
             this.loadRunErrors();
           }
+          // Always show any in-period transactions still awaiting approval so
+          // the operator knows what is blocking the next run before clicking it.
+          this.loadBlockers();
         } else {
           this.currentStep = 0;
           this.results = [];
           this.showTrialResults = false;
           this.resetGlState();
+          this.blockers = [];
+          this.blockersTotal = 0;
         }
         this.loading = false;
         this.cdr.detectChanges();
@@ -199,13 +333,14 @@ export class PayrollRunComponent implements OnInit, OnDestroy {
       this.runErrors = [];
       this.showErrorsPanel = false;
       this.progressStartTime = Date.now();
-      this.progressData = { percent: 0, processed: 0, total: 0, status: 'PROCESSING', currentEmployee: '', errors: 0 };
+      this.progressData = { percent: 0, processed: 0, total: 0, status: 'PROCESSING', currentEmployee: '', stage: 'PREPARING', stageMessage: 'Preparing run...', errors: 0 };
       this.api.post<any>(`/payroll/runs/${runId}/execute`, { async: true }).subscribe({
         next: () => {
           this.startProgressPolling();
         },
-        error: (err: any) => {
+        error: async (err: any) => {
           this.showProgress = false;
+          if (await this.handleApprovalBlock(err)) { this.cdr.detectChanges(); return; }
           this.ui.toast('error', 'Error', 'Failed to start execution: ' + (err.error?.error?.message || 'Unknown error'));
         }
       });
@@ -233,12 +368,17 @@ export class PayrollRunComponent implements OnInit, OnDestroy {
   startProgressPolling(): void {
     this.stopProgressPolling();
     if (!this.currentRun) return;
-    this.progressInterval = setInterval(() => {
+    this.progressPollCount = 0;
+    const tick = () => {
       this.api.get<any>(`/payroll/runs/${this.currentRun.id}/progress`).subscribe({
         next: (data: any) => {
           this.progressData = data;
           if (['COMPLETED', 'LOCKED', 'FAILED'].includes(data.status)) {
             this.stopProgressPolling();
+            if (data.status === 'COMPLETED') {
+              this.progressData = { ...data, percent: 100 };
+              this.cdr.detectChanges();
+            }
             setTimeout(() => {
               this.showProgress = false;
               if (data.status === 'COMPLETED') {
@@ -256,18 +396,66 @@ export class PayrollRunComponent implements OnInit, OnDestroy {
               }
               this.cdr.detectChanges();
             }, 1500);
+            return;
           }
           this.cdr.detectChanges();
+          this.scheduleNextPoll(tick);
+        },
+        error: () => {
+          this.scheduleNextPoll(tick);
         }
       });
-    }, 1000);
+    };
+    tick();
+  }
+
+  private scheduleNextPoll(tick: () => void): void {
+    this.progressPollCount++;
+    const delay = this.progressPollCount < 6 ? 500 : 1000;
+    this.progressInterval = setTimeout(tick, delay);
   }
 
   stopProgressPolling(): void {
     if (this.progressInterval) {
+      clearTimeout(this.progressInterval);
       clearInterval(this.progressInterval);
       this.progressInterval = null;
     }
+  }
+
+  get isProgressIndeterminate(): boolean {
+    const d = this.progressData || {};
+    if (d.status === 'COMPLETED') return false;
+    if (!d.total || d.total === 0) return true;
+    const stage = d.stage || '';
+    return stage === 'PREPARING' || stage === 'LOADING_EMPLOYEES' || stage === 'PREPARING_CALCULATIONS';
+  }
+
+  get progressStatusLabel(): string {
+    const d = this.progressData || {};
+    if (d.status === 'COMPLETED') return 'Completed';
+    if (d.status === 'FAILED') return 'Failed';
+    if (d.status === 'LOCKED') return 'Locked';
+    if (d.status !== 'PROCESSING') return d.status || 'Starting...';
+    const stage = d.stage || 'PROCESSING';
+    if (stage === 'PREPARING') return 'Preparing run...';
+    if (stage === 'LOADING_EMPLOYEES') return 'Loading employees...';
+    if (stage === 'PREPARING_CALCULATIONS') return 'Preparing calculations...';
+    return 'Calculating...';
+  }
+
+  get progressCurrentLabel(): string {
+    const d = this.progressData || {};
+    if (d.currentEmployee) return d.currentEmployee;
+    if (d.stageMessage) return d.stageMessage;
+    if (d.status === 'COMPLETED') return 'Done';
+    return 'Preparing...';
+  }
+
+  get progressCountLabel(): string {
+    const d = this.progressData || {};
+    if (!d.total || d.total === 0) return 'Preparing...';
+    return `${d.processed || 0} / ${d.total}`;
   }
 
   loadResults(page?: number): void {
@@ -284,6 +472,7 @@ export class PayrollRunComponent implements OnInit, OnDestroy {
     if (this.filters.name) params.name = this.filters.name;
     if (this.filters.surname) params.surname = this.filters.surname;
 
+    params._t = Date.now();
     this.api.getRaw<any>(`/payroll/runs/${this.currentRun.id}/results-summary`, params).subscribe({
       next: (res: any) => {
         this.results = res.data || [];
@@ -297,7 +486,7 @@ export class PayrollRunComponent implements OnInit, OnDestroy {
 
   loadRunErrors(): void {
     if (!this.currentRun) return;
-    this.api.get<any>(`/payroll/runs/${this.currentRun.id}/errors`).subscribe({
+    this.api.get<any>(`/payroll/runs/${this.currentRun.id}/errors`, { _t: Date.now() }).subscribe({
       next: (res: any) => {
         this.runErrors = res.data || res || [];
         this.showErrorsPanel = this.runErrors.length > 0;
@@ -335,7 +524,7 @@ export class PayrollRunComponent implements OnInit, OnDestroy {
         this.currentRun = data;
         this.updateStepFromRun();
         this.showTrialResults = false;
-        this.results = [];
+        // Keep this.results populated so lockedRunTotal can use resultTotals
         this.loading = false;
         this.ui.toast('success', 'Success', 'Trial run locked down successfully');
         this.cdr.detectChanges();
@@ -375,22 +564,24 @@ export class PayrollRunComponent implements OnInit, OnDestroy {
         this.currentRun = data;
         this.showProgress = true;
         this.progressStartTime = Date.now();
-        this.progressData = { percent: 0, processed: 0, total: 0, status: 'PROCESSING', currentEmployee: '', errors: 0 };
+        this.progressData = { percent: 0, processed: 0, total: 0, status: 'PROCESSING', currentEmployee: '', stage: 'PREPARING', stageMessage: 'Preparing run...', errors: 0 };
         this.api.post<any>(`/payroll/runs/${this.currentRun.id}/execute`, { async: true }).subscribe({
           next: () => {
             this.startProgressPolling();
           },
-          error: () => {
+          error: async (err: any) => {
             this.showProgress = false;
             this.currentStep = 2;
             this.loading = false;
+            if (await this.handleApprovalBlock(err)) { this.cdr.detectChanges(); return; }
             this.ui.toast('warning', 'Warning', 'Run promoted to FINAL but re-execution failed');
             this.cdr.detectChanges();
           }
         });
       },
-      error: (err: any) => {
+      error: async (err: any) => {
         this.loading = false;
+        if (await this.handleApprovalBlock(err)) { this.cdr.detectChanges(); return; }
         this.ui.toast('error', 'Error', 'Failed to promote to final: ' + (err.error?.error?.message || 'Unknown error'));
       }
     });
@@ -399,9 +590,9 @@ export class PayrollRunComponent implements OnInit, OnDestroy {
   downloadExcel(): void {
     if (!this.currentRun) return;
     if (this.resultsTab === 'ledger') {
-      window.open(`/api/v1/payroll/runs/${this.currentRun.id}/gl-ledger/export`, '_blank');
+      window.open(`/payroll-app/api/payroll/runs/${this.currentRun.id}/gl-ledger/export`, '_blank');
     } else {
-      window.open(`/api/v1/payroll/runs/${this.currentRun.id}/results-summary/export`, '_blank');
+      window.open(`/payroll-app/api/payroll/runs/${this.currentRun.id}/results-summary/export`, '_blank');
     }
   }
 
@@ -430,6 +621,42 @@ export class PayrollRunComponent implements OnInit, OnDestroy {
     return cycle ? cycle.name : '';
   }
 
+  get resultTotals(): { salary: number; earnings: number; deductions: number; contributions: number; fringe: number; nett_salary: number } {
+    return this.results.reduce(
+      (acc, row) => ({
+        salary:        acc.salary        + (parseFloat(row.salary)        || 0),
+        earnings:      acc.earnings      + (parseFloat(row.earnings)      || 0),
+        deductions:    acc.deductions    + (parseFloat(row.deductions)    || 0),
+        contributions: acc.contributions + (parseFloat(row.contributions) || 0),
+        fringe:        acc.fringe        + (parseFloat(row.fringe)        || 0),
+        nett_salary:   acc.nett_salary   + (parseFloat(row.nett_salary)   || 0),
+      }),
+      { salary: 0, earnings: 0, deductions: 0, contributions: 0, fringe: 0, nett_salary: 0 }
+    );
+  }
+
+  /** Locked summary card total cost to company.
+   *  Prefer resultTotals (earnings excl. fringe + contributions) when the
+   *  results array is loaded — this matches the grid exactly.
+   *  Fall back to the persisted run record totals only when navigating to a
+   *  locked run fresh (before loadResults() completes). */
+  get lockedRunTotal(): number {
+    if (this.results.length > 0) {
+      return this.resultTotals.earnings + this.resultTotals.contributions;
+    }
+    if (!this.currentRun) return 0;
+    return (parseFloat(this.currentRun.total_earnings) || 0) +
+           (parseFloat(this.currentRun.total_company_contributions) || 0);
+  }
+
+  /** Total Cost to Company for the results grid footer. */
+  get totalCostToCompany(): number {
+    if (this.results.length > 0) {
+      return this.resultTotals.earnings + this.resultTotals.contributions;
+    }
+    return this.lockedRunTotal;
+  }
+
   formatCurrency(val: any): string {
     const n = parseFloat(val) || 0;
     return 'R ' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -444,10 +671,10 @@ export class PayrollRunComponent implements OnInit, OnDestroy {
   get elapsedTime(): string {
     if (!this.progressStartTime) return '0s';
     const seconds = Math.floor((Date.now() - this.progressStartTime) / 1000);
+    if (seconds < 60) return `${seconds}s`;
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    if (mins > 0) return `${mins}m ${secs}s`;
-    return `${secs}s`;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   }
 
   getPageArray(): number[] {

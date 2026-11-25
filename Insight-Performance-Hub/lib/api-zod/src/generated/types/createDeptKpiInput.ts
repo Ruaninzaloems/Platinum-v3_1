@@ -5,6 +5,7 @@
  * Organisational Performance Management API
  * OpenAPI spec version: 0.1.0
  */
+import type { CreateDeptKpiInputCustomFields } from "./createDeptKpiInputCustomFields";
 
 export interface CreateDeptKpiInput {
   parentKpiId?: number;
@@ -19,4 +20,5 @@ export interface CreateDeptKpiInput {
   weighting?: number;
   unitOfMeasureId?: number;
   isCumulative?: boolean;
+  customFields?: CreateDeptKpiInputCustomFields;
 }

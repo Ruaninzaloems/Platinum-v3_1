@@ -1,0 +1,36 @@
+<div class="user-switcher-wrapper">
+  <div class="user-switcher-trigger" (click)="toggleDropdown()">
+    <div class="user-avatar-sw">{{ initials }}</div>
+    <div class="user-info">
+      <span class="user-name">{{ currentUser.displayName }}</span>
+      <span class="user-role-badge">{{ roleBadge }}</span>
+    </div>
+    <svg class="chevron" [class.open]="showDropdown" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
+  @if (showDropdown) {
+    <div class="user-switcher-dropdown">
+      <div class="dropdown-header">
+        <span class="dropdown-title">Switch Dev User</span>
+        <span class="dropdown-subtitle">For testing role-based access</span>
+      </div>
+      <div class="dropdown-list">
+        @for (user of users; track user.userId) {
+          <div class="dropdown-item" [class.active]="isSelected(user)" (click)="selectUser(user)">
+            <div class="item-avatar">{{ getUserInitials(user) }}</div>
+            <div class="item-info">
+              <span class="item-name">{{ user.displayName }}</span>
+              <span class="item-roles">{{ getRoleTags(user) }}</span>
+            </div>
+            @if (isSelected(user)) {
+              <svg class="check-icon" viewBox="0 0 24 24" width="16" height="16" stroke="#16a34a" stroke-width="2.5" fill="none"><polyline points="20 6 9 17 4 12"/></svg>
+            }
+          </div>
+        }
+      </div>
+      <div class="dropdown-footer">
+        <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        Dev mode only — replace with real auth
+      </div>
+    </div>
+  }
+</div>

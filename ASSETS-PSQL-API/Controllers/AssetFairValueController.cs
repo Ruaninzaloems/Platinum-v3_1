@@ -42,7 +42,7 @@ public class AssetFairValueController : ControllerBase
         await conn.OpenAsync();
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Asset_FairValue"" (""AssetRegisterItem_ID"", ""FairValueDate"", ""FairValue"", ""PreviousCarryingAmount"", ""GainLoss"", ""Status"", ""FinYear"", ""DateCaptured"", ""CapturerID"")
-            VALUES (@AssetRegisterItem_ID, @FairValueDate, @FairValueAmount, @PreviousCarryingAmount, @GainLoss, @Status, @FinYear, GETDATE(), @CapturerID)
+            VALUES (@AssetRegisterItem_ID, @FairValueDate, @FairValueAmount, @PreviousCarryingAmount, @GainLoss, @Status, @FinYear, NOW(), @CapturerID)
             RETURNING ""RegistrationItemFairValue_Id""", model);
         model.AssetFairValue_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -56,7 +56,7 @@ public class AssetFairValueController : ControllerBase
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Asset_FairValue""
             SET ""FairValueDate"" = @FairValueDate, ""FairValue"" = @FairValueAmount, ""PreviousCarryingAmount"" = @PreviousCarryingAmount,
-                ""GainLoss"" = @GainLoss, ""Status"" = @Status, ""FinYear"" = @FinYear, ""DateModified"" = GETDATE(), ""ModifierID"" = @ModifierID
+                ""GainLoss"" = @GainLoss, ""Status"" = @Status, ""FinYear"" = @FinYear, ""DateModified"" = NOW(), ""ModifierID"" = @ModifierID
             WHERE ""RegistrationItemFairValue_Id"" = @id", new { model.FairValueDate, model.FairValueAmount, model.PreviousCarryingAmount, model.GainLoss, model.Status, model.FinYear, model.ModifierID, id });
         return rows == 0 ? NotFound(new { error = "Fair value record not found" }) : Ok(new { success = 1 });
     }

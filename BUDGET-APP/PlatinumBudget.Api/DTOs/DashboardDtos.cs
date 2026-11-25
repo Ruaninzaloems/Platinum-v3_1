@@ -1,5 +1,18 @@
 namespace PlatinumBudget.Api.DTOs;
 
+public record PatchCreditDebitDto(string? CreditDebit);
+public record PatchIsActiveForScmDto(bool? IsActiveForScm);
+public record PatchMunicipalClassificationDto(int? DivisionId, string? Label);
+public record PatchProjectItemDto(int? ProjectItemId, string? Text, string? FinYear);
+public record PatchProjectGrapSegmentDto(
+    string? GrapClassification, string? GrapClassificationNote,
+    string? MainSegmentReporting, string? SubSegmentReporting);
+public record PatchProjectMonthsDto(
+    decimal? Month01, decimal? Month02, decimal? Month03, decimal? Month04,
+    decimal? Month05, decimal? Month06, decimal? Month07, decimal? Month08,
+    decimal? Month09, decimal? Month10, decimal? Month11, decimal? Month12);
+public record PatchBudgetAmountsDto(decimal? Year1, decimal? Year2, decimal? Year3, int? BudgetSplitId);
+
 public record CfoDashboardDto(
     decimal TotalBudgetYear1,
     decimal TotalRevenueYear1,
@@ -124,7 +137,73 @@ public record ProjectDto(
     int ScoaLineCount,
     DateTime CreatedOn,
     List<ProjectBudgetLineDto>? BudgetLines,
-    bool IsRegistered
+    bool IsRegistered,
+    string? FinancialYear,
+    string? SingleMultiYear,
+    string? ProjectTypeName,
+    bool CostingProject,
+    // SCOA segment fields
+    string? ScoaProject,
+    string? ScoaProjectPath,
+    string? ScoaProjectNtId,
+    string? ScoaProjectDesc,
+    string? ScoaFunction,
+    int? ScoaFunctionId,
+    int? ScoaFunctionRecordId,
+    string? ScoaFunctionPath,
+    string? ScoaFunctionNtId,
+    string? ScoaFunctionDesc,
+    string? MunicipalClassification,
+    int? MunicipalClassificationId,
+    string? MunicipalClassificationPath,
+    string? ScoaFund,
+    int? ScoaFundId,
+    int? ScoaFundRecordId,
+    string? ScoaFundPath,
+    string? ScoaFundNtId,
+    string? ScoaFundDesc,
+    string? ScoaRegion,
+    int? ScoaRegionId,
+    int? ScoaRegionRecordId,
+    string? ScoaRegionPath,
+    string? ScoaRegionNtId,
+    string? ScoaRegionDesc,
+    string? ScoaCosting,
+    int? ScoaCostingId,
+    int? ScoaCostingRecordId,
+    string? ScoaCostingPath,
+    string? ScoaCostingNtId,
+    string? ScoaCostingDesc,
+    string? ScoaItem,
+    int? ScoaItemId,
+    int? ScoaItemRecordId,
+    string? ScoaItemPath,
+    string? ScoaItemCode,
+    string? ScoaItemNtId,
+    string? ScoaItemDesc,
+    string? ProjectItem,
+    int? ProjectItemId,
+    string? CreditDebit,
+    bool? IsActiveForScm,
+    decimal? Month01,
+    decimal? Month02,
+    decimal? Month03,
+    decimal? Month04,
+    decimal? Month05,
+    decimal? Month06,
+    decimal? Month07,
+    decimal? Month08,
+    decimal? Month09,
+    decimal? Month10,
+    decimal? Month11,
+    decimal? Month12,
+    string? GrapClassification,
+    string? GrapClassificationNote,
+    string? MainSegmentReporting,
+    string? SubSegmentReporting,
+    int? BudgetSplitId,
+    int? PlanProjectItemCode,
+    int? PlanProjectItemId
 );
 
 public record CreateProjectDto(
@@ -166,7 +245,12 @@ public record UpdateProjectDto(
     DateTime? StartDate,
     DateTime? EndDate,
     decimal? TotalProjectCost,
-    bool? IsRegistered
+    bool? IsRegistered,
+    string? FinancialYear,
+    string? SingleMultiYear,
+    string? ProjectTypeName,
+    bool? CostingProject,
+    bool? IsActiveForScm
 );
 
 public record ProjectBudgetLineDto(

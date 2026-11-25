@@ -1,0 +1,283 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Shift Rotations</h1>
+    <p class="page-subtitle">Define weekly rotation patterns and assign shifts per day of the week</p>
+  </div>
+  <button class="btn btn-primary" (click)="openAdd()">
+    <app-icon name="plus" [size]="14"></app-icon> Add Rotation
+  </button>
+</div>
+
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading shift rotations...</div>
+} @else {
+  <div class="rotation-layout">
+    <!-- Left panel: rotation list -->
+    <div class="rotation-list-panel">
+      <div class="toolbar" style="margin-bottom:12px">
+        <div class="toolbar-search">
+          <input type="text" placeholder="Search..." [(ngModel)]="search">
+        </div>
+      </div>
+      @if (filtered.length === 0) {
+        <div style="text-align:center;color:var(--text-muted);padding:32px 16px">No rotations — click Add Rotation</div>
+      }
+      @for (r of filtered; track r.id) {
+        <div class="rotation-card" [class.active]="selectedRotation?.id === r.id" (click)="selectRotation(r)">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <div style="font-weight:600;font-size:13px">{{ r.name }}</div>
+              @if (r.short_description) { <div style="font-size:11px;color:var(--text-muted)">{{ r.short_description }}</div> }
+            </div>
+            <span class="status-badge" [ngClass]="r.enabled ? 'status-approved' : 'status-inactive'">{{ r.enabled ? 'Active' : 'Inactive' }}</span>
+          </div>
+          <div style="display:flex;gap:12px;margin-top:8px;font-size:11px;color:var(--text-muted);flex-wrap:wrap">
+            <span>{{ r.no_of_weeks || 1 }} week{{ (r.no_of_weeks || 1) !== 1 ? 's' : '' }}</span>
+            @if (r.condition_of_service_name) { <span>{{ r.condition_of_service_name }}</span> }
+            @if (r.start_date) {
+              <span>From: {{ r.start_date | dateSa }}</span>
+            }
+            @if (r.end_date && !r.end_date.startsWith('9999')) {
+              <span>To: {{ r.end_date | dateSa }}</span>
+            }
+          </div>
+          <div style="display:flex;gap:6px;margin-top:8px" (click)="$event.stopPropagation()">
+            <button class="action-btn danger" (click)="deleteRotation(r)" title="Delete rotation">
+              <app-icon name="trash" [size]="14"></app-icon>
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Right panel: editable header + week schedule -->
+    <div class="rotation-detail-panel">
+      @if (!selectedRotation) {
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);gap:12px;padding:60px 0">
+          <app-icon name="calendar" [size]="40"></app-icon>
+          <p style="font-size:14px">Select a rotation to view and configure its weekly schedule</p>
+        </div>
+      } @else {
+        <!-- Inline editable header form -->
+        <div class="detail-header-form">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h3 style="margin:0;font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted)">Rotation Details</h3>
+            <button class="btn btn-primary btn-sm" (click)="saveHeader()" [disabled]="savingHeader">
+              @if (savingHeader) { <div class="spinner spinner-sm"></div> } @else { <app-icon name="save" [size]="13"></app-icon> }
+              Save Changes
+            </button>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Rotation Name <span class="required">*</span></label>
+              <input class="form-control" type="text" [(ngModel)]="headerForm.name">
+            </div>
+            <div class="form-group">
+              <label>Short Code</label>
+              <input class="form-control" type="text" [(ngModel)]="headerForm.short_description" maxlength="50">
+            </div>
+            <div class="form-group">
+              <label>Condition of Service</label>
+              <select class="form-control" [(ngModel)]="headerForm.condition_of_service_id">
+                <option value="">— All Conditions —</option>
+                @for (c of conditions; track c.id) { <option [value]="c.id">{{ c.name }}</option> }
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Employee Sub-Type</label>
+              <select class="form-control" [(ngModel)]="headerForm.employee_subtype_id">
+                <option value="">— All Sub-Types —</option>
+                @for (s of subtypes; track s.id) { <option [value]="s.id">{{ s.name }}</option> }
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Effective From</label>
+              <app-date-input [(ngModel)]="headerForm.start_date"></app-date-input>
+            </div>
+            <div class="form-group">
+              <label>Effective To</label>
+              <app-date-input [(ngModel)]="headerForm.end_date" [placeholder]="'dd/mm/yyyy (blank = no end)'"></app-date-input>
+            </div>
+            <div class="form-group">
+              <label>Number of Weeks</label>
+              <input class="form-control" type="number" [(ngModel)]="headerForm.no_of_weeks" min="1" max="52">
+            </div>
+            <div class="form-group">
+              <label>Status</label>
+              <div style="display:flex;align-items:center;gap:8px;padding-top:6px">
+                <label class="toggle-switch"><input type="checkbox" [(ngModel)]="headerForm.enabled"><span class="toggle-track"><span class="toggle-thumb"></span></span></label>
+                <span style="font-size:13px">{{ headerForm.enabled ? 'Active' : 'Inactive' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Week schedule grid -->
+        <div style="margin-top:24px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div style="font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted)">Week Schedule</div>
+            <button class="btn btn-primary btn-sm" (click)="openAddWeek()">
+              <app-icon name="plus" [size]="12"></app-icon> Add Week
+            </button>
+          </div>
+
+          @if (weeksLoading) {
+            <div class="loading"><div class="spinner"></div>Loading schedule...</div>
+          } @else if (weeks.length === 0) {
+            <div style="text-align:center;color:var(--text-muted);padding:40px">
+              <app-icon name="calendar" [size]="32"></app-icon>
+              <p style="margin-top:8px;font-size:13px">No week lines defined — click "Add Week" to start building the rotation</p>
+            </div>
+          } @else {
+            @for (wNo of weekNos(); track wNo) {
+              <div style="margin-bottom:20px">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border,#e2e8f0)">
+                  Week {{ wNo }}
+                </div>
+                @for (d of weeksForNo(wNo); track d.id) {
+                  <div class="detail-row" [class.row-disabled]="!d.enabled">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                      <span style="font-weight:500;font-size:13px">{{ d.description }}</span>
+                      <div style="display:flex;gap:6px">
+                        <button class="action-btn" (click)="openEditWeek(d)" title="Edit week"><app-icon name="edit" [size]="13"></app-icon></button>
+                        <button class="action-btn danger" (click)="deleteWeek(d)" title="Delete week"><app-icon name="trash" [size]="13"></app-icon></button>
+                      </div>
+                    </div>
+                    <div class="day-grid">
+                      @for (day of DAYS; track day; let i = $index) {
+                        <div class="day-cell">
+                          <div class="day-label">{{ DAY_LABELS[i] }}</div>
+                          @if (d[day]) {
+                            <div class="day-shift" [style.background]="getShiftColor(d[day])">{{ shiftName(d[day]) }}</div>
+                          } @else {
+                            <div class="day-empty">—</div>
+                          }
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          }
+        </div>
+      }
+    </div>
+  </div>
+}
+
+<!-- Add Rotation Modal (for new rotations only) -->
+@if (showRotationModal) {
+  <div class="modal-overlay visible" (click)="showRotationModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Add Shift Rotation</h3>
+        <button class="modal-close" (click)="showRotationModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Rotation Name <span class="required">*</span></label>
+            <input class="form-control" type="text" [(ngModel)]="form.name" placeholder="e.g. 2-Week Rotation A">
+          </div>
+          <div class="form-group">
+            <label>Short Code</label>
+            <input class="form-control" type="text" [(ngModel)]="form.short_description" placeholder="e.g. ROT-A" maxlength="50">
+          </div>
+          <div class="form-group full-width">
+            <label>Description</label>
+            <input class="form-control" type="text" [(ngModel)]="form.description">
+          </div>
+          <div class="form-group">
+            <label>Condition of Service</label>
+            <select class="form-control" [(ngModel)]="form.condition_of_service_id">
+              <option value="">— All Conditions —</option>
+              @for (c of conditions; track c.id) { <option [value]="c.id">{{ c.name }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Employee Sub-Type</label>
+            <select class="form-control" [(ngModel)]="form.employee_subtype_id">
+              <option value="">— All Sub-Types —</option>
+              @for (s of subtypes; track s.id) { <option [value]="s.id">{{ s.name }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Number of Weeks</label>
+            <input class="form-control" type="number" [(ngModel)]="form.no_of_weeks" min="1" max="52">
+          </div>
+          <div class="form-group">
+            <label>Enabled</label>
+            <div style="padding-top:6px">
+              <label class="toggle-switch"><input type="checkbox" [(ngModel)]="form.enabled"><span class="toggle-track"><span class="toggle-thumb"></span></span></label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Effective From</label>
+            <app-date-input [(ngModel)]="form.start_date"></app-date-input>
+          </div>
+          <div class="form-group">
+            <label>Effective To</label>
+            <app-date-input [(ngModel)]="form.end_date" [placeholder]="'dd/mm/yyyy (blank = no end)'"></app-date-input>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showRotationModal = false" [disabled]="saving">Cancel</button>
+        <button class="btn btn-primary" (click)="save()" [disabled]="saving">
+          @if (saving) { <div class="spinner spinner-sm"></div> } @else { <app-icon name="save" [size]="14"></app-icon> }
+          Create Rotation
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Week Line Modal -->
+@if (showWeekModal) {
+  <div class="modal-overlay visible" (click)="showWeekModal = false">
+    <div class="modal modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ editingWeekId ? 'Edit' : 'Add' }} Week Schedule Line</h3>
+        <button class="modal-close" (click)="showWeekModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Description <span class="required">*</span></label>
+            <input class="form-control" type="text" [(ngModel)]="weekForm.description" placeholder="e.g. Standard Week">
+          </div>
+          <div class="form-group">
+            <label>Week Number</label>
+            <input class="form-control" type="number" [(ngModel)]="weekForm.week_no" min="1">
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:12px">Assign Shift Per Day</div>
+          <div class="day-assign-grid">
+            @for (day of DAYS; track day; let i = $index) {
+              <div class="form-group">
+                <label>{{ DAY_LABELS[i] }}</label>
+                <select class="form-control" [(ngModel)]="weekForm[day]">
+                  <option value="">— Off / Rest —</option>
+                  @for (s of shifts; track s.id) { <option [value]="s.id">{{ s.short_description || s.name }}</option> }
+                </select>
+              </div>
+            }
+          </div>
+        </div>
+        <div style="margin-top:12px;display:flex;align-items:center;gap:10px">
+          <label class="toggle-switch"><input type="checkbox" [(ngModel)]="weekForm.enabled"><span class="toggle-track"><span class="toggle-thumb"></span></span></label>
+          <span style="font-size:13px">Enabled</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showWeekModal = false" [disabled]="saving">Cancel</button>
+        <button class="btn btn-primary" (click)="saveWeek()" [disabled]="saving">
+          @if (saving) { <div class="spinner spinner-sm"></div> } @else { <app-icon name="save" [size]="14"></app-icon> }
+          {{ editingWeekId ? 'Update' : 'Add' }} Week Line
+        </button>
+      </div>
+    </div>
+  </div>
+}

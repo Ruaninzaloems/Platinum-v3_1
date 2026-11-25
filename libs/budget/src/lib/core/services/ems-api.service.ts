@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-const BASE = '/api/ems';
+const BASE = '/budget-app/api/ems';
 
 export interface EmsProjectSummary {
   projectId: number;

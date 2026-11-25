@@ -4,7 +4,7 @@
   <div class="page-header">
     <div>
       <h1 class="page-title">Time & Attendance</h1>
-      <p class="page-subtitle">Manage shift patterns, overtime and attendance records</p>
+      <p class="page-subtitle">Manage shift patterns and attendance records</p>
     </div>
   </div>
 
@@ -15,52 +15,6 @@
       </button>
     }
   </div>
-
-  @if (activeTab === 'overtime') {
-    @if (overtimeLoading) {
-      <div class="loading"><div class="spinner"></div>Loading overtime...</div>
-    } @else {
-      <div class="stat-cards">
-        <div class="stat-card" style="border-left-color:#3B82F6"><div class="stat-value">{{ overtimeTotal }}</div><div class="stat-label">Total OT Records</div></div>
-        <div class="stat-card" style="border-left-color:#F59E0B"><div class="stat-value">{{ overtimePendingCount }}</div><div class="stat-label">Pending Approval</div></div>
-      </div>
-      <div class="toolbar">
-        <div class="toolbar-search"><input type="text" placeholder="Search overtime..." /></div>
-        <button class="btn btn-primary" (click)="openOvertimeModal()"><app-icon name="plus" [size]="14"></app-icon> Capture Overtime</button>
-      </div>
-      <div class="data-grid">
-        <table>
-          <thead><tr><th>Employee</th><th>Date</th><th>Type</th><th style="text-align:right">Hours</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody>
-            @if (overtimeRecords.length === 0) {
-              <tr><td colspan="8" style="text-align:center;color:var(--text-muted)">No overtime records</td></tr>
-            }
-            @for (o of overtimeRecords; track o.id) {
-              <tr>
-                <td>{{ o.employee_code }} - {{ o.first_name }} {{ o.surname }}</td>
-                <td>{{ o.overtime_date ? o.overtime_date.split('T')[0] : '-' }}</td>
-                <td>{{ o.salary_head_name || '-' }}</td>
-                <td style="text-align:right">{{ o.hours }}h</td>
-                <td style="text-align:right">x{{ o.rate_multiplier }}</td>
-                <td style="text-align:right">{{ formatCurrency(o.amount) }}</td>
-                <td><span class="status-badge" [ngClass]="'status-' + (o.status||'').toLowerCase()">{{ o.status }}</span></td>
-                <td>
-                  <div class="action-bar">
-                    @if (o.status === 'PENDING') {
-                      <button class="action-btn success" (click)="approveOvertime(o.id)">Approve</button>
-                    }
-                  </div>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-      @if (overtimeTotal > 20) {
-        <app-pagination [page]="overtimePage" [limit]="20" [total]="overtimeTotal" (pageChange)="onOvertimePage($event)"></app-pagination>
-      }
-    }
-  }
 
   @if (activeTab === 'attendance') {
     @if (attendanceLoading) {
@@ -79,7 +33,7 @@
             }
             @for (a of attendanceRecords; track a.id) {
               <tr>
-                <td>{{ a.employee_code }} - {{ a.first_name }} {{ a.surname }}</td>
+                <td>{{ a.employee_id }} | {{ a.employee_code }} - {{ a.first_name }} {{ a.surname }}</td>
                 <td>{{ a.attendance_date ? a.attendance_date.split('T')[0] : '-' }}</td>
                 <td>{{ a.clock_in || '-' }}</td>
                 <td>{{ a.clock_out || '-' }}</td>
@@ -142,7 +96,7 @@
             }
             @for (r of rosters; track $index) {
               <tr>
-                <td>{{ r.employee_code || '' }} - {{ r.first_name || '' }} {{ r.surname || '' }}</td>
+                <td>{{ r.employee_id || '' }} | {{ r.employee_code || '' }} - {{ r.first_name || '' }} {{ r.surname || '' }}</td>
                 <td>{{ r.shift_name || '-' }}</td>
                 <td>{{ r.roster_date ? r.roster_date.split('T')[0] : '-' }}</td>
                 <td>{{ r.start_time || '-' }}</td>
@@ -172,7 +126,7 @@
             }
             @for (b of flexiRecords; track $index) {
               <tr>
-                <td>{{ b.employee_code || '' }} - {{ b.first_name || '' }} {{ b.surname || '' }}</td>
+                <td>{{ b.employee_id || '' }} | {{ b.employee_code || '' }} - {{ b.first_name || '' }} {{ b.surname || '' }}</td>
                 <td style="text-align:right">{{ b.balance_hours != null ? parseFloat(b.balance_hours).toFixed(1) + 'h' : '-' }}</td>
                 <td style="text-align:right">{{ b.accrued_hours != null ? parseFloat(b.accrued_hours).toFixed(1) + 'h' : '-' }}</td>
                 <td style="text-align:right">{{ b.used_hours != null ? parseFloat(b.used_hours).toFixed(1) + 'h' : '-' }}</td>
@@ -202,7 +156,7 @@
             }
             @for (c of claimsRecords; track c.id) {
               <tr>
-                <td>{{ c.employee_code }} - {{ c.first_name }} {{ c.surname }}</td>
+                <td>{{ c.employee_id }} | {{ c.employee_code }} - {{ c.first_name }} {{ c.surname }}</td>
                 <td><span class="badge badge-info">{{ c.claim_type }}</span></td>
                 <td>{{ c.sub_type || '-' }}</td>
                 <td>{{ c.start_date ? c.start_date.split('T')[0] : '-' }}</td>
@@ -237,7 +191,7 @@
             }
             @for (i of instalments; track i.id) {
               <tr>
-                <td>{{ i.employee_code }} - {{ i.first_name }} {{ i.surname }}</td>
+                <td>{{ i.employee_id }} | {{ i.employee_code }} - {{ i.first_name }} {{ i.surname }}</td>
                 <td>{{ i.salary_head_name || '-' }}</td>
                 <td>{{ i.description || '-' }}</td>
                 <td style="text-align:right">{{ formatCurrency(i.total_amount) }}</td>
@@ -342,11 +296,12 @@
         <h4 style="margin:0 0 12px;font-size:14px"><app-icon name="check" [size]="16"></app-icon> Attendance Summary ({{ reportResults.start }} to {{ reportResults.end }})</h4>
         <div class="data-grid">
           <table>
-            <thead><tr><th>Code</th><th>Employee</th><th style="text-align:right">Present</th><th style="text-align:right">Absent</th><th style="text-align:right">Late</th><th style="text-align:right">Total Hours</th></tr></thead>
+            <thead><tr><th>ID</th><th>Code</th><th>Employee</th><th style="text-align:right">Present</th><th style="text-align:right">Absent</th><th style="text-align:right">Late</th><th style="text-align:right">Total Hours</th></tr></thead>
             <tbody>
-              @if (reportResults.data.length === 0) { <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No data found</td></tr> }
+              @if (reportResults.data.length === 0) { <tr><td colspan="7" style="text-align:center;color:var(--text-muted)">No data found</td></tr> }
               @for (r of reportResults.data; track $index) {
                 <tr>
+                  <td>{{ r.employee_id || '-' }}</td>
                   <td>{{ r.employee_code || '-' }}</td>
                   <td>{{ r.first_name || '' }} {{ r.surname || '' }}</td>
                   <td style="text-align:right">{{ r.days_present || 0 }}</td>
@@ -363,11 +318,12 @@
         <h4 style="margin:0 0 12px;font-size:14px"><app-icon name="clock" [size]="16"></app-icon> Overtime Summary</h4>
         <div class="data-grid">
           <table>
-            <thead><tr><th>Code</th><th>Employee</th><th style="text-align:right">Total Hours</th><th style="text-align:right">Total Amount</th><th>Status</th></tr></thead>
+            <thead><tr><th>ID</th><th>Code</th><th>Employee</th><th style="text-align:right">Total Hours</th><th style="text-align:right">Total Amount</th><th>Status</th></tr></thead>
             <tbody>
-              @if (reportResults.data.length === 0) { <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No data found</td></tr> }
+              @if (reportResults.data.length === 0) { <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No data found</td></tr> }
               @for (r of reportResults.data; track $index) {
                 <tr>
+                  <td>{{ r.employee_id || '-' }}</td>
                   <td>{{ r.employee_code || '-' }}</td>
                   <td>{{ r.first_name || '' }} {{ r.surname || '' }}</td>
                   <td style="text-align:right">{{ r.total_hours ? parseFloat(r.total_hours).toFixed(1) : '0.0' }}</td>
@@ -441,38 +397,6 @@
   }
 }
 
-@if (showOvertimeModal) {
-  <div class="modal-overlay visible" (click)="showOvertimeModal = false">
-    <div class="modal" (click)="$event.stopPropagation()">
-      <div class="modal-header"><h3>Capture Overtime</h3><button class="modal-close" (click)="showOvertimeModal = false">&times;</button></div>
-      <div class="modal-body">
-        <div class="form-grid">
-          <div class="form-group full-width"><label>Employee <span class="required">*</span></label>
-            <select class="form-control" [(ngModel)]="otForm.employee_id">
-              <option value="">-- Select --</option>
-              @for (emp of employees; track emp.id) { <option [value]="emp.id">{{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option> }
-            </select>
-          </div>
-          <div class="form-group"><label>Overtime Date <span class="required">*</span></label><app-date-input [(ngModel)]="otForm.overtime_date"></app-date-input></div>
-          <div class="form-group"><label>Hours Worked <span class="required">*</span></label><input class="form-control" type="number" [(ngModel)]="otForm.hours" min="0.5" max="24" step="0.5"></div>
-          <div class="form-group"><label>Rate Multiplier <span class="required">*</span></label>
-            <select class="form-control" [(ngModel)]="otForm.rate_multiplier">
-              <option value="1.5">1.5x (Weekday)</option>
-              <option value="2.0">2.0x (Sunday/Public Holiday)</option>
-              <option value="1.0">1.0x (Normal Rate)</option>
-            </select>
-          </div>
-          <div class="form-group full-width"><label>Reason</label><textarea class="form-control" [(ngModel)]="otForm.reason" placeholder="Reason for overtime..."></textarea></div>
-        </div>
-        <div style="margin-top:12px;padding:12px;background:#FEF3C7;border-radius:8px;font-size:13px;color:#92400E">
-          <strong>BCEA Note:</strong> Overtime may not exceed 10 hours per week (Section 10). Amount is calculated automatically from employee's salary.
-        </div>
-      </div>
-      <div class="modal-footer"><button class="btn" (click)="showOvertimeModal = false">Cancel</button><button class="btn btn-primary" (click)="submitOvertime()">Submit Overtime</button></div>
-    </div>
-  </div>
-}
-
 @if (showAttendanceModal) {
   <div class="modal-overlay visible" (click)="showAttendanceModal = false">
     <div class="modal" (click)="$event.stopPropagation()">
@@ -482,7 +406,7 @@
           <div class="form-group full-width"><label>Employee <span class="required">*</span></label>
             <select class="form-control" [(ngModel)]="attForm.employee_id">
               <option value="">-- Select --</option>
-              @for (emp of employees; track emp.id) { <option [value]="emp.id">{{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option> }
+              @for (emp of employees; track emp.id) { <option [value]="emp.id">{{ emp.id }} | {{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option> }
             </select>
           </div>
           <div class="form-group"><label>Date <span class="required">*</span></label><app-date-input [(ngModel)]="attForm.attendance_date"></app-date-input></div>
@@ -515,7 +439,7 @@
           <div class="form-group full-width"><label>Employee <span class="required">*</span></label>
             <select class="form-control" [(ngModel)]="rosterForm.employee_id">
               <option value="">-- Select --</option>
-              @for (emp of employees; track emp.id) { <option [value]="emp.id">{{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option> }
+              @for (emp of employees; track emp.id) { <option [value]="emp.id">{{ emp.id }} | {{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option> }
             </select>
           </div>
           <div class="form-group full-width"><label>Shift <span class="required">*</span></label>
@@ -541,7 +465,7 @@
           <div class="form-group full-width"><label>Employee <span class="required">*</span></label>
             <select class="form-control" [(ngModel)]="claimForm.employee_id">
               <option value="">-- Select --</option>
-              @for (emp of employees; track emp.id) { <option [value]="emp.id">{{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option> }
+              @for (emp of employees; track emp.id) { <option [value]="emp.id">{{ emp.id }} | {{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option> }
             </select>
           </div>
           <div class="form-group"><label>Claim Type <span class="required">*</span></label>
@@ -572,7 +496,7 @@
           <div class="form-group full-width"><label>Employee <span class="required">*</span></label>
             <select class="form-control" [(ngModel)]="instForm.employee_id">
               <option value="">-- Select --</option>
-              @for (emp of employees; track emp.id) { <option [value]="emp.id">{{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option> }
+              @for (emp of employees; track emp.id) { <option [value]="emp.id">{{ emp.id }} | {{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option> }
             </select>
           </div>
           <div class="form-group full-width"><label>Description <span class="required">*</span></label><input class="form-control" [(ngModel)]="instForm.description" placeholder="e.g. Garnishee Order - Court Ref XYZ"></div>

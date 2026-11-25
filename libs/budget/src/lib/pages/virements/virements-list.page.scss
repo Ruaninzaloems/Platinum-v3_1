@@ -3,6 +3,15 @@
   h1 { font-size: 24px; font-weight: 600; color: var(--navy); margin: 0; }
 }
 
+.preflight-error-banner {
+  display: flex; align-items: center; gap: 12px;
+  background: #fff3cd; border: 1px solid #f5c518; border-radius: 8px;
+  padding: 14px 18px; margin-bottom: 20px; color: #6b4700;
+  mat-icon { color: #d97706; flex-shrink: 0; }
+  span { flex: 1; font-size: 14px; line-height: 1.5; }
+  button { flex-shrink: 0; color: #6b4700; }
+}
+
 .kpi-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
 .kpi-card { display: flex; align-items: center; gap: 12px; background: white; border-radius: 8px; padding: 16px 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); min-width: 160px; flex: 1; }
 .kpi-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center;

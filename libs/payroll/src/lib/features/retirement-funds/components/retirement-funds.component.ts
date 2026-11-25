@@ -11,6 +11,7 @@ import { DateInputComponent } from '../../../shared/components/date-input/date-i
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent, DateInputComponent],
   templateUrl: './retirement-funds.component.html',
+  host: { 'data-accent': 'benefits' },
   styleUrl: './retirement-funds.component.css'
 })
 export class RetirementFundsComponent implements OnInit {

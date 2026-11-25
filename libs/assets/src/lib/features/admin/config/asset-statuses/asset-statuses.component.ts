@@ -19,7 +19,7 @@ export class AssetStatusesComponent implements OnInit {
   loading = signal(true);
   showForm = signal(false);
   editingId = signal<number | null>(null);
-  formData = { assetStatusDesc: '' };
+  formData = { assetStatusDesc: '', enabled: 1 };
   showImport = signal(false);
   importFile = signal<File | null>(null);
   importing = signal(false);
@@ -38,11 +38,13 @@ export class AssetStatusesComponent implements OnInit {
     });
   }
 
-  openAdd(): void { this.formData = { assetStatusDesc: '' }; this.editingId.set(null); this.showForm.set(true); }
+  openAdd(): void { this.formData = { assetStatusDesc: '', enabled: 1 }; this.editingId.set(null); this.showForm.set(true); }
 
-  openEdit(item: any): void { this.formData = { assetStatusDesc: item.assetStatusDesc }; this.editingId.set(item.assetStatus_ID); this.showForm.set(true); }
+  openEdit(item: any): void { this.formData = { assetStatusDesc: item.assetStatusDesc, enabled: item.enabled ?? 1 }; this.editingId.set(item.assetStatusId); this.showForm.set(true); }
 
   cancelForm(): void { this.showForm.set(false); this.editingId.set(null); }
+
+  onEnabledChange(event: Event): void { this.formData.enabled = (event.target as HTMLInputElement).checked ? 1 : 0; }
 
   save(): void {
     const id = this.editingId();
@@ -55,7 +57,7 @@ export class AssetStatusesComponent implements OnInit {
 
   confirmDelete(item: any): void {
     if (confirm('Delete "' + item.assetStatusDesc + '"?')) {
-      this.api.deleteAssetStatus(item.assetStatus_ID).subscribe({
+      this.api.deleteAssetStatus(item.assetStatusId).subscribe({
         next: function(this: AssetStatusesComponent) { this.loadData(); this.snackBar.open('Deleted', 'OK', { duration: 3000 }); }.bind(this),
         error: function(this: AssetStatusesComponent, err: any) { this.snackBar.open(err.error?.error || 'Delete failed', 'OK', { duration: 4000 }); }.bind(this)
       });
@@ -83,6 +85,12 @@ export class AssetStatusesComponent implements OnInit {
   downloadTemplate(): void {
     this.api.downloadAssetStatusTemplate().subscribe({
       next: function(blob: Blob) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'asset_statuses_template.xlsx'; a.click(); URL.revokeObjectURL(url); }
+    });
+  }
+
+  exportToExcel(): void {
+    this.api.exportAssetStatuses().subscribe({
+      next: function(blob: Blob) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'asset_statuses_export.xlsx'; a.click(); URL.revokeObjectURL(url); }
     });
   }
 }

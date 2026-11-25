@@ -81,4 +81,10 @@ export class LeadTimesComponent implements OnInit {
       error: function(this: LeadTimesComponent, err: any) { this.snackBar.open(err.error?.error || 'Update failed', 'OK', { duration: 4000 }); }.bind(this)
     });
   }
+
+  exportToExcel(): void {
+    this.api.exportLeadTimes().subscribe({
+      next: (blob: Blob) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'lead_times_export.xlsx'; a.click(); URL.revokeObjectURL(url); }
+    });
+  }
 }

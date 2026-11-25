@@ -1,6 +1,7 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router, ActivatedRoute } from '@angular/router';
 import { ApiService } from '../../../../core/services/api.service';
 import { UiService } from '../../../../core/services/ui.service';
 import { IconComponent } from '../../../../shared/components/icon/icon.component';
@@ -9,6 +10,7 @@ import { CurrencyZarPipe } from '../../../../shared/pipes/currency-zar.pipe';
 @Component({
   selector: 'app-employee-payslip-view',
   standalone: true,
+  host: { 'data-accent': 'payroll' },
   imports: [CommonModule, FormsModule, IconComponent, CurrencyZarPipe],
   templateUrl: './employee-payslip-view.component.html',
   styleUrl: './employee-payslip-view.component.css'
@@ -29,8 +31,11 @@ export class EmployeePayslipViewComponent implements OnInit {
   selectedEmployeeIndex = -1;
   payslipData: any = null;
   payslipLoading = false;
+  structureError: string | null = null;
 
   showPayslip = false;
+  payslipError = false;
+  lastErrorEmployeeId: number | null = null;
   activeTab: 'earnings' | 'deductions' | 'company' | 'fringe' = 'earnings';
 
   showPayeModal = false;
@@ -47,12 +52,26 @@ export class EmployeePayslipViewComponent implements OnInit {
   editingTxId: number | null = null;
 
   goToInput = '';
+  isLocked = false;
 
   Math = Math;
 
-  constructor(private api: ApiService, private ui: UiService, private cdr: ChangeDetectorRef) {}
+  private returnEmployeeId = '';
+  private returnPeriodId = '';
+
+  constructor(private api: ApiService, private ui: UiService, private cdr: ChangeDetectorRef, private router: Router, private route: ActivatedRoute) {}
 
   ngOnInit(): void {
+    const qp = this.route.snapshot.queryParams;
+    if (qp['cycleId']) {
+      this.selectedCycleId = qp['cycleId'];
+    }
+    if (qp['periodId']) {
+      this.returnPeriodId = qp['periodId'];
+    }
+    if (qp['employeeId']) {
+      this.returnEmployeeId = qp['employeeId'];
+    }
     this.loadCycles();
   }
 
@@ -60,6 +79,10 @@ export class EmployeePayslipViewComponent implements OnInit {
     this.api.get<any[]>('/payroll/cycles').subscribe({
       next: (data) => {
         this.cycles = (data || []).filter((c: any) => c.enabled);
+        if (this.selectedCycleId) {
+          this.loadEmployees();
+          this.checkLockStatus();
+        }
         this.cdr.detectChanges();
       },
       error: () => { this.cycles = []; this.cdr.detectChanges(); }
@@ -70,12 +93,24 @@ export class EmployeePayslipViewComponent implements OnInit {
     this.showPayslip = false;
     this.selectedEmployee = null;
     this.payslipData = null;
+    this.payslipError = false;
+    this.lastErrorEmployeeId = null;
     this.currentPeriod = null;
+    this.isLocked = false;
     if (this.selectedCycleId) {
       this.loadEmployees();
+      this.checkLockStatus();
     } else {
       this.employees = [];
     }
+  }
+
+  checkLockStatus(): void {
+    if (!this.selectedCycleId) { this.isLocked = false; this.cdr.detectChanges(); return; }
+    this.api.getRaw<any>('/payroll/lock-status', { cycle_id: this.selectedCycleId }).subscribe({
+      next: (res: any) => { this.isLocked = res?.data?.locked === true; this.cdr.detectChanges(); },
+      error: () => { this.isLocked = false; this.cdr.detectChanges(); }
+    });
   }
 
   loadEmployees(): void {
@@ -97,6 +132,32 @@ export class EmployeePayslipViewComponent implements OnInit {
         this.employeePagination.total = res.meta?.total || 0;
         this.employeePagination.totalPages = res.meta?.totalPages || 0;
         this.employeesLoading = false;
+        if (this.returnEmployeeId) {
+          const empId = Number(this.returnEmployeeId);
+          this.returnEmployeeId = '';
+          const found = this.employees.find((e: any) => e.id === empId);
+          if (found) {
+            const idx = this.employees.indexOf(found);
+            this.selectEmployee(found, idx);
+          } else {
+            this.api.getRaw<any>('/payroll/payslip-view/employee-lookup', {
+              cycle_id: this.selectedCycleId,
+              code: String(empId)
+            }).subscribe({
+              next: (lookupRes: any) => {
+                if (lookupRes.data) {
+                  this.selectedEmployee = lookupRes.data;
+                  this.selectedEmployeeIndex = -1;
+                  this.showPayslip = true;
+                  this.activeTab = 'earnings';
+                  this.loadPayslip(lookupRes.data.id);
+                  this.cdr.detectChanges();
+                }
+              },
+              error: () => { this.cdr.detectChanges(); }
+            });
+          }
+        }
         this.cdr.detectChanges();
       },
       error: () => {
@@ -145,28 +206,52 @@ export class EmployeePayslipViewComponent implements OnInit {
   loadPayslip(employeeId: number): void {
     if (!this.currentPeriod) return;
     this.payslipLoading = true;
+    this.payslipError = false;
+    this.structureError = null;
     this.api.getRaw<any>(`/payroll/payslip-view/employee/${employeeId}/calculate`, {
       period_id: this.currentPeriod.id,
       cycle_id: this.selectedCycleId
     }).subscribe({
       next: (res: any) => {
         this.payslipData = res.data;
+        this.payslipError = false;
+        this.lastErrorEmployeeId = null;
+        this.structureError = null;
         this.payslipLoading = false;
         this.cdr.detectChanges();
       },
-      error: () => {
+      error: (err: any) => {
         this.payslipData = null;
         this.payslipLoading = false;
-        this.ui.toast('error', 'Error', 'Failed to calculate payslip');
+        this.payslipError = true;
+        this.lastErrorEmployeeId = employeeId;
+        const errBody = err?.error;
+        const code = errBody?.error?.code;
+        const msg = errBody?.error?.message || errBody?.message || err?.message || 'Failed to calculate payslip';
+        if (code === 'SALARY_STRUCTURE_UNBALANCED') {
+          this.structureError = msg;
+        } else {
+          this.structureError = null;
+        }
+        this.ui.toast('error', 'Payslip Error', msg);
         this.cdr.detectChanges();
       }
     });
+  }
+
+  retryPayslip(): void {
+    if (this.lastErrorEmployeeId != null) {
+      this.loadPayslip(this.lastErrorEmployeeId);
+    }
   }
 
   backToList(): void {
     this.showPayslip = false;
     this.selectedEmployee = null;
     this.payslipData = null;
+    this.payslipError = false;
+    this.lastErrorEmployeeId = null;
+    this.structureError = null;
     this.activeTab = 'earnings';
   }
 
@@ -213,6 +298,29 @@ export class EmployeePayslipViewComponent implements OnInit {
       error: () => {
         this.ui.toast('warning', 'Not Found', 'Employee not found in this payroll cycle');
         this.cdr.detectChanges();
+      }
+    });
+  }
+
+  openEmployeeMaster(): void {
+    if (!this.selectedEmployee) return;
+    this.router.navigate(['/payroll/employees', this.selectedEmployee.id], {
+      queryParams: {
+        from: 'payslip',
+        cycleId: this.selectedCycleId,
+        periodId: this.currentPeriod?.id || ''
+      }
+    });
+  }
+
+  goToSalaryStructure(): void {
+    if (!this.selectedEmployee) return;
+    this.router.navigate(['/payroll/employees', this.selectedEmployee.id], {
+      queryParams: {
+        tab: 'salary-transactions',
+        from: 'payslip',
+        cycleId: this.selectedCycleId,
+        periodId: this.currentPeriod?.id || ''
       }
     });
   }
@@ -323,7 +431,11 @@ export class EmployeePayslipViewComponent implements OnInit {
         this.loadExistingTransactions();
         this.loadPayslip(this.selectedEmployee.id);
       },
-      error: () => { this.ui.toast('error', 'Error', 'Failed to delete transaction'); this.cdr.detectChanges(); }
+      error: (err: any) => {
+        const msg = err?.error?.error?.message || err?.error?.message || err?.message || 'Failed to delete transaction';
+        this.ui.toast('error', 'Error', msg);
+        this.cdr.detectChanges();
+      }
     });
   }
 
@@ -367,7 +479,11 @@ export class EmployeePayslipViewComponent implements OnInit {
           this.closeAddTxModal();
           this.loadPayslip(this.selectedEmployee.id);
         },
-        error: () => { this.ui.toast('error', 'Error', 'Failed to update transaction'); this.cdr.detectChanges(); }
+        error: (err: any) => {
+          const msg = err?.error?.error?.message || err?.error?.message || err?.message || 'Failed to update transaction';
+          this.ui.toast('error', 'Error', msg);
+          this.cdr.detectChanges();
+        }
       });
       return;
     }
@@ -386,7 +502,11 @@ export class EmployeePayslipViewComponent implements OnInit {
         this.closeAddTxModal();
         this.loadPayslip(this.selectedEmployee.id);
       },
-      error: () => { this.ui.toast('error', 'Error', 'Failed to add transaction'); this.cdr.detectChanges(); }
+      error: (err: any) => {
+        const msg = err?.error?.error?.message || err?.error?.message || err?.message || 'Failed to add transaction';
+        this.ui.toast('error', 'Error', msg);
+        this.cdr.detectChanges();
+      }
     });
   }
 
@@ -411,7 +531,11 @@ export class EmployeePayslipViewComponent implements OnInit {
         this.ui.toast('success', 'Removed', 'Transaction removed and payslip recalculated');
         this.loadPayslip(this.selectedEmployee.id);
       },
-      error: () => { this.ui.toast('error', 'Error', 'Failed to remove transaction'); this.cdr.detectChanges(); }
+      error: (err: any) => {
+        const msg = err?.error?.error?.message || err?.error?.message || err?.message || 'Failed to remove transaction';
+        this.ui.toast('error', 'Error', msg);
+        this.cdr.detectChanges();
+      }
     });
   }
 

@@ -1,0 +1,245 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Work Shifts</h1>
+    <p class="page-subtitle">Configure shift patterns — start/end times, breaks, night shift indicators</p>
+  </div>
+  <button class="btn btn-primary" (click)="openAdd()">
+    <app-icon name="plus" [size]="14"></app-icon> Add Shift
+  </button>
+</div>
+
+<div class="list-summary">
+  <div class="summary-stat">
+    <span class="summary-number">{{ shifts.length }}</span>
+    <span class="summary-label">Total Shifts</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-active">{{ enabledCount }}</span>
+    <span class="summary-label">Active</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-inactive">{{ disabledCount }}</span>
+    <span class="summary-label">Inactive</span>
+  </div>
+</div>
+
+<div class="list-toolbar">
+  <div class="search-box">
+    <app-icon name="search" [size]="14"></app-icon>
+    <input class="search-input" type="text" placeholder="Search shifts..." [(ngModel)]="search">
+    <span class="result-count">{{ filtered.length }} result{{ filtered.length !== 1 ? 's' : '' }}</span>
+  </div>
+</div>
+
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading work shifts...</div>
+} @else {
+  <div class="list-card">
+    <div class="table-wrap">
+      <table class="jp-table">
+        <thead>
+          <tr>
+            <th>Shift Name</th>
+            <th>Code</th>
+            <th>Start</th>
+            <th>End</th>
+            <th style="text-align:right">Hours</th>
+            <th style="text-align:right">Night Hrs</th>
+            <th>Break</th>
+            <th>Type</th>
+            <th>Colour</th>
+            <th>Status</th>
+            <th style="text-align:center;width:100px">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (filtered.length === 0) {
+            <tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:40px">No shifts defined — click Add Shift to create one</td></tr>
+          }
+          @for (s of filtered; track s.id) {
+            <tr [class.row-disabled]="!s.enabled">
+              <td><strong>{{ s.name }}</strong></td>
+              <td><span style="font-size:11px;color:var(--text-muted)">{{ s.short_description || '—' }}</span></td>
+              <td>{{ s.shift_start_time || '—' }}</td>
+              <td>{{ s.shift_end_time || '—' }}</td>
+              <td style="text-align:right">{{ s.total_hours != null ? (+s.total_hours).toFixed(2) + 'h' : '—' }}</td>
+              <td style="text-align:right">{{ s.night_hours != null ? (+s.night_hours).toFixed(2) + 'h' : '—' }}</td>
+              <td>
+                @if (s.has_break) {
+                  <span style="font-size:12px">{{ s.break_start_time || '' }}{{ s.break_start_time && s.break_end_time ? '–' : '' }}{{ s.break_end_time || '' }}<br>
+                  <span style="color:var(--text-muted)">{{ s.break_duration_minutes || 0 }} min</span></span>
+                } @else {
+                  <span style="color:var(--text-muted)">None</span>
+                }
+              </td>
+              <td>
+                <span class="badge" [ngClass]="s.is_night_shift ? 'badge-warning' : 'badge-info'">
+                  {{ s.is_night_shift ? 'Night' : 'Day' }}
+                </span>
+              </td>
+              <td>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <div [style.background]="s.color || '#1976D2'" style="width:18px;height:18px;border-radius:4px;border:1px solid rgba(0,0,0,.12)"></div>
+                  <span style="font-size:11px;color:var(--text-muted)">{{ s.color || '#1976D2' }}</span>
+                </div>
+              </td>
+              <td>
+                @if (s.enabled) {
+                  <span class="badge badge-success">Active</span>
+                } @else {
+                  <span class="badge badge-secondary">Inactive</span>
+                }
+              </td>
+              <td style="text-align:center">
+                <div style="display:flex;gap:6px;justify-content:center">
+                  <button class="action-btn" (click)="openEdit(s)" title="Edit">
+                    <app-icon name="edit" [size]="13"></app-icon>
+                  </button>
+                  <button class="action-btn danger" (click)="disableShift(s)" title="Disable">
+                    <app-icon name="trash" [size]="14"></app-icon>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+
+@if (showModal) {
+  <div class="modal-overlay visible" (click)="showModal = false">
+    <div class="modal modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ editingId ? 'Edit' : 'Add' }} Work Shift</h3>
+        <button class="modal-close" (click)="showModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-section">
+          <div class="form-section-title">Basic Details</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Shift Name <span class="required">*</span></label>
+              <input class="form-control" type="text" [(ngModel)]="form.name" placeholder="e.g. Day Shift A">
+            </div>
+            <div class="form-group">
+              <label>Short Code</label>
+              <input class="form-control" type="text" [(ngModel)]="form.short_description" placeholder="e.g. DSA" maxlength="50">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Shift Times</div>
+          <div class="form-grid form-grid-4">
+            <div class="form-group">
+              <label>Start Time <span class="required">*</span></label>
+              <app-time-input [(ngModel)]="form.shift_start_time" (ngModelChange)="autoCalcHours()"></app-time-input>
+            </div>
+            <div class="form-group">
+              <label>End Time <span class="required">*</span></label>
+              <app-time-input [(ngModel)]="form.shift_end_time" (ngModelChange)="autoCalcHours()"></app-time-input>
+            </div>
+            <div class="form-group">
+              <label>Total Hours</label>
+              <div class="form-control computed-field">
+                {{ form.total_hours != null ? (+form.total_hours).toFixed(2) + 'h' : '—' }}
+              </div>
+              <div class="field-hint">Auto-computed: shift duration minus break</div>
+            </div>
+            <div class="form-group">
+              <label>Night Hours</label>
+              <input class="form-control" type="number" [(ngModel)]="form.night_hours" step="0.25" min="0">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Break Configuration</div>
+          <div style="margin-bottom:12px;display:flex;align-items:center;gap:10px">
+            <label class="toggle-switch"><input type="checkbox" [(ngModel)]="form.has_break"><span class="toggle-track"><span class="toggle-thumb"></span></span></label>
+            <span style="font-size:13px;font-weight:500">Has Break Period</span>
+          </div>
+          @if (form.has_break) {
+            <div class="form-grid form-grid-4">
+              <div class="form-group">
+                <label>Break Start</label>
+                <app-time-input [(ngModel)]="form.break_start_time" (ngModelChange)="autoCalcHours()"></app-time-input>
+              </div>
+              <div class="form-group">
+                <label>Break End</label>
+                <app-time-input [(ngModel)]="form.break_end_time" (ngModelChange)="autoCalcHours()"></app-time-input>
+              </div>
+              <div class="form-group">
+                <label>Break Hours</label>
+                <div class="form-control computed-field">{{ form.break_hours != null ? (+form.break_hours).toFixed(2) + 'h' : '—' }}</div>
+              </div>
+              <div class="form-group">
+                <label>Break Minutes</label>
+                <div class="form-control computed-field">{{ form.break_duration_minutes || 0 }} min</div>
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Classification &amp; Colour</div>
+          <div class="form-grid form-grid-3">
+            <div class="form-group">
+              <label>Shift Type</label>
+              <div style="display:flex;gap:16px;padding-top:6px">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+                  <input type="radio" [value]="false" [(ngModel)]="form.is_night_shift"> Day Shift
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+                  <input type="radio" [value]="true" [(ngModel)]="form.is_night_shift"> Night Shift
+                </label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Colour</label>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;padding-top:4px">
+                @for (c of colorOptions; track c) {
+                  <div [style.background]="c" (click)="form.color = c"
+                       style="width:24px;height:24px;border-radius:4px;cursor:pointer;transition:transform .15s"
+                       [style.transform]="form.color === c ? 'scale(1.25)' : 'scale(1)'"
+                       [style.border]="form.color === c ? '2px solid #0f2b46' : '1px solid rgba(0,0,0,.15)'"
+                       [title]="c"></div>
+                }
+                <input type="color" [(ngModel)]="form.color" style="width:26px;height:26px;border:none;padding:0;cursor:pointer;border-radius:4px">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Enabled</label>
+              <div style="padding-top:6px">
+                <label class="toggle-switch"><input type="checkbox" [(ngModel)]="form.enabled"><span class="toggle-track"><span class="toggle-thumb"></span></span></label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Validity Period (optional)</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Effective From</label>
+              <app-date-input [(ngModel)]="form.start_date"></app-date-input>
+            </div>
+            <div class="form-group">
+              <label>Effective To</label>
+              <app-date-input [(ngModel)]="form.end_date"></app-date-input>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showModal = false" [disabled]="saving">Cancel</button>
+        <button class="btn btn-primary" (click)="save()" [disabled]="saving">
+          @if (saving) { <div class="spinner spinner-sm"></div> } @else { <app-icon name="save" [size]="14"></app-icon> }
+          {{ editingId ? 'Update' : 'Create' }} Shift
+        </button>
+      </div>
+    </div>
+  </div>
+}

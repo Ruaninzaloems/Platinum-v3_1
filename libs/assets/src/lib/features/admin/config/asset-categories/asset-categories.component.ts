@@ -53,23 +53,25 @@ export class AssetCategoriesComponent implements OnInit {
 
   getTypeName(typeId: number): string {
     const types = this.assetTypes();
-    for (let i = 0; i < types.length; i++) { if (types[i].assetType_ID === typeId) return types[i].assetTypeDesc; }
+    for (let i = 0; i < types.length; i++) { if (types[i].assetTypeId === typeId) return types[i].assetTypeDesc; }
     return '';
   }
 
-  openAdd(): void { this.formData = { assetCategoryDesc: '', typeID: null }; this.editingId.set(null); this.showForm.set(true); }
+  openAdd(): void { this.formData = { assetCategoryDesc: '', typeID: null, enabled: 1 }; this.editingId.set(null); this.showForm.set(true); }
 
   openEdit(item: any): void {
-    this.formData = { assetCategoryDesc: item.assetCategoryDesc, typeID: item.typeID };
-    this.editingId.set(item.assetCategoryID);
+    this.formData = { assetCategoryDesc: item.assetCategoryDesc, typeID: item.typeID, enabled: item.enabled ?? 1 };
+    this.editingId.set(item.assetCategoryId);
     this.showForm.set(true);
   }
 
   cancelForm(): void { this.showForm.set(false); this.editingId.set(null); }
 
+  onEnabledChange(event: Event): void { this.formData.enabled = (event.target as HTMLInputElement).checked ? 1 : 0; }
+
   save(): void {
     const id = this.editingId();
-    const payload = { assetCategoryDesc: this.formData.assetCategoryDesc, typeID: Number(this.formData.typeID) };
+    const payload = { assetCategoryDesc: this.formData.assetCategoryDesc, typeID: Number(this.formData.typeID), enabled: this.formData.enabled };
     const obs = id ? this.api.updateAssetCategory(id, payload) : this.api.createAssetCategory(payload);
     obs.subscribe({
       next: function(this: AssetCategoriesComponent) { this.showForm.set(false); this.loadData(); this.snackBar.open(id ? 'Updated' : 'Created', 'OK', { duration: 3000 }); }.bind(this),
@@ -79,7 +81,7 @@ export class AssetCategoriesComponent implements OnInit {
 
   confirmDelete(item: any): void {
     if (confirm('Delete "' + item.assetCategoryDesc + '"?')) {
-      this.api.deleteAssetCategory(item.assetCategoryID).subscribe({
+      this.api.deleteAssetCategory(item.assetCategoryId).subscribe({
         next: function(this: AssetCategoriesComponent) { this.loadData(); this.snackBar.open('Deleted', 'OK', { duration: 3000 }); }.bind(this),
         error: function(this: AssetCategoriesComponent, err: any) { this.snackBar.open(err.error?.error || 'Delete failed', 'OK', { duration: 4000 }); }.bind(this)
       });
@@ -103,6 +105,12 @@ export class AssetCategoriesComponent implements OnInit {
   downloadTemplate(): void {
     this.api.downloadAssetCategoryTemplate().subscribe({
       next: function(blob: Blob) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'asset_categories_template.xlsx'; a.click(); URL.revokeObjectURL(url); }
+    });
+  }
+
+  exportToExcel(): void {
+    this.api.exportAssetCategories().subscribe({
+      next: function(blob: Blob) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'asset_categories_export.xlsx'; a.click(); URL.revokeObjectURL(url); }
     });
   }
 }

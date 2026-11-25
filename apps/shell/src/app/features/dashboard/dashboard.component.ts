@@ -1,9 +1,18 @@
-import { Component } from '@angular/core';
+import { Component, isDevMode } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '@platinumv3/shared/auth';
+
+interface DashboardModule {
+  name: string;
+  path: string;
+  module: string;   // side-nav module code — gates visibility via AuthService.canAccessModule
+  icon: string;
+  color: string;
+  description: string;
+}
 
 @Component({
   selector: 'app-dashboard',
@@ -13,15 +22,21 @@ import { AuthService } from '@platinumv3/shared/auth';
     <div class="dashboard">
       <h2>Welcome, {{ authService.user()?.firstName }} {{ authService.user()?.lastName }}</h2>
       <p class="subtitle">Platinum ERP — Municipal Management System</p>
-      <div class="module-grid">
-        @for (mod of modules; track mod.path) {
-          <a [routerLink]="mod.path" class="module-card">
-            <mat-icon class="module-icon" [style.color]="mod.color">{{ mod.icon }}</mat-icon>
-            <h3>{{ mod.name }}</h3>
-            <p>{{ mod.description }}</p>
-          </a>
-        }
-      </div>
+      @if (visibleModules().length === 0) {
+        <div class="no-access">
+          No access granted. Please contact your administrator.
+        </div>
+      } @else {
+        <div class="module-grid">
+          @for (mod of visibleModules(); track mod.path) {
+            <a [routerLink]="mod.path" class="module-card">
+              <mat-icon class="module-icon" [style.color]="mod.color">{{ mod.icon }}</mat-icon>
+              <h3>{{ mod.name }}</h3>
+              <p>{{ mod.description }}</p>
+            </a>
+          }
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -38,19 +53,44 @@ import { AuthService } from '@platinumv3/shared/auth';
     .module-icon { font-size: 48px; width: 48px; height: 48px; margin-bottom: 1rem; }
     h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
     p { font-size: 0.85rem; color: #64748b; line-height: 1.4; }
+    .no-access {
+      display: flex; align-items: center; justify-content: center; text-align: center;
+      width: 220px; min-height: 200px; padding: 2rem; box-sizing: border-box;
+      background: #5f7fa6; color: #fff; font-weight: 700; font-size: 1.05rem; line-height: 1.4;
+      border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    }
   `]
 })
 export class DashboardComponent {
   constructor(public authService: AuthService) {}
 
-  modules = [
-    { name: 'Asset Management', path: '/assets', icon: 'inventory_2', color: '#1a237e', description: 'GRAP-compliant asset register, verification, depreciation and disposal management.' },
-    { name: 'Supply Chain', path: '/scm', icon: 'local_shipping', color: '#0d47a1', description: 'SCM procurement workflows, supplier management, and bid processes.' },
-    { name: 'Point of Sale', path: '/pos', icon: 'point_of_sale', color: '#1b5e20', description: 'Revenue collection, payment processing, debt management and billing.' },
-    { name: 'Payroll', path: '/payroll', icon: 'payments', color: '#e65100', description: 'Employee management, salary processing, tax calculations and reporting.' },
-    { name: 'IDP', path: '/idp', icon: 'account_tree', color: '#4a148c', description: 'Integrated Development Plan cycles, projects and performance tracking.' },
-    { name: 'Budget', path: '/budget', icon: 'account_balance', color: '#006064', description: 'MFMA budget preparation, virements, scenarios and expenditure tracking.' },
-    { name: 'AFS', path: '/afs', icon: 'description', color: '#bf360c', description: 'Annual Financial Statements builder, mappings, compilations and audit management.' },
-    { name: 'Performance', path: '/insight', icon: 'insights', color: '#311b92', description: 'KPI tracking, SDBIP monitoring, and municipal performance analytics.' }
+  // POS and Performance are still in active development — hidden on production
+  // builds, mirroring the side nav (shell.component.ts canShowModule).
+  private readonly _isDev = isDevMode();
+  private readonly _devOnlyModules = new Set<string>(['pos', 'insights']);
+
+  modules: DashboardModule[] = [
+    { name: 'Asset Management', path: '/assets', module: 'assets', icon: 'inventory_2', color: '#1a237e', description: 'GRAP-compliant asset register, verification, depreciation and disposal management.' },
+    { name: 'Supply Chain', path: '/scm', module: 'scm', icon: 'local_shipping', color: '#0d47a1', description: 'SCM procurement workflows, supplier management, and bid processes.' },
+    { name: 'Point of Sale', path: '/pos', module: 'pos', icon: 'point_of_sale', color: '#1b5e20', description: 'Revenue collection, payment processing, debt management and billing.' },
+    { name: 'Payroll', path: '/payroll', module: 'payroll', icon: 'payments', color: '#e65100', description: 'Employee management, salary processing, tax calculations and reporting.' },
+    { name: 'IDP', path: '/idp', module: 'idp', icon: 'account_tree', color: '#4a148c', description: 'Integrated Development Plan cycles, projects and performance tracking.' },
+    { name: 'Budget', path: '/budget', module: 'budget', icon: 'account_balance', color: '#006064', description: 'MFMA budget preparation, virements, scenarios and expenditure tracking.' },
+    { name: 'AFS', path: '/afs', module: 'afs', icon: 'description', color: '#bf360c', description: 'Annual Financial Statements builder, mappings, compilations and audit management.' },
+    { name: 'Performance', path: '/ins', module: 'insights', icon: 'trending_up', color: '#311b92', description: 'KPI tracking, SDBIP monitoring, and municipal performance analytics.' },
+    { name: 'Overtime', path: '/overtime', module: 'overtime', icon: 'more_time', color: '#00838f', description: 'Overtime capture, approvals and payroll processing.' }
   ];
+
+  /**
+   * Tiles the current user may see — the same rule as the side-nav chips:
+   * the user must have access to the module (AuthService.canAccessModule) AND,
+   * for in-development modules, be on a dev build. superUsers pass the access
+   * check for everything.
+   */
+  visibleModules(): DashboardModule[] {
+    return this.modules.filter(m => {
+      if (this._devOnlyModules.has(m.module) && !this._isDev) return false;
+      return this.authService.canAccessModule(m.module);
+    });
+  }
 }

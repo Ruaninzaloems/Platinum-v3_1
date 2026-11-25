@@ -11,13 +11,19 @@ public class AssetConfigEventTypeController : ControllerBase
     private readonly DbConnectionFactory _db;
     public AssetConfigEventTypeController(DbConnectionFactory db) => _db = db;
 
+    private const string SelectColumns = @"
+        SELECT ""EventType_ID""   AS ""eventTypeId"",
+               ""SourceDocType""  AS ""sourceDocType"",
+               ""EventType""      AS ""eventType"",
+               ""Description""    AS ""description""
+        FROM ""AssetConfig_EventType""";
+
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
-        var items = await conn.QueryAsync<dynamic>(@"
-            SELECT * FROM ""AssetConfig_EventType"" ORDER BY ""EventTypeCode""");
+        var items = await conn.QueryAsync<dynamic>(SelectColumns + @" ORDER BY ""EventType""");
         return Ok(items);
     }
 
@@ -26,8 +32,8 @@ public class AssetConfigEventTypeController : ControllerBase
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
-        var item = await conn.QueryFirstOrDefaultAsync<dynamic>(@"
-            SELECT * FROM ""AssetConfig_EventType"" WHERE ""EventType_ID"" = @id", new { id });
+        var item = await conn.QueryFirstOrDefaultAsync<dynamic>(
+            SelectColumns + @" WHERE ""EventType_ID"" = @id", new { id });
         return item is null ? NotFound() : Ok(item);
     }
 }

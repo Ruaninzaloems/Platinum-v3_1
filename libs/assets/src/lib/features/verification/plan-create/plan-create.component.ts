@@ -7,11 +7,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../../core/api.service';
+import { EmployeeSelectComponent } from '../../../shared/employee-select/employee-select.component';
 
 @Component({
   selector: 'app-plan-create',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatButtonModule, MatSnackBarModule],
+  imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatButtonModule, MatSnackBarModule, EmployeeSelectComponent],
   template: `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
       <button mat-icon-button routerLink="/assets/verification/planning"><mat-icon>arrow_back</mat-icon></button>
@@ -52,8 +53,8 @@ import { ApiService } from '../../../core/api.service';
               <button type="button" class="toggle-all-btn" (click)="toggleAllTypes()">{{allTypesSelected() ? 'None' : 'All'}}</button>
             </label>
             <select multiple class="field-input multi-select" [(ngModel)]="form.selectedAssetTypes">
-              @for (t of assetTypes; track t.assetType_ID) {
-                <option [value]="t.assetType_ID">{{t.assetTypeDesc}}</option>
+              @for (t of assetTypes; track t.assetTypeId) {
+                <option [value]="t.assetTypeId">{{t.assetTypeDesc}}</option>
               }
             </select>
           </div>
@@ -62,8 +63,8 @@ import { ApiService } from '../../../core/api.service';
               <button type="button" class="toggle-all-btn" (click)="toggleAllCategories()">{{allCategoriesSelected() ? 'None' : 'All'}}</button>
             </label>
             <select multiple class="field-input multi-select" [(ngModel)]="form.selectedCategories">
-              @for (c of filteredCategories; track c.assetCategoryID) {
-                <option [value]="c.assetCategoryID">{{c.assetCategoryDesc}}</option>
+              @for (c of filteredCategories; track c.assetCategoryId) {
+                <option [value]="c.assetCategoryId">{{c.assetCategoryDesc}}</option>
               }
             </select>
           </div>
@@ -146,12 +147,13 @@ import { ApiService } from '../../../core/api.service';
                     @if (tm.isExternal) {
                       <input class="field-input" style="width:200px" [(ngModel)]="tm.employeeName" placeholder="Full name">
                     } @else {
-                      <select class="field-input" style="width:200px" [(ngModel)]="tm.employeeId" (change)="onEmployeeSelect(tm)">
-                        <option [value]="null">-- Select --</option>
-                        @for (e of employees; track e.employeeId) {
-                          <option [value]="e.employeeId">{{e.surname}}, {{e.firstName}}</option>
-                        }
-                      </select>
+                      <app-employee-select
+                        [(ngModel)]="tm.employeeId"
+                        placeholder="-- Select --"
+                        selectClass="field-input"
+                        selectStyle="width:200px"
+                        (selectionChange)="onEmployeeSelect(tm, $event)"
+                      ></app-employee-select>
                     }
                   </td>
                   <td style="text-align:center">
@@ -236,7 +238,6 @@ export class PlanCreateComponent implements OnInit {
   towns: any[] = [];
   suburbs: any[] = [];
   buildings: any[] = [];
-  employees: any[] = [];
   registers: any[] = [];
 
   get filteredCategories(): any[] {
@@ -275,7 +276,7 @@ export class PlanCreateComponent implements OnInit {
       this.form.selectedAssetTypes = [];
     } else {
       var ids: number[] = [];
-      for (var i = 0; i < this.assetTypes.length; i++) ids.push(this.assetTypes[i].assetType_ID);
+      for (var i = 0; i < this.assetTypes.length; i++) ids.push(this.assetTypes[i].assetTypeId);
       this.form.selectedAssetTypes = ids;
     }
   }
@@ -286,7 +287,7 @@ export class PlanCreateComponent implements OnInit {
       this.form.selectedCategories = [];
     } else {
       var ids: number[] = [];
-      for (var i = 0; i < cats.length; i++) ids.push(cats[i].assetCategoryID);
+      for (var i = 0; i < cats.length; i++) ids.push(cats[i].assetCategoryId);
       this.form.selectedCategories = ids;
     }
   }
@@ -301,7 +302,6 @@ export class PlanCreateComponent implements OnInit {
       towns: this.api.getVerificationLookupTowns(),
       suburbs: this.api.getVerificationLookupSuburbs(),
       buildings: this.api.getVerificationLookupBuildings(),
-      employees: this.api.getEmployees(),
       registers: this.api.getVerificationRegisters({ isHistory: 0 })
     }).subscribe({
       next: function(data: any) {
@@ -310,7 +310,6 @@ export class PlanCreateComponent implements OnInit {
         self.towns = data.towns || [];
         self.suburbs = data.suburbs || [];
         self.buildings = data.buildings || [];
-        self.employees = data.employees || [];
         self.registers = data.registers || [];
       }
     });
@@ -335,14 +334,11 @@ export class PlanCreateComponent implements OnInit {
     this.teamMembers.splice(idx, 1);
   }
 
-  onEmployeeSelect(tm: any) {
-    if (tm.employeeId) {
-      for (var i = 0; i < this.employees.length; i++) {
-        if (this.employees[i].employeeId === tm.employeeId) {
-          tm.employeeName = this.employees[i].surname + ', ' + this.employees[i].firstName;
-          break;
-        }
-      }
+  onEmployeeSelect(tm: any, emp: any) {
+    if (emp) {
+      tm.employeeName = emp.surname + ', ' + emp.firstName;
+    } else {
+      tm.employeeName = '';
     }
   }
 

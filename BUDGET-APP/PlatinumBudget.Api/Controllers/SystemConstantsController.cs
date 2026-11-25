@@ -36,7 +36,7 @@ public class SystemConstantsController : ControllerBase
     {
         var query = _db.Const_BudgetSplitOptions.AsQueryable();
         if (enabledOnly == true) query = query.Where(x => x.Enabled);
-        return Ok(await query.OrderBy(x => x.BudgetSplit_ID).ToListAsync());
+        return Ok(await query.OrderBy(x => x.DivideBy_ID).ToListAsync());
     }
 
     [HttpGet("budget-split-options/{id}")]
@@ -213,6 +213,52 @@ public class SystemConstantsController : ControllerBase
         return Ok(await query.OrderBy(x => x.IDPLevelNumber).ThenBy(x => x.ItemOrderID).ThenBy(x => x.Item_ID).ToListAsync());
     }
 
+    [HttpGet("idp-items/with-path")]
+    public async Task<IActionResult> GetIdpItemsWithPath([FromQuery] string? financialYear)
+    {
+        var fy = string.IsNullOrEmpty(financialYear) ? "2025/2026" : financialYear;
+
+        var header = await _db.ConstIdpLevelDescriptionHeaders
+            .Where(h => h.FinancialYear == fy)
+            .FirstOrDefaultAsync();
+        var maxLevel = header?.IDPNumLevel ?? 5;
+
+        var allItems = await _db.IdpItems
+            .Where(x => x.FinancialYear == fy && x.IDPLevelNumber < 50)
+            .OrderBy(x => x.IDPLevelNumber).ThenBy(x => x.ItemOrderID).ThenBy(x => x.Item_ID)
+            .ToListAsync();
+
+        var map = allItems.ToDictionary(x => x.Item_ID);
+
+        string BuildPath(IdpItem item)
+        {
+            var parts = new List<string>();
+            var current = item;
+            while (current != null)
+            {
+                parts.Insert(0, current.ItemDesc ?? "");
+                current = current.ItemParentID.HasValue && map.ContainsKey(current.ItemParentID.Value)
+                    ? map[current.ItemParentID.Value]
+                    : null;
+            }
+            return string.Join(" > ", parts);
+        }
+
+        var leafItems = allItems.Where(x => x.IDPLevelNumber == maxLevel);
+
+        var result = leafItems.Select(x => new
+        {
+            item_ID = x.Item_ID,
+            itemDesc = x.ItemDesc,
+            idpLevelNumber = x.IDPLevelNumber,
+            itemParentID = x.ItemParentID,
+            financialYear = x.FinancialYear,
+            path = BuildPath(x)
+        });
+
+        return Ok(result);
+    }
+
     [HttpGet("idp-items/{id}")]
     public async Task<IActionResult> GetIdpItem(int id)
     {
@@ -221,12 +267,22 @@ public class SystemConstantsController : ControllerBase
     }
 
     [HttpGet("scoa-function-structure-consolidated")]
-    public async Task<IActionResult> GetScoaFunctionStructureConsolidated([FromQuery] bool? enabledOnly, [FromQuery] string? finYearText)
+    public async Task<IActionResult> GetScoaFunctionStructureConsolidated([FromQuery] bool? enabledOnly, [FromQuery] string? finYearText, [FromQuery] int? parentId, [FromQuery] bool? rootOnly, [FromQuery] string? postingLevel, [FromQuery] string? search, [FromQuery] int? take)
     {
         var query = _db.ConstScoaFunctionStructureConsolidated.AsQueryable();
-        if (enabledOnly == true) query = query.Where(x => x.Enabled == true);
+        if (enabledOnly == true)          query = query.Where(x => x.Enabled == true);
         if (!string.IsNullOrEmpty(finYearText)) query = query.Where(x => x.FinYearText == finYearText);
-        return Ok(await query.OrderBy(x => x.LevelID).ThenBy(x => x.ScoaID).ToListAsync());
+        if (parentId.HasValue)            query = query.Where(x => x.ScoaParentID == parentId);
+        if (rootOnly == true)             query = query.Where(x => x.ScoaParentID == null || x.ScoaParentID == 0);
+        if (!string.IsNullOrEmpty(postingLevel)) query = query.Where(x => x.PostingLevel == postingLevel);
+        if (!string.IsNullOrEmpty(search))
+            query = query.Where(x => (x.ScoaCode != null && x.ScoaCode.Contains(search)) ||
+                                     (x.ScoaShortDesc != null && x.ScoaShortDesc.Contains(search)) ||
+                                     (x.ScoaDesc != null && x.ScoaDesc.Contains(search)) ||
+                                     (x.NTScoaID != null && x.NTScoaID.Contains(search)));
+        var ordered = query.OrderBy(x => x.LevelID).ThenBy(x => x.ScoaID);
+        var result = take.HasValue ? await ordered.Take(take.Value).ToListAsync() : await ordered.ToListAsync();
+        return Ok(result);
     }
 
     [HttpGet("scoa-function-structure-consolidated/{id}")]
@@ -237,13 +293,23 @@ public class SystemConstantsController : ControllerBase
     }
 
     [HttpGet("scoa-funds-structure-consolidated")]
-    public async Task<IActionResult> GetScoaFundsStructureConsolidated([FromQuery] bool? enabledOnly, [FromQuery] string? finYearText, [FromQuery] int? levelID)
+    public async Task<IActionResult> GetScoaFundsStructureConsolidated([FromQuery] bool? enabledOnly, [FromQuery] string? finYearText, [FromQuery] int? levelID, [FromQuery] int? parentId, [FromQuery] bool? rootOnly, [FromQuery] string? postingLevel, [FromQuery] string? search, [FromQuery] int? take)
     {
         var query = _db.ConstScoaFundsStructureConsolidated.AsQueryable();
         if (enabledOnly == true) query = query.Where(x => x.Enabled == true);
         if (!string.IsNullOrEmpty(finYearText)) query = query.Where(x => x.FinYearText == finYearText);
         if (levelID.HasValue) query = query.Where(x => x.LevelID == levelID);
-        return Ok(await query.OrderBy(x => x.LevelID).ThenBy(x => x.ScoaID).ToListAsync());
+        if (parentId.HasValue) query = query.Where(x => x.ScoaParentID == parentId);
+        if (rootOnly == true) query = query.Where(x => x.ScoaParentID == null || x.ScoaParentID == 0);
+        if (!string.IsNullOrEmpty(postingLevel)) query = query.Where(x => x.PostingLevel == postingLevel);
+        if (!string.IsNullOrEmpty(search))
+            query = query.Where(x => (x.ScoaCode != null && x.ScoaCode.Contains(search)) ||
+                                     (x.ScoaShortDesc != null && x.ScoaShortDesc.Contains(search)) ||
+                                     (x.ScoaDesc != null && x.ScoaDesc.Contains(search)) ||
+                                     (x.NTScoaID != null && x.NTScoaID.Contains(search)));
+        var ordered = query.OrderBy(x => x.LevelID).ThenBy(x => x.ScoaID);
+        var result = take.HasValue ? await ordered.Take(take.Value).ToListAsync() : await ordered.ToListAsync();
+        return Ok(result);
     }
 
     [HttpGet("scoa-funds-structure-consolidated/{id}")]
@@ -274,13 +340,23 @@ public class SystemConstantsController : ControllerBase
     }
 
     [HttpGet("scoa-regional-structure-consolidated")]
-    public async Task<IActionResult> GetScoaRegionalStructureConsolidated([FromQuery] bool? enabledOnly, [FromQuery] string? finYearText, [FromQuery] int? levelID)
+    public async Task<IActionResult> GetScoaRegionalStructureConsolidated([FromQuery] bool? enabledOnly, [FromQuery] string? finYearText, [FromQuery] int? levelID, [FromQuery] int? parentId, [FromQuery] bool? rootOnly, [FromQuery] string? postingLevel, [FromQuery] string? search, [FromQuery] int? take)
     {
         var query = _db.ConstScoaRegionalStructureConsolidated.AsQueryable();
         if (enabledOnly == true) query = query.Where(x => x.Enabled == true);
         if (!string.IsNullOrEmpty(finYearText)) query = query.Where(x => x.FinYearText == finYearText);
         if (levelID.HasValue) query = query.Where(x => x.LevelID == levelID);
-        return Ok(await query.OrderBy(x => x.LevelID).ThenBy(x => x.ScoaID).ToListAsync());
+        if (parentId.HasValue) query = query.Where(x => x.ScoaParentID == parentId.Value);
+        if (rootOnly == true)  query = query.Where(x => x.ScoaParentID == null || x.ScoaParentID == 0);
+        if (!string.IsNullOrEmpty(postingLevel)) query = query.Where(x => x.PostingLevel == postingLevel);
+        if (!string.IsNullOrEmpty(search))
+            query = query.Where(x => (x.ScoaCode != null && x.ScoaCode.Contains(search)) ||
+                                     (x.ScoaShortDesc != null && x.ScoaShortDesc.Contains(search)) ||
+                                     (x.ScoaDesc != null && x.ScoaDesc.Contains(search)) ||
+                                     (x.NTScoaID != null && x.NTScoaID.Contains(search)));
+        var ordered = query.OrderBy(x => x.LevelID).ThenBy(x => x.ScoaID);
+        var result = take.HasValue ? await ordered.Take(take.Value).ToListAsync() : await ordered.ToListAsync();
+        return Ok(result);
     }
 
     [HttpGet("scoa-regional-structure-consolidated/{id}")]
@@ -304,7 +380,8 @@ public class SystemConstantsController : ControllerBase
         if (!string.IsNullOrEmpty(search))
             query = query.Where(x => (x.ScoaCode != null && x.ScoaCode.Contains(search)) ||
                                      (x.ScoaShortDesc != null && x.ScoaShortDesc.Contains(search)) ||
-                                     (x.ScoaDesc != null && x.ScoaDesc.Contains(search)));
+                                     (x.ScoaDesc != null && x.ScoaDesc.Contains(search)) ||
+                                     (x.NTScoaID != null && x.NTScoaID.Contains(search)));
         var ordered = query.OrderBy(x => x.NTSCOAFile).ThenBy(x => x.LevelID).ThenBy(x => x.ScoaID);
         var result = take.HasValue ? await ordered.Take(take.Value).ToListAsync() : await ordered.ToListAsync();
         return Ok(result);
@@ -318,13 +395,25 @@ public class SystemConstantsController : ControllerBase
     }
 
     [HttpGet("scoa-costing-structure-consolidated")]
-    public async Task<IActionResult> GetScoaCostingStructureConsolidated([FromQuery] bool? enabledOnly, [FromQuery] string? finYearText, [FromQuery] string? scoaFile)
+    public async Task<IActionResult> GetScoaCostingStructureConsolidated([FromQuery] bool? enabledOnly, [FromQuery] string? finYearText, [FromQuery] string? scoaFile, [FromQuery] int? parentId, [FromQuery] bool? rootOnly, [FromQuery] string? postingLevel, [FromQuery] string? search, [FromQuery] int? take)
     {
         var query = _db.ConstScoaCostingStructureConsolidated.AsQueryable();
         if (enabledOnly == true) query = query.Where(x => x.Enabled == true);
         if (!string.IsNullOrEmpty(finYearText)) query = query.Where(x => x.FinYearText == finYearText);
         if (!string.IsNullOrEmpty(scoaFile)) query = query.Where(x => x.NTSCOAFile == scoaFile);
-        return Ok(await query.OrderBy(x => x.LevelID).ThenBy(x => x.ScoaID).ToListAsync());
+        if (parentId.HasValue)
+            query = query.Where(x => x.ScoaParentID == parentId.Value);
+        else if (rootOnly == true)
+            query = query.Where(x => x.ScoaParentID == null || x.ScoaParentID == 0);
+        if (!string.IsNullOrEmpty(postingLevel)) query = query.Where(x => x.PostingLevel == postingLevel);
+        if (!string.IsNullOrEmpty(search))
+            query = query.Where(x => (x.ScoaCode != null && x.ScoaCode.Contains(search)) ||
+                                     (x.ScoaShortDesc != null && x.ScoaShortDesc.Contains(search)) ||
+                                     (x.ScoaDesc != null && x.ScoaDesc.Contains(search)) ||
+                                     (x.NTScoaID != null && x.NTScoaID.Contains(search)));
+        var ordered = query.OrderBy(x => x.LevelID).ThenBy(x => x.ScoaID);
+        var result = take.HasValue ? await ordered.Take(take.Value).ToListAsync() : await ordered.ToListAsync();
+        return Ok(result);
     }
 
     [HttpGet("scoa-costing-structure-consolidated/{id}")]
@@ -391,5 +480,117 @@ public class SystemConstantsController : ControllerBase
     {
         var item = await _db.ConstStatuses.FindAsync(id);
         return item == null ? NotFound() : Ok(item);
+    }
+
+    // ── Municipal Classification tree ─────────────────────────────────────
+    // rootOnly=true  → Const_Department nodes
+    // deptId={id}    → root Const_Division nodes for that dept (DivisionParentID IS NULL)
+    // parentId={id}  → child Const_Division nodes for that parent division
+    [HttpGet("municipal-classification-tree")]
+    public async Task<IActionResult> GetMunicipalClassificationTree(
+        [FromQuery] bool? rootOnly,
+        [FromQuery] int? deptId,
+        [FromQuery] int? parentId)
+    {
+        if (rootOnly == true)
+        {
+            var depts = await _db.Const_Department
+                .Where(d => d.Enabled)
+                .OrderBy(d => d.DepartmentCode)
+                .ToListAsync();
+
+            var deptIds = depts.Select(d => d.Department_ID).ToList();
+            var hasChildDiv = (await _db.Const_Division
+                .Where(d => deptIds.Contains(d.DepartmentID) && d.DivisionParentID == null && d.Enabled)
+                .Select(d => d.DepartmentID)
+                .Distinct()
+                .ToListAsync()).ToHashSet();
+
+            return Ok(depts.Select(d => new
+            {
+                id       = d.Department_ID,
+                code     = d.DepartmentCode,
+                label    = !string.IsNullOrEmpty(d.DepartmentCode) && !string.IsNullOrEmpty(d.DepartmentDesc)
+                           ? $"{d.DepartmentCode} - {d.DepartmentDesc}"
+                           : d.DepartmentCode ?? d.DepartmentDesc,
+                nodeType = "dept",
+                isLeaf   = false
+            }));
+        }
+
+        if (deptId.HasValue)
+        {
+            var rootDivs = await _db.Const_Division
+                .Where(d => d.DepartmentID == deptId.Value && d.DivisionParentID == null && d.Enabled)
+                .OrderBy(d => d.DivisionCode)
+                .ToListAsync();
+
+            var divIds = rootDivs.Select(d => d.Division_ID).ToList();
+            var hasChildren = (await _db.Const_Division
+                .Where(d => d.DivisionParentID.HasValue && divIds.Contains(d.DivisionParentID.Value) && d.Enabled)
+                .Select(d => d.DivisionParentID!.Value)
+                .Distinct()
+                .ToListAsync()).ToHashSet();
+
+            return Ok(rootDivs.Select(d => new
+            {
+                id       = d.Division_ID,
+                code     = d.DivisionCode,
+                label    = !string.IsNullOrEmpty(d.DivisionCode) && !string.IsNullOrEmpty(d.DivisionDesc)
+                           ? $"{d.DivisionCode} - {d.DivisionDesc}"
+                           : d.DivisionCode ?? d.DivisionDesc,
+                nodeType = "div",
+                isLeaf   = !hasChildren.Contains(d.Division_ID)
+            }));
+        }
+
+        if (parentId.HasValue)
+        {
+            var children = await _db.Const_Division
+                .Where(d => d.DivisionParentID == parentId.Value && d.Enabled)
+                .OrderBy(d => d.DivisionCode)
+                .ToListAsync();
+
+            var childIds = children.Select(d => d.Division_ID).ToList();
+            var hasGrandChildren = (await _db.Const_Division
+                .Where(d => d.DivisionParentID.HasValue && childIds.Contains(d.DivisionParentID.Value) && d.Enabled)
+                .Select(d => d.DivisionParentID!.Value)
+                .Distinct()
+                .ToListAsync()).ToHashSet();
+
+            return Ok(children.Select(d => new
+            {
+                id       = d.Division_ID,
+                code     = d.DivisionCode,
+                label    = !string.IsNullOrEmpty(d.DivisionCode) && !string.IsNullOrEmpty(d.DivisionDesc)
+                           ? $"{d.DivisionCode} - {d.DivisionDesc}"
+                           : d.DivisionCode ?? d.DivisionDesc,
+                nodeType = "div",
+                isLeaf   = !hasGrandChildren.Contains(d.Division_ID)
+            }));
+        }
+
+        return BadRequest("Provide rootOnly=true, deptId, or parentId");
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // GET /api/constants/project-items?finYear=&search=
+    // Returns Const_ProjectItem entries (Enabled=true, filtered by FinYear and optional search text)
+    // ──────────────────────────────────────────────────────────
+    [HttpGet("project-items")]
+    public async Task<IActionResult> GetProjectItems([FromQuery] string? finYear, [FromQuery] string? search)
+    {
+        var query = _db.Const_ProjectItem.Where(x => x.Enabled);
+        if (!string.IsNullOrWhiteSpace(finYear))
+            query = query.Where(x => x.FinYear == finYear || x.FinYear == null);
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(x => x.Code != null && x.Code.ToLower().Contains(search.ToLower()));
+
+        var results = await query
+            .OrderBy(x => x.Code)
+            .Select(x => new { id = x.ProjectItem_ID, code = x.Code, description = x.Description, finYear = x.FinYear })
+            .ToListAsync();
+
+        return Ok(results);
     }
 }

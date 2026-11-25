@@ -7,10 +7,11 @@ public record TariffDto(int Id, int ServiceCategoryId, string ServiceCategoryNam
 public record CreateTariffDto(int ServiceCategoryId, string Name, string PropertyCategory, string TariffType, decimal BasicCharge, decimal UnitRate, decimal? BlockStart, decimal? BlockEnd, DateTime EffectiveFrom, DateTime? EffectiveTo, int FinancialYearId);
 public record UpdateTariffDto(string? Name, string? PropertyCategory, string? TariffType, decimal? BasicCharge, decimal? UnitRate, decimal? BlockStart, decimal? BlockEnd, DateTime? EffectiveFrom, DateTime? EffectiveTo, bool? IsApproved);
 
-public record TariffScenarioDto(int Id, string Name, string? Description, int FinancialYearId, string FinancialYear, string Status, decimal BaseIncreasePercentage, string? Justification, string CreatedBy, DateTime CreatedOn, string? ApprovedBy, DateTime? ApprovedOn, List<TariffScenarioLineDto> Lines);
-public record TariffScenarioSummaryDto(int Id, string Name, string Status, decimal BaseIncreasePercentage, decimal TotalCurrentRevenue, decimal TotalProjectedRevenue, decimal TotalVariance, int LineCount, DateTime CreatedOn);
-public record CreateTariffScenarioDto(string Name, string? Description, int FinancialYearId, decimal BaseIncreasePercentage, string? Justification, List<int>? ServiceCategoryIds);
-public record UpdateTariffScenarioDto(string? Name, string? Description, decimal? BaseIncreasePercentage, string? Justification);
+public record TariffScenarioDto(int Id, string Name, string? Description, int FinancialYearId, string FinancialYear, string Status, decimal BaseIncreasePercentage, string? Justification, string CreatedBy, DateTime CreatedOn, string? ApprovedBy, DateTime? ApprovedOn, List<TariffScenarioLineDto> Lines, List<ServiceTypeIncreaseDto> ServiceIncreases);
+public record TariffScenarioSummaryDto(int Id, string Name, string Status, decimal BaseIncreasePercentage, decimal TotalCurrentRevenue, decimal TotalProjectedRevenue, decimal TotalVariance, int LineCount, DateTime CreatedOn, bool IsArchived);
+public record ServiceTypeIncreaseDto(string ServiceType, string ConsumerType, decimal IncreasePercentage);
+public record CreateTariffScenarioDto(string Name, string? Description, int FinancialYearId, decimal BaseIncreasePercentage, string? Justification, List<int>? ServiceCategoryIds, List<ServiceTypeIncreaseDto>? ServiceIncreases);
+public record UpdateTariffScenarioDto(string? Name, string? Description, decimal? BaseIncreasePercentage, string? Justification, List<ServiceTypeIncreaseDto>? ServiceIncreases);
 public record UpdateScenarioLineDto(int Id, decimal ProjectedUnitRate, decimal ProjectedBasicCharge);
 
 public record TariffScenarioLineDto(int Id, int ServiceCategoryId, string ServiceCategoryName, string ServiceType, int? BaseTariffId, decimal CurrentUnitRate, decimal CurrentBasicCharge, decimal ProjectedUnitRate, decimal ProjectedBasicCharge, decimal IncreasePercent, decimal CurrentRevenue, decimal ProjectedRevenue, decimal VarianceAmount, decimal VariancePercent, bool IsMaterialShift);
@@ -46,3 +47,63 @@ public record DraftRevenueLineDto(int ServiceCategoryId, string ServiceCategoryN
 public record GenerateBudgetStringsDto(int BudgetVersionId, int FinancialYearId);
 public record GenerateBudgetStringsResultDto(int StringsGenerated, int StringsUpdated, List<string> Warnings);
 public record BillingIntegrationStatusDto(string Status, int ProjectionsApproved, int ProjectionsPending, int RebatesApproved, int RebatesPending, int BudgetStringsGenerated, DateTime? LastSyncOn);
+
+public record WaterProjectBudgetDto(
+    string FinancialYear,
+    string ScoaVersion,
+    int MatchedScoaCodes,
+    int MatchedProjectItems,
+    decimal Year1,
+    decimal Year2,
+    decimal Year3,
+    List<WaterProjectBudgetItemDto> Items
+);
+public record WaterProjectBudgetItemDto(string ProjectName, string ScoaCode, string ScoaDesc, decimal Year1, decimal Year2, decimal Year3);
+
+public record ElectricityProjectBudgetDto(
+    string FinancialYear,
+    string ScoaVersion,
+    int MatchedScoaCodes,
+    int MatchedProjectItems,
+    decimal Year1,
+    decimal Year2,
+    decimal Year3,
+    List<ElectricityProjectBudgetItemDto> Items
+);
+public record ElectricityProjectBudgetItemDto(string ProjectName, string ScoaCode, string ScoaDesc, decimal Year1, decimal Year2, decimal Year3);
+
+public record SanitationProjectBudgetDto(
+    string FinancialYear,
+    string ScoaVersion,
+    int MatchedScoaCodes,
+    int MatchedProjectItems,
+    decimal Year1,
+    decimal Year2,
+    decimal Year3,
+    List<SanitationProjectBudgetItemDto> Items
+);
+public record SanitationProjectBudgetItemDto(string ProjectName, string ScoaCode, string ScoaDesc, decimal Year1, decimal Year2, decimal Year3);
+
+public record RefuseProjectBudgetDto(
+    string FinancialYear,
+    string ScoaVersion,
+    int MatchedScoaCodes,
+    int MatchedProjectItems,
+    decimal Year1,
+    decimal Year2,
+    decimal Year3,
+    List<RefuseProjectBudgetItemDto> Items
+);
+public record RefuseProjectBudgetItemDto(string ProjectName, string ScoaCode, string ScoaDesc, decimal Year1, decimal Year2, decimal Year3);
+
+public record PropertyRatesProjectBudgetDto(
+    string FinancialYear,
+    string ScoaVersion,
+    int MatchedScoaCodes,
+    int MatchedProjectItems,
+    decimal Year1,
+    decimal Year2,
+    decimal Year3,
+    List<PropertyRatesProjectBudgetItemDto> Items
+);
+public record PropertyRatesProjectBudgetItemDto(string ProjectName, string ScoaCode, string ScoaDesc, decimal Year1, decimal Year2, decimal Year3);

@@ -1,0 +1,132 @@
+<div class="page-container">
+
+  <div class="page-header">
+    <h1>Import Zero Budget Items</h1>
+  </div>
+
+  <div class="wizard-card">
+
+    <div class="template-bar">
+      <button class="btn-template" (click)="onDownloadTemplate()">
+        <mat-icon>download</mat-icon>
+        Download Zero Budget Item Import Template
+      </button>
+    </div>
+
+    <div class="template-link-row">
+      <a class="template-link" (click)="onDownloadTemplateSample()">Click Here To Download Template (with sample data)</a>
+    </div>
+
+    <div class="wizard-steps">
+      <div class="wstep" [class.active]="step === 0" [class.done]="step > 0">
+        <span class="wstep-num">1</span>
+        <span class="wstep-label">Import File</span>
+      </div>
+      <div class="wstep-line" [class.done]="step > 0"></div>
+      <div class="wstep" [class.active]="step === 1">
+        <span class="wstep-num">2</span>
+        <span class="wstep-label">Import Results</span>
+      </div>
+    </div>
+
+    <div class="step-content">
+
+      @if (step === 0) {
+        <div class="form-section">
+          @if (loading) {
+            <div class="loading-row"><mat-spinner diameter="20"></mat-spinner><span>Loading years...</span></div>
+          } @else {
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Financial Year</mat-label>
+                <mat-select [(ngModel)]="selectedYear">
+                  @for (y of financialYears; track y.id) {
+                    <mat-option [value]="y.yearCode">{{ y.yearCode }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Budget Import Type</mat-label>
+                <mat-select [value]="'Zero Budget Item'" disabled>
+                  <mat-option value="Zero Budget Item">Zero Budget Item</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+
+            <div class="form-row">
+              <div class="file-pick-col">
+                <div class="file-pick-wrap">
+                  <input #fileInput type="file" accept=".csv" class="hidden-input" (change)="onFileChange($event)">
+                  <button class="btn-choose" (click)="fileInput.click()">Choose File</button>
+                  <span class="file-name">{{ selectedFile ? selectedFile.name : 'No file chosen' }}</span>
+                </div>
+                <p class="file-hint">Allowed File Extension .csv</p>
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="step-footer">
+          <button class="btn-primary" [disabled]="uploading" (click)="onUpload()">
+            @if (uploading) { <mat-spinner diameter="16" class="btn-spinner"></mat-spinner> }
+            Next
+          </button>
+        </div>
+      }
+
+      @if (step === 1) {
+        <div class="results-section">
+          <div class="table-card">
+            <table>
+              <thead>
+                <tr>
+                  <th>Total Items Imported</th>
+                  <th class="center">Error Records</th>
+                  <th>File Name</th>
+                  <th>Status</th>
+                  <th class="center">File</th>
+                </tr>
+              </thead>
+              <tbody>
+                @if (summaryRow) {
+                  <tr>
+                    <td>{{ summaryRow.totalItemsImported }}</td>
+                    <td class="center">
+                      <span class="error-badge" [class.has-errors]="summaryRow.errorRecords > 0">
+                        {{ summaryRow.errorRecords }}
+                      </span>
+                    </td>
+                    <td class="file-name-cell">{{ summaryRow.fileName }}</td>
+                    <td>
+                      <span class="status-badge" [class.ok]="summaryRow.errorRecords === 0" [class.warn]="summaryRow.errorRecords > 0">
+                        {{ statusLabel(summaryRow.status) }}
+                      </span>
+                    </td>
+                    <td class="center">
+                      <button class="btn-download" (click)="onDownload()" title="Download CSV">
+                        <mat-icon>download</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                } @else {
+                  <tr>
+                    <td colspan="5" class="empty">No records found</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="step-footer">
+          <button class="btn-outline" (click)="step = 0">Back</button>
+        </div>
+      }
+
+    </div>
+  </div>
+
+</div>

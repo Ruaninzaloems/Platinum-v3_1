@@ -386,6 +386,31 @@ public class Plan_AdjustmentBudgetVersionDetail
     public string? SubSegmentReporting { get; set; }
 
     public bool? CostingProject { get; set; }
+
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M1 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M2 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M3 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M4 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M5 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M6 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M7 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M8 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M9 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M10 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M11 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M12 { get; set; }
 }
 
 [Table("Plan_AdjustmentBudgetVersionMonths")]
@@ -902,6 +927,32 @@ public class Plan_AdjustmentProjectItem
     public string? SubSegmentReporting { get; set; }
 
     public bool? IsActiveForSCM { get; set; }
+
+    [Column(TypeName = "decimal(18,2)")] public decimal? M1 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? M2 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? M3 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? M4 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? M5 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? M6 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? M7 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? M8 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? M9 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? M10 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? M11 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? M12 { get; set; }
+
+    [Column(TypeName = "decimal(18,2)")] public decimal? AdjustedM1 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? AdjustedM2 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? AdjustedM3 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? AdjustedM4 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? AdjustedM5 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? AdjustedM6 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? AdjustedM7 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? AdjustedM8 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? AdjustedM9 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? AdjustedM10 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? AdjustedM11 { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal? AdjustedM12 { get; set; }
 }
 
 [Table("Plan_AdjustmentProjectItemDocs")]
@@ -2050,6 +2101,31 @@ public class Plan_BudgetVersionDetail
     public DateTime DateCaptured { get; set; } = DateTime.UtcNow;
 
     public bool? CostingProject { get; set; }
+
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M1 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M2 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M3 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M4 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M5 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M6 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M7 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M8 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M9 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M10 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M11 { get; set; }
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? M12 { get; set; }
 }
 
 [Table("Plan_BudgetVersionMonths")]
@@ -2703,39 +2779,17 @@ public class Plan_ProjectDivisions
     public int? PreviousReferenceId { get; set; }
 }
 
-[Table("Plan_ProjectFunctions")]
-public class Plan_ProjectFunctions
+
+[Table("Plan_ProjectScoaFunds")]
+public class Plan_ProjectScoaFunds
 {
     [Key]
-    public int ProjectFunction_ID { get; set; } = 0;
-
-    public int ProjectID { get; set; }
-
-    public int ScoaFunctionID { get; set; }
-
-    public int CapturerID { get; set; }
-
-    public DateTime DateCaptured { get; set; } = DateTime.UtcNow;
-
-    public int? ModifierID { get; set; }
-
-    public DateTime? DateModified { get; set; }
-
-    public int? PreviousReferenceId { get; set; }
-}
-
-[Table("Plan_ProjectFund")]
-public class Plan_ProjectFund
-{
-    [Key]
-    public int ProjectFund_ID { get; set; } = 0;
+    public int ProjectScoaFund_ID { get; set; } = 0;
 
     public int ProjectID { get; set; }
 
     public int ScoaFundID { get; set; }
 
-    public decimal? FundAmount { get; set; }
-
     public int CapturerID { get; set; }
 
     public DateTime DateCaptured { get; set; } = DateTime.UtcNow;
@@ -2744,26 +2798,18 @@ public class Plan_ProjectFund
 
     public DateTime? DateModified { get; set; }
 
-    public string? FundReference { get; set; }
-
-    public int? VirementId { get; set; }
-
-    public int? AdjustmentId { get; set; }
-
     public int? PreviousReferenceId { get; set; }
 }
 
-[Table("Plan_ProjectFundYear")]
-public class Plan_ProjectFundYear
+[Table("Plan_ProjectScoaRegions")]
+public class Plan_ProjectScoaRegions
 {
     [Key]
-    public int ProjectFundYear_ID { get; set; } = 0;
+    public int ProjectScoaRegion_ID { get; set; } = 0;
 
-    public int ProjectFundID { get; set; }
+    public int ProjectID { get; set; }
 
-    public string? FinYear { get; set; }
-
-    public decimal YearFundAmount { get; set; }
+    public int ScoaRegionID { get; set; }
 
     public int CapturerID { get; set; }
 
@@ -2773,12 +2819,31 @@ public class Plan_ProjectFundYear
 
     public DateTime? DateModified { get; set; }
 
-    public int? VirementId { get; set; }
+    public int? PreviousReferenceId { get; set; }
+}
 
-    public int? AdjustmentId { get; set; }
+
+[Table("Plan_ProjectScoaItem")]
+public class Plan_ProjectScoaItem
+{
+    [Key]
+    public int ProjectScoaItem_ID { get; set; } = 0;
+
+    public int ProjectID { get; set; }
+
+    public int ScoaItemID { get; set; }
+
+    public int CapturerID { get; set; }
+
+    public DateTime DateCaptured { get; set; } = DateTime.UtcNow;
+
+    public int? ModifierID { get; set; }
+
+    public DateTime? DateModified { get; set; }
 
     public int? PreviousReferenceId { get; set; }
 }
+
 
 [Table("Plan_ProjectIDP")]
 public class Plan_ProjectIDP
@@ -2820,6 +2885,8 @@ public class Plan_ProjectItem
     public int? ProjectItemID { get; set; }
 
     public int? ProjectItemCode { get; set; }
+
+    public int? PlanProjectItemCode { get; set; }
 
     public int SCOAItemID { get; set; }
 
@@ -2880,6 +2947,19 @@ public class Plan_ProjectItem
     public bool? ZeroBudgetItem { get; set; }
 
     public string? ZeroBudgetItemReason { get; set; }
+
+    [Column("M1")]  public decimal? Month01 { get; set; }
+    [Column("M2")]  public decimal? Month02 { get; set; }
+    [Column("M3")]  public decimal? Month03 { get; set; }
+    [Column("M4")]  public decimal? Month04 { get; set; }
+    [Column("M5")]  public decimal? Month05 { get; set; }
+    [Column("M6")]  public decimal? Month06 { get; set; }
+    [Column("M7")]  public decimal? Month07 { get; set; }
+    [Column("M8")]  public decimal? Month08 { get; set; }
+    [Column("M9")]  public decimal? Month09 { get; set; }
+    [Column("M10")] public decimal? Month10 { get; set; }
+    [Column("M11")] public decimal? Month11 { get; set; }
+    [Column("M12")] public decimal? Month12 { get; set; }
 }
 
 [Table("Plan_ProjectItemDocs")]
@@ -2951,28 +3031,6 @@ public class Plan_ProjectJustification
     public DateTime? DateModified { get; set; }
 }
 
-[Table("Plan_ProjectRegions")]
-public class Plan_ProjectRegions
-{
-    [Key]
-    public int ProjectRegion_ID { get; set; } = 0;
-
-    public int ProjectID { get; set; }
-
-    public int ScoaRegionID { get; set; }
-
-    public decimal? RegionPercent { get; set; }
-
-    public int CapturerID { get; set; }
-
-    public DateTime DateCaptured { get; set; } = DateTime.UtcNow;
-
-    public int? ModifierID { get; set; }
-
-    public DateTime? DateModified { get; set; }
-
-    public int? PreviousReferenceId { get; set; }
-}
 
 [Table("Plan_SupplementaryAdjustment")]
 public class Plan_SupplementaryAdjustment
@@ -3335,6 +3393,8 @@ public class Plan_VirementPolicyVersion
     public DateTime? DateModified { get; set; }
 
     public int? ModifierID { get; set; }
+
+    public bool IsLocked { get; set; }
 }
 
 [Table("Plan_VirementPolicyVersionDetail")]
@@ -3465,4 +3525,106 @@ public class Plan_Virements
     public string? ToUkey { get; set; }
 
     public int? ToPlanProjectItemID { get; set; }
+}
+
+// ── Monorepo-only: used by BUDGET-APP/PlatinumBudget.Api/Controllers/ProjectFundingController.cs
+// (not present in the C:\Repos\Budget-Management standalone — do not remove on future syncs)
+[Table("Plan_ProjectFunctions")]
+public class Plan_ProjectFunctions
+{
+    [Key]
+    public int ProjectFunction_ID { get; set; } = 0;
+
+    public int ProjectID { get; set; }
+
+    public int ScoaFunctionID { get; set; }
+
+    public int CapturerID { get; set; }
+
+    public DateTime DateCaptured { get; set; } = DateTime.UtcNow;
+
+    public int? ModifierID { get; set; }
+
+    public DateTime? DateModified { get; set; }
+
+    public int? PreviousReferenceId { get; set; }
+}
+
+[Table("Plan_ProjectFund")]
+public class Plan_ProjectFund
+{
+    [Key]
+    public int ProjectFund_ID { get; set; } = 0;
+
+    public int ProjectID { get; set; }
+
+    public int ScoaFundID { get; set; }
+
+    public decimal? FundAmount { get; set; }
+
+    public int CapturerID { get; set; }
+
+    public DateTime DateCaptured { get; set; } = DateTime.UtcNow;
+
+    public int? ModifierID { get; set; }
+
+    public DateTime? DateModified { get; set; }
+
+    public string? FundReference { get; set; }
+
+    public int? VirementId { get; set; }
+
+    public int? AdjustmentId { get; set; }
+
+    public int? PreviousReferenceId { get; set; }
+}
+
+[Table("Plan_ProjectFundYear")]
+public class Plan_ProjectFundYear
+{
+    [Key]
+    public int ProjectFundYear_ID { get; set; } = 0;
+
+    public int ProjectFundID { get; set; }
+
+    public string? FinYear { get; set; }
+
+    public decimal YearFundAmount { get; set; }
+
+    public int CapturerID { get; set; }
+
+    public DateTime DateCaptured { get; set; } = DateTime.UtcNow;
+
+    public int? ModifierID { get; set; }
+
+    public DateTime? DateModified { get; set; }
+
+    public int? VirementId { get; set; }
+
+    public int? AdjustmentId { get; set; }
+
+    public int? PreviousReferenceId { get; set; }
+}
+
+[Table("Plan_ProjectRegions")]
+public class Plan_ProjectRegions
+{
+    [Key]
+    public int ProjectRegion_ID { get; set; } = 0;
+
+    public int ProjectID { get; set; }
+
+    public int ScoaRegionID { get; set; }
+
+    public decimal? RegionPercent { get; set; }
+
+    public int CapturerID { get; set; }
+
+    public DateTime DateCaptured { get; set; } = DateTime.UtcNow;
+
+    public int? ModifierID { get; set; }
+
+    public DateTime? DateModified { get; set; }
+
+    public int? PreviousReferenceId { get; set; }
 }

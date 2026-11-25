@@ -1,3 +1,7 @@
+/* display:block restores the pre-leak default — the global `.tab-content{display:none}`
+   from libs/payroll/_payroll-global.css (a global style in apps/shell/angular.json)
+   otherwise hides this component's tab content. */
+.tab-content { display: block; }
 .info-bar { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 24px; padding: 16px 20px; background: white; border: 1px solid var(--platinum-border); border-radius: 12px; }
 .info-item { display: flex; flex-direction: column; gap: 4px; }
 .info-label { font-size: 11px; font-weight: 600; color: var(--platinum-text-secondary); text-transform: uppercase; letter-spacing: 0.3px; }

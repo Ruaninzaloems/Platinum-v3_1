@@ -1,0 +1,1283 @@
+$navy: #0f2b46;
+$gold: #c9a84c;
+$border: #e8ecf1;
+$surface: #f8f9fb;
+$text-main: #1e293b;
+$text-muted: #64748b;
+$danger: #ef4444;
+$success: #22c55e;
+
+.capture-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: $surface;
+}
+
+/* ─── Header ─────────────────────────────────────── */
+.capture-header {
+  background: #fff;
+  border-bottom: 1px solid $border;
+  padding: 16px 28px;
+}
+
+.capture-title-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.btn-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid $border;
+  background: #fff;
+  cursor: pointer;
+  border-radius: 8px;
+  color: $text-muted;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+  &:hover { background: $surface; border-color: #cbd5e1; color: $text-main; }
+  mat-icon { font-size: 20px; width: 20px; height: 20px; }
+}
+
+.capture-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: $text-main;
+  line-height: 1.2;
+}
+
+.capture-subtitle {
+  font-size: 13px;
+  color: $text-muted;
+  margin-top: 2px;
+}
+
+/* ─── Stepper ─────────────────────────────────────── */
+.wizard-stepper {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-bottom: 1px solid $border;
+  padding: 0 24px;
+  height: 56px;
+  gap: 0;
+}
+
+.wstep {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 0 8px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.wstep-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #9ca3af;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  mat-icon.wstep-check { font-size: 14px; width: 14px; height: 14px; }
+}
+
+.wstep-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #9ca3af;
+  white-space: nowrap;
+  transition: color 0.2s;
+}
+
+.wstep-line {
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+  margin: 0 10px;
+  min-width: 24px;
+}
+
+.wstep--active {
+  .wstep-num {
+    border-color: $gold;
+    background: $gold;
+    color: #fff;
+  }
+  .wstep-label { color: $text-main; }
+}
+
+.wstep--done {
+  .wstep-num {
+    border-color: $navy;
+    background: $navy;
+    color: #fff;
+  }
+  .wstep-label { color: $navy; }
+  .wstep-line { background: $navy; }
+}
+
+.wstep--locked {
+  cursor: not-allowed;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* ─── Loading ─────────────────────────────────────── */
+.tab-loading {
+  display: flex;
+  justify-content: center;
+  padding: 60px;
+}
+
+/* ─── Tab Panel ───────────────────────────────────── */
+.tab-panel {
+  padding: 20px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ─── Form Section ────────────────────────────────── */
+.form-section {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 10px;
+  padding: 20px 24px 8px;
+  margin-bottom: 16px;
+}
+
+.section-heading {
+  font-size: 14px;
+  font-weight: 700;
+  color: $navy;
+  margin: 0 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid $border;
+  letter-spacing: 0.1px;
+}
+
+/* ─── Details Grid (2-col) ────────────────────────── */
+.details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+
+  &.details-grid--3col {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
+.details-grid__full {
+  grid-column: 1 / -1;
+}
+
+/* ─── Checkbox field in grid ──────────────────────── */
+.details-checkbox-field {
+  display: flex;
+  align-items: center;
+  padding-bottom: 16px;
+  padding-top: 8px;
+}
+
+/* ─── Info banners ────────────────────────────────── */
+.tab-info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+
+  mat-icon { font-size: 18px; width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; }
+
+  &.tab-info-banner--warn {
+    color: #92400e;
+    background: #fffbeb;
+    border-color: #fcd34d;
+  }
+}
+
+/* ─── Add action row ──────────────────────────────── */
+.tab-add-action {
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 16px;
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 9px 20px;
+  background: $navy;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+  &:hover { background: darken($navy, 8%); }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+  mat-icon { font-size: 16px; width: 16px; height: 16px; }
+}
+
+/* ─── SCOA Item autocomplete search field ─────────── */
+.scoa-search-field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+}
+
+.scoa-search-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: $text-muted;
+  margin-bottom: 4px;
+}
+
+.scoa-search-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+  color: $text-main;
+  background: #fff;
+  box-sizing: border-box;
+  line-height: 1.4;
+
+  &:focus {
+    outline: none;
+    border-color: $navy;
+    border-width: 2px;
+  }
+
+  &::placeholder { color: #bdbdbd; }
+}
+
+/* ─── Document upload field ───────────────────────── */
+.document-upload-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 16px;
+}
+
+.document-upload-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: $text-muted;
+}
+
+/* ─── Material outline field overrides ────────────── */
+mat-form-field.mat-mdc-form-field {
+  width: 100%;
+}
+
+/* ─── SCOA Drill trigger — updated style ──────────── */
+.scoa-drill-trigger-label {
+  font-size: 13px;
+  color: $text-muted;
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+
+.scoa-drill-trigger-value {
+  flex: 1;
+  font-size: 14px;
+  color: $text-main;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scoa-drill-placeholder {
+  color: #9ca3af;
+}
+
+.scoa-drill-trigger-icons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.scoa-drill-clear {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  color: $text-muted;
+  &:hover { color: $danger; }
+}
+
+.scoa-drill-arrow {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  color: $text-muted;
+}
+
+.scoa-drill-path-prefix {
+  color: $text-muted;
+  font-size: 13px;
+}
+
+.scoa-drill-selected-code {
+  font-size: 12px;
+  color: $text-muted;
+  margin-left: 4px;
+}
+
+.field-wrap {
+  display: flex;
+  flex-direction: column;
+
+  &__field { width: 100%; }
+}
+
+::ng-deep .field-wrap--error .mdc-notched-outline__leading,
+::ng-deep .field-wrap--error .mdc-notched-outline__notch,
+::ng-deep .field-wrap--error .mdc-notched-outline__trailing {
+  border-color: #d32f2f !important;
+  border-width: 2px !important;
+}
+
+.details-validation-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff5f5;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 16px;
+  margin: 8px 0 4px;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+}
+
+.field-error-msg {
+  font-size: 12px;
+  color: #d32f2f;
+  margin-top: 2px;
+  margin-bottom: 6px;
+  padding-left: 2px;
+}
+
+.scoa-drill-trigger--error {
+  border-color: #d32f2f !important;
+  box-shadow: 0 0 0 1px #d32f2f;
+}
+
+.btn-spinner-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  margin-right: 4px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Recommender warning ─────────────────────────── */
+.recommender-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #92400e;
+  font-size: 13px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+  mat-icon { font-size: 18px; width: 18px; height: 18px; flex-shrink: 0; }
+}
+
+/* ─── Plain form controls (used in split/month grids) */
+.plain-input,
+.plain-select,
+.plain-textarea {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 13px;
+  font-family: inherit;
+  color: $text-main;
+  background: #fff;
+  box-sizing: border-box;
+  line-height: 1.4;
+
+  &:focus {
+    outline: none;
+    border-color: $navy;
+    box-shadow: 0 0 0 2px rgba($navy, 0.08);
+  }
+}
+
+.plain-select {
+  appearance: auto;
+  cursor: pointer;
+}
+
+.plain-textarea {
+  background: #f0f0f0;
+  resize: vertical;
+}
+
+.plain-input.narrow,
+.plain-select.narrow {
+  max-width: 200px;
+}
+
+.plain-input.coord-input {
+  max-width: 100%;
+}
+
+/* ─── SCOA Drill-down ─────────────────────────────── */
+.scoa-drill-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.scoa-path-text {
+  font-size: 11px;
+  color: $text-muted;
+  margin-bottom: 4px;
+  font-style: italic;
+}
+
+.scoa-drill-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+  min-height: 34px;
+  font-size: 13px;
+  color: $text-main;
+
+  &:hover { border-color: $navy; }
+}
+
+.scoa-selected-text { flex: 1; }
+.scoa-placeholder { flex: 1; color: #9ca3af; }
+
+.scoa-trigger-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.scoa-clear-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  color: $text-muted;
+  border-radius: 4px;
+  &:hover { background: $surface; color: $danger; }
+  mat-icon { font-size: 16px; width: 16px; height: 16px; }
+}
+
+.scoa-arrow {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: $text-muted;
+}
+
+.scoa-drill-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  z-index: 200;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  &--above {
+    top: auto;
+    bottom: calc(100% + 4px);
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.12);
+  }
+}
+
+.scoa-drill-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid $border;
+  background: $surface;
+}
+
+.scoa-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid $border;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: $text-main;
+  &:hover { background: #fff; }
+  mat-icon { font-size: 14px; width: 14px; height: 14px; }
+}
+
+.scoa-breadcrumb {
+  font-size: 12px;
+  color: $text-muted;
+}
+
+.scoa-drill-loading {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+
+.scoa-drill-list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.scoa-drill-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
+  &:hover { background: #f8fafc; }
+
+  &.scoa-drill-item--leaf { color: $navy; font-weight: 500; }
+}
+
+.scoa-drill-code {
+  font-weight: 600;
+  color: $text-muted;
+  font-size: 12px;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.scoa-drill-desc { flex: 1; }
+
+.scoa-drill-item-code {
+  font-size: 11px;
+  color: $text-muted;
+  margin-left: 4px;
+  font-weight: 400;
+}
+
+.scoa-drill-chevron {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  color: $text-muted;
+  flex-shrink: 0;
+}
+
+.scoa-drill-empty {
+  padding: 20px;
+  text-align: center;
+  color: $text-muted;
+  font-size: 13px;
+}
+
+/* ─── IDP Warning ─────────────────────────────────── */
+.idp-warning {
+  color: #d97706;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 14px;
+}
+
+/* ─── Funding info banner ─────────────────────────── */
+.fund-info-banner {
+  color: #d97706;
+  font-size: 13px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+/* ─── Field control right-align ───────────────────── */
+.field-control--right {
+  align-items: flex-end;
+}
+
+/* ─── Single action column ────────────────────────── */
+.col-action-single {
+  width: 70px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ─── Description cell (truncate) ────────────────── */
+.td-desc {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Grid footer with pagination ─────────────────── */
+.grid-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  border-top: 1px solid $border;
+  background: $surface;
+}
+
+.pagination-info {
+  font-size: 12px;
+  color: $text-muted;
+}
+
+/* ─── Add IDP Button ──────────────────────────────── */
+.btn-add-idp {
+  padding: 7px 18px;
+  background: $navy;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: flex-end;
+  transition: background 0.15s;
+  &:hover { background: darken($navy, 8%); }
+}
+
+/* ─── Add Line Row (for funding/items/recommenders) ── */
+.add-line-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+
+  .field-row {
+    margin-bottom: 0;
+    flex: 1;
+    min-width: 160px;
+  }
+}
+
+/* ─── Grid ────────────────────────────────────────── */
+.grid-panel {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+
+  .header-row th {
+    background: $navy;
+    color: #fff;
+    padding: 8px 10px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .filter-row th {
+    background: #f1f5f9;
+    padding: 4px 6px;
+    border-bottom: 1px solid $border;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid $border;
+    &:hover { background: #f8fafc; }
+  }
+
+  tbody td {
+    padding: 7px 10px;
+    color: $text-main;
+    vertical-align: middle;
+  }
+
+  .col-action {
+    width: 46px;
+    text-align: center;
+  }
+
+  .col-num {
+    text-align: right;
+    white-space: nowrap;
+  }
+}
+
+.filter-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.filter-input {
+  width: 100%;
+  padding: 3px 20px 3px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: inherit;
+  background: #fff;
+  &:focus { outline: none; border-color: $navy; }
+}
+
+.filter-icon {
+  position: absolute;
+  right: 5px;
+  font-size: 9px;
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.empty-row {
+  text-align: center;
+  color: $text-muted;
+  padding: 24px !important;
+  font-size: 13px;
+}
+
+.total-row {
+  background: $navy !important;
+  td { color: #fff !important; font-weight: 700; padding: 8px 10px !important; }
+  .total-label { text-align: right; font-weight: 700; }
+}
+
+/* ─── Cell edit input ─────────────────────────────── */
+.cell-input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #94a3b8;
+  border-radius: 3px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #fff;
+  box-sizing: border-box;
+  &:focus { outline: none; border-color: $navy; }
+}
+
+/* ─── Icon buttons ────────────────────────────────── */
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  color: $text-muted;
+  transition: background 0.12s, color 0.12s;
+  &:hover { background: $surface; color: $navy; }
+
+  mat-icon { font-size: 16px; width: 16px; height: 16px; }
+
+  &.btn-icon--danger:hover { color: $danger; }
+  &.btn-icon--success { color: $success; &:hover { color: darken($success, 10%); } }
+}
+
+/* ─── SCOA item autocomplete ──────────────────────── */
+.scoa-search-wrap {
+  position: relative;
+}
+
+.scoa-autocomplete {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  z-index: 300;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.scoa-autocomplete-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
+  &:hover { background: #f8fafc; }
+}
+
+.scoa-ac-code {
+  font-weight: 600;
+  color: $text-muted;
+  font-size: 12px;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.scoa-ac-desc { flex: 1; color: $text-main; }
+
+/* ─── Fund Details Side Panel ─────────────────────── */
+.fund-details-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.fund-details-left { display: flex; flex-direction: column; }
+.fund-details-right { display: flex; flex-direction: column; }
+
+.fund-budget-panel {
+  border: 1px solid $border;
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.fund-budget-title {
+  background: $navy;
+  color: #fff;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fund-budget-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+
+  thead th {
+    background: #f1f5f9;
+    padding: 5px 10px;
+    text-align: right;
+    font-weight: 600;
+    font-size: 11px;
+    border-bottom: 1px solid $border;
+    &:first-child { text-align: left; }
+  }
+
+  tbody td {
+    padding: 4px 10px;
+    text-align: right;
+    border-bottom: 1px solid #f1f5f9;
+    &:first-child { text-align: left; }
+  }
+
+  tfoot td {
+    background: $navy;
+    color: #fff;
+    padding: 6px 10px;
+    text-align: right;
+    font-weight: 700;
+    &:first-child { text-align: left; }
+  }
+}
+
+.text-right { text-align: right !important; }
+
+/* ─── Costing path sub-label ──────────────────────── */
+.costing-path-label {
+  font-size: 11px;
+  color: $text-muted;
+  margin-top: 3px;
+  font-style: italic;
+}
+
+/* ─── Document upload ─────────────────────────────── */
+.document-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.file-input {
+  display: none;
+}
+
+.btn-upload {
+  padding: 5px 12px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: #f8f9fb;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  &:hover { background: #e8ecf1; }
+}
+
+.btn-upload-submit {
+  padding: 5px 14px;
+  font-size: 12px;
+}
+
+.file-name-label {
+  font-size: 12px;
+  color: $text-muted;
+}
+
+.restricted-ext {
+  font-size: 11px;
+  color: #d97706;
+  margin-top: 4px;
+}
+
+/* ─── Split Budget Section ────────────────────────── */
+.split-budget-section {
+  margin: 0 0 16px;
+  border: 1px solid $border;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.split-section-title {
+  background: #e8ecf1;
+  color: $text-main;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-bottom: 1px solid $border;
+}
+
+.split-panel {
+  border-top: 1px solid $border;
+  &:first-of-type { border-top: none; }
+}
+
+.split-panel-header {
+  background: #f4f6f8;
+  color: $text-main;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-bottom: 1px solid $border;
+}
+
+.split-type-row {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  padding: 10px 14px 4px;
+}
+
+.split-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  cursor: pointer;
+
+  input[type="radio"] { cursor: pointer; }
+}
+
+.split-year-rows {
+  padding: 6px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-width: 340px;
+}
+
+.split-year-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.split-year-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: $text-main;
+  text-align: right;
+
+  &.req::after {
+    content: ' *';
+    color: #c0392b;
+  }
+}
+
+.split-input {
+  width: 120px;
+}
+
+.months-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  padding: 10px 14px;
+}
+
+.month-col {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.month-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.month-label {
+  font-size: 12px;
+  color: $text-main;
+  min-width: 80px;
+}
+
+.month-input {
+  width: 80px;
+}
+
+.split-add-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 14px 10px;
+  border-top: 1px solid $border;
+}
+
+/* ─── Items Grid ──────────────────────────────────── */
+.items-grid-outer {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid $border;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.items-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 700px;
+
+  th, td {
+    border: 1px solid #f1f5f9;
+    padding: 5px 8px;
+    vertical-align: middle;
+  }
+}
+
+.items-filter-row th {
+  background: $surface;
+  padding: 3px 4px;
+}
+
+.filter-cell {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+
+  .filter-icon {
+    font-size: 13px;
+    width: 13px;
+    height: 13px;
+    color: $text-muted;
+    flex-shrink: 0;
+  }
+
+  .col-filter {
+    flex: 1;
+    border: 1px solid $border;
+    border-radius: 4px;
+    padding: 2px 5px;
+    font-size: 11px;
+    width: 100%;
+    min-width: 0;
+    &:focus { outline: none; border-color: $navy; }
+  }
+}
+
+.items-header-row th {
+  background: #f8fafc;
+  font-weight: 600;
+  font-size: 10px;
+  color: $text-muted;
+  text-align: left;
+  white-space: nowrap;
+  padding: 6px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid $border;
+}
+
+.ig-col-view   { width: 60px; text-align: center; font-size: 10px; line-height: 1.2; }
+.ig-col-action { width: 52px; text-align: center; }
+.ig-col-check  { width: 70px; text-align: center; }
+.ig-col-desc   { min-width: 200px; }
+.ig-col-scoa   { min-width: 160px; }
+.ig-col-fund   { min-width: 200px; }
+
+.items-total-row {
+  background: $navy;
+  color: #fff;
+
+  td {
+    font-weight: 700;
+    font-size: 12px;
+    border-color: #2a3e5a;
+  }
+}
+
+.items-grid-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: #555;
+  background: #f9f9f9;
+  border-top: 1px solid #ddd;
+}
+
+.items-page-info {
+  font-size: 11px;
+  color: #555;
+}
+
+.items-pagination {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.page-btn {
+  background: none;
+  border: 1px solid $border;
+  border-radius: 3px;
+  padding: 2px 7px;
+  cursor: pointer;
+  font-size: 13px;
+  &:disabled { opacity: 0.4; cursor: default; }
+  &:hover:not(:disabled) { background: #eee; }
+}
+
+.page-num { font-size: 11px; color: #555; }
+
+
+/* ─── Finish button ───────────────────────────────── */
+.btn-finish {
+  padding: 8px 28px;
+  background: $navy;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+
+  &:hover:not(:disabled) { background: #1a3e60; }
+  &:disabled { opacity: 0.55; cursor: default; }
+}
+
+/* ─── Navigation buttons ──────────────────────────── */
+.tab-nav-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 4px;
+}
+
+.btn-prev {
+  padding: 8px 22px;
+  border-radius: 6px;
+  border: 1px solid $border;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: $text-main;
+  transition: background 0.15s;
+  &:hover { background: $surface; }
+}
+
+.btn-next {
+  padding: 8px 22px;
+  border-radius: 6px;
+  border: none;
+  background: $navy;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  &:hover { background: darken($navy, 8%); }
+}
+
+.btn-save-final {
+  padding: 8px 24px;
+  border-radius: 6px;
+  border: none;
+  background: $gold;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+  &:hover { background: darken($gold, 8%); }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+}

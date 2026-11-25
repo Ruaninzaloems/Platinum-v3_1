@@ -68,6 +68,8 @@ public class ConstFundingSourceController : ControllerBase
             return BadRequest(new { error = "Funding source description is required" });
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var dup = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_FundingSource"" WHERE ""FundingSourceDesc"" ILIKE @FundingSourceDesc", new { model.FundingSourceDesc }) > 0;
+        if (dup) return Conflict(new { error = $"Funding source '{model.FundingSourceDesc}' already exists" });
         var id = await conn.ExecuteScalarAsync<int>(
             @"INSERT INTO ""Const_FundingSource"" (""FundingSourceDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""FinYear"", ""PreviousReferenceId"")
               VALUES (@FundingSourceDesc, @Enabled, NOW(), 1, @FinYear, @PreviousReferenceId)
@@ -82,6 +84,8 @@ public class ConstFundingSourceController : ControllerBase
             return BadRequest(new { error = "Funding source description is required" });
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var dup = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_FundingSource"" WHERE ""FundingSourceDesc"" ILIKE @FundingSourceDesc AND ""FundingSource_ID"" <> @id", new { model.FundingSourceDesc, id }) > 0;
+        if (dup) return Conflict(new { error = $"Funding source '{model.FundingSourceDesc}' already exists" });
         var rows = await conn.ExecuteAsync(
             @"UPDATE ""Const_FundingSource""
               SET ""FundingSourceDesc"" = @FundingSourceDesc,

@@ -1,0 +1,122 @@
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:12px">
+    <button mat-icon-button (click)="goBack()"><mat-icon>arrow_back</mat-icon></button>
+    <div>
+      <h1>Work Orders</h1>
+      <p class="subtitle">All maintenance work orders across reactive and planned maintenance</p>
+    </div>
+  </div>
+  <button class="btn-primary" (click)="openCreate()"><mat-icon>add</mat-icon> New Work Order</button>
+</div>
+
+@if (showCreateForm()) {
+  <div class="create-panel">
+    <h3>Create New Work Order</h3>
+    <div class="form-grid">
+      <div class="form-group full-width">
+        <label>Description *</label>
+        <textarea rows="2" [(ngModel)]="createForm.workOrderDesc" placeholder="Describe the work to be done..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Type *</label>
+        <select [(ngModel)]="createForm.workOrderTypeId">
+          <option value="">Select type</option>
+          @for (t of woTypes(); track t.workOrderTypeId) {
+            <option [value]="t.workOrderTypeId">{{t.workOrderTypeDesc}}</option>
+          }
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Priority *</label>
+        <select [(ngModel)]="createForm.priority">
+          <option value="Low">Low</option>
+          <option value="Medium">Medium</option>
+          <option value="High">High</option>
+          <option value="Critical">Critical</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" (click)="cancelCreate()" [disabled]="creating()">Cancel</button>
+      <button class="btn-primary" (click)="submitCreate()" [disabled]="creating()">
+        @if (creating()) { <mat-spinner diameter="16" style="display:inline-block"></mat-spinner> } Create & Open
+      </button>
+    </div>
+  </div>
+}
+
+<div class="filter-bar">
+  <input class="search-input" [(ngModel)]="filterSearch" placeholder="Search by number or description...">
+  <input class="search-input asset-input" [(ngModel)]="filterAsset" placeholder="Filter by Asset ID or description...">
+  <select [(ngModel)]="filterStatus" (change)="applyFilters()">
+    <option value="">All Statuses</option>
+    @for (s of woStatuses(); track s.workOrderStatusId) {
+      <option [value]="s.workOrderStatusId">{{s.workOrderStatusDesc}}</option>
+    }
+  </select>
+  <select [(ngModel)]="filterType" (change)="applyFilters()">
+    <option value="">All Types</option>
+    @for (t of woTypes(); track t.workOrderTypeId) {
+      <option [value]="t.workOrderTypeId">{{t.workOrderTypeDesc}}</option>
+    }
+  </select>
+  <select [(ngModel)]="filterPriority" (change)="applyFilters()">
+    <option value="">All Priorities</option>
+    <option value="Critical">Critical</option>
+    <option value="High">High</option>
+    <option value="Medium">Medium</option>
+    <option value="Low">Low</option>
+  </select>
+  <div class="date-range">
+    <label>From</label>
+    <input type="date" [(ngModel)]="filterDateFrom" (change)="applyFilters()">
+    <label>To</label>
+    <input type="date" [(ngModel)]="filterDateTo" (change)="applyFilters()">
+  </div>
+  <button class="btn-secondary btn-sm" (click)="clearFilters()"><mat-icon>clear</mat-icon> Clear</button>
+</div>
+
+@if (loading()) {
+  <div class="loading-container">
+    <mat-spinner diameter="40"></mat-spinner>
+    <span>Loading work orders...</span>
+  </div>
+} @else if (filtered.length === 0) {
+  <div class="empty-state">
+    <mat-icon>engineering</mat-icon>
+    <h3>No Work Orders Found</h3>
+    <p>Try adjusting your filters or create a new work order.</p>
+  </div>
+} @else {
+  <div class="table-card">
+    <table class="wo-table">
+      <thead>
+        <tr>
+          <th>WO Number</th>
+          <th>Description</th>
+          <th>Status</th>
+          <th>Type</th>
+          <th>Priority</th>
+          <th>Planned Start</th>
+          <th>Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (wo of filtered; track wo.maintenanceWorksOrderId) {
+          <tr (click)="openDetail(wo.maintenanceWorksOrderId)" class="clickable-row">
+            <td class="wo-number">{{wo.workOrderNumber || ('WO-' + wo.maintenanceWorksOrderId)}}</td>
+            <td class="wo-desc">{{wo.workOrderDesc}}</td>
+            <td><span class="status-badge" [class]="getStatusClass(wo.workOrderStatusId)">{{wo.workOrderStatusDesc || '—'}}</span></td>
+            <td>{{wo.workOrderTypeDesc || '—'}}</td>
+            <td><span class="priority-badge" [class]="getPriorityClass(wo.priority)">{{wo.priority || '—'}}</span></td>
+            <td>{{formatDate(wo.plannedStartDate)}}</td>
+            <td>{{formatDate(wo.workOrderDate)}}</td>
+            <td><button mat-icon-button class="open-btn" (click)="openDetail(wo.maintenanceWorksOrderId); $event.stopPropagation()"><mat-icon>open_in_new</mat-icon></button></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    <div class="table-footer">{{filtered.length}} work order{{filtered.length === 1 ? '' : 's'}}</div>
+  </div>
+}

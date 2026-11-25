@@ -1,0 +1,266 @@
+<div class="page-container">
+
+  <div class="page-header">
+    <h1>Virement - Approve Virement</h1>
+  </div>
+
+  <div class="main-card">
+
+    <div class="section-header">Approve Virement</div>
+
+    @if (showSearchParams) {
+      <div class="search-body">
+        <div class="search-fields">
+          <mat-form-field appearance="outline" class="field-fy">
+            <mat-label>Financial Year</mat-label>
+            <mat-select [(ngModel)]="selectedYearId" (ngModelChange)="loadProjects()">
+              @for (y of financialYears; track y.id) {
+                <mat-option [value]="y.id">{{ y.yearCode }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="field-proj">
+            <mat-label>Project</mat-label>
+            <mat-select [(ngModel)]="selectedProjectId">
+              <mat-option [value]="null">All</mat-option>
+              @for (p of projects; track p.id) {
+                <mat-option [value]="p.id">{{ p.label }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <div class="search-btns">
+          <button class="btn-search" (click)="onSearch()">Search</button>
+          <button class="btn-clear" (click)="onClear()">Clear</button>
+        </div>
+      </div>
+    }
+
+    <div class="toggle-row">
+      <button class="btn-toggle" (click)="showSearchParams = !showSearchParams">
+        {{ showSearchParams ? 'Hide' : 'Show' }} Search Parameters
+      </button>
+    </div>
+
+    @if (loading) {
+      <div class="loading-row">Loading...</div>
+    } @else {
+
+      <div class="table-wrapper">
+        <table class="approval-table">
+          <thead>
+            <tr class="header-row">
+              <th class="col-action">Approve / Reject</th>
+              <th class="col-reason">Reject Reason</th>
+              <th class="col-ref">
+                From Legacy Ref
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.fromLegacyRef" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+              <th class="col-ref">
+                To Legacy Ref
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.toLegacyRef" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+              <th class="col-proj">
+                From Project
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.fromProject" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+              <th class="col-proj">
+                To Project
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.toProject" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+              <th class="col-func">
+                From SCOA Project
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.fromScoaProject" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+              <th class="col-func">
+                To SCOA Project
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.toScoaProject" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+              <th class="col-func">
+                From SCOA Function
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.fromScoaFunction" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+              <th class="col-func">
+                To SCOA Function
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.toScoaFunction" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+              <th class="col-div">
+                From Division
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.fromDivision" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+              <th class="col-div">
+                To Division
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.toDivision" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+              <th class="col-fund">
+                From SCOA Fund
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.fromScoaFund" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+              <th class="col-fund">
+                To SCOA Fund
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.toScoaFund" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+              <th class="col-func">
+                From SCOA Region
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.fromScoaRegion" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+              <th class="col-func">
+                To SCOA Region
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.toScoaRegion" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+              <th class="col-func">
+                From SCOA Item
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.fromScoaItem" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+              <th class="col-func">
+                To SCOA Item
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.toScoaItem" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+              <th class="col-amount">
+                From Virement Amount
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.fromVirementAmount" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+              <th class="col-amount">
+                To Virement Amount
+                <div class="th-filter">
+                  <input [(ngModel)]="filters.toVirementAmount" (ngModelChange)="applyFilters()" class="col-filter">
+                  <span class="flt-icon">▼</span>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (!filteredRows.length) {
+              <tr>
+                <td colspan="20" class="empty-row">
+                  @if (rows.length) { No results match the current filters. }
+                  @else { Use Search to load virement requests pending approval. }
+                </td>
+              </tr>
+            }
+            @for (row of filteredRows; track row.id) {
+              <tr class="data-row">
+                <td class="col-action">
+                  <div class="radio-pair">
+                    <label class="radio-opt">
+                      <input type="radio" [name]="'action_' + row.id" value="Approve" [(ngModel)]="row._action">
+                      <span>Approve</span>
+                    </label>
+                    <label class="radio-opt">
+                      <input type="radio" [name]="'action_' + row.id" value="Reject" [(ngModel)]="row._action">
+                      <span>Reject</span>
+                    </label>
+                  </div>
+                </td>
+                <td class="col-reason">
+                  <input class="reason-input" [(ngModel)]="row._rejectReason"
+                         [disabled]="row._action !== 'Reject'">
+                </td>
+                <td class="col-ref">{{ row.fromLegacyRef }}</td>
+                <td class="col-ref">{{ row.toLegacyRef }}</td>
+                <td class="col-proj">{{ row.fromProject }}</td>
+                <td class="col-proj">{{ row.toProject }}</td>
+                <td class="col-func">{{ row.fromScoaProject }}</td>
+                <td class="col-func">{{ row.toScoaProject }}</td>
+                <td class="col-func">{{ row.fromScoaFunction }}</td>
+                <td class="col-func">{{ row.toScoaFunction }}</td>
+                <td class="col-div">{{ row.fromDivision }}</td>
+                <td class="col-div">{{ row.toDivision }}</td>
+                <td class="col-fund">{{ row.fromScoaFund }}</td>
+                <td class="col-fund">{{ row.toScoaFund }}</td>
+                <td class="col-func">{{ row.fromScoaRegion }}</td>
+                <td class="col-func">{{ row.toScoaRegion }}</td>
+                <td class="col-func">{{ row.fromScoaItem }}</td>
+                <td class="col-func">{{ row.toScoaItem }}</td>
+                <td class="col-amount text-right">{{ row.fromVirementAmount | number:'1.0-0' }}</td>
+                <td class="col-amount text-right">{{ row.toVirementAmount | number:'1.0-0' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination-row">
+        <div class="page-nav">
+          <button class="pg-btn">|&lt;</button>
+          <button class="pg-btn">&lt;</button>
+          <span class="pg-num">1</span>
+          <button class="pg-btn">&gt;</button>
+          <button class="pg-btn">&gt;|</button>
+        </div>
+        <span class="pg-info">{{ totalItems }} items in {{ totalPages }} pages</span>
+      </div>
+
+    }
+
+    @if (successMsg) {
+      <div class="alert-success mx">{{ successMsg }}</div>
+    }
+    @if (errorMsg) {
+      <div class="alert-error mx">{{ errorMsg }}</div>
+    }
+
+    <div class="card-footer">
+      <button class="btn-primary" [disabled]="submitting" (click)="onSubmit()">
+        @if (submitting) { <span class="spinner"></span> }
+        Submit
+      </button>
+      <button class="btn-outline" (click)="onCancel()">Cancel</button>
+    </div>
+
+  </div>
+
+</div>

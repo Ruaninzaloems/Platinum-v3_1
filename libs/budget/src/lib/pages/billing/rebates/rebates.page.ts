@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '../../../core/services/api.service';
-import { RebateType, RebateProjection, ServiceCategory } from '../../../core/models/budget.models';
+import { RebateType, RebateProjection, ServiceCategory, FinancialYear } from '../../../core/models/budget.models';
 
 @Component({
   selector: 'app-rebates-page',
@@ -164,7 +164,12 @@ import { RebateType, RebateProjection, ServiceCategory } from '../../../core/mod
           </div>
           <div class="dialog-body">
             <div class="form-grid">
-              <div class="form-group"><label>Financial Year ID</label><input type="number" [(ngModel)]="calcForm.financialYearId" value="1"></div>
+              <div class="form-group">
+                <label>Financial Year</label>
+                <select [(ngModel)]="calcForm.financialYearId">
+                  <option *ngFor="let fy of financialYears" [ngValue]="fy.id">{{fy.yearCode}}</option>
+                </select>
+              </div>
               <div class="form-group"><label>Y2 Growth %</label><input type="number" [(ngModel)]="calcForm.growthRateY2" step="0.1"></div>
               <div class="form-group"><label>Y3 Growth %</label><input type="number" [(ngModel)]="calcForm.growthRateY3" step="0.1"></div>
             </div>
@@ -256,6 +261,7 @@ export class RebatesPage implements OnInit {
   rebateTypes: RebateType[] = [];
   rebateProjections: RebateProjection[] = [];
   serviceCategories: ServiceCategory[] = [];
+  financialYears: FinancialYear[] = [];
   kpiCards: any[] = [];
   totalY1 = 0; totalY2 = 0; totalY3 = 0;
   showCreateDialog = false;
@@ -263,11 +269,15 @@ export class RebatesPage implements OnInit {
   saving = false;
   calculating = false;
   createForm: any = { category: 'Indigent', rebatePercent: 100, serviceCategoryId: null };
-  calcForm: any = { financialYearId: 1, growthRateY2: 5.5, growthRateY3: 5.5 };
+  calcForm: any = { financialYearId: 0, growthRateY2: 5.5, growthRateY3: 5.5 };
 
   constructor(private api: ApiService, private cdr: ChangeDetectorRef) {}
 
-  ngOnInit() { this.loadData(); this.api.getServiceCategories().subscribe(d => { this.serviceCategories = d; this.cdr.markForCheck(); }); }
+  ngOnInit() {
+    this.loadData();
+    this.api.getServiceCategories().subscribe(d => { this.serviceCategories = d; this.cdr.markForCheck(); });
+    this.api.getFinancialYears().subscribe(fys => { this.financialYears = fys; if (fys.length) this.calcForm.financialYearId = fys[0].id; this.cdr.markForCheck(); });
+  }
 
   loadData() {
     this.api.getRebateTypes().subscribe(data => { this.rebateTypes = data; this.buildKpis(); this.cdr.markForCheck(); });

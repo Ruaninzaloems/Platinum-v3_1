@@ -346,7 +346,7 @@
       <div class="modal-body">
         <div class="form-group"><label>Employee</label>
           <select class="form-control" [(ngModel)]="onboardingForm.employee_id">
-            @for (e of employees; track e.id) { <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option> }
+            @for (e of employees; track e.id) { <option [ngValue]="e.id">{{ e.id }} | {{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option> }
           </select>
         </div>
         <div class="form-group"><label>Start Date</label><app-date-input [(ngModel)]="onboardingForm.start_date"></app-date-input></div>

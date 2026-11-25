@@ -14,6 +14,8 @@ public class BulkUploadValidationService
     private Dictionary<string, int> _assetStatuses = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, int> _assetConditions = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, int> _measurementTypes = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<int, string> _measurementTypeIdToName = new();
+    private string _measurementModel = "Mixed";
     private Dictionary<string, int> _componentTypes = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, int> _cidmsAccountingGroups = new(StringComparer.OrdinalIgnoreCase);
     private List<CidmsChildRecord> _cidmsAccountingSubGroups = new();
@@ -97,6 +99,9 @@ public class BulkUploadValidationService
         _assetStatuses = ToSafeDictionary(await conn.QueryAsync<(string desc, int id)>(@"SELECT ""AssetStatusDesc"", ""AssetStatus_ID"" FROM ""Const_AssetStatus_Sys"" WHERE ""Enabled"" = 1"));
         _assetConditions = ToSafeDictionary(await conn.QueryAsync<(string desc, int id)>(@"SELECT ""Description"" AS ""AssetConditionDesc"", ""Asset_Condition_ID"" AS ""AssetCondition_ID"" FROM ""Const_Asset_Condition"" WHERE ""Enabled"" = 1"));
         _measurementTypes = ToSafeDictionary(await conn.QueryAsync<(string desc, int id)>(@"SELECT ""Name"", ""AssetConfig_MeasurementType_ID"" FROM ""AssetConfig_MeasurementType"" WHERE ""Enabled"" = 1"));
+        var mtNameRows = await conn.QueryAsync<(int id, string name)>(@"SELECT ""AssetConfig_MeasurementType_ID"", COALESCE(""Name"", '') FROM ""AssetConfig_MeasurementType"" WHERE ""Enabled"" = 1");
+        _measurementTypeIdToName = mtNameRows.ToDictionary(x => x.id, x => x.name);
+        _measurementModel = await conn.ExecuteScalarAsync<string?>(@"SELECT ""measurement_model"" FROM ""Asset_OrganisationSettings"" LIMIT 1") ?? "Mixed";
         _componentTypes = ToSafeDictionary(await conn.QueryAsync<(string desc, int id)>(@"SELECT ""Asset_Component_Description"", ""Asset_ComponentType_ID"" AS ""Asset_Component_ID"" FROM ""Const_Asset_ComponentType"" WHERE ""Enabled"" = 1"));
         _cidmsAccountingGroups = ToSafeDictionary(await conn.QueryAsync<(string desc, int id)>(@"SELECT ""AssetAccountGroupDesc"", ""AssetAccountGroupID"" FROM ""Const_Asset_CIDMS_Accounting_Group"" WHERE ""Enabled"" = 1"));
         _cidmsAccountingSubGroups = (await conn.QueryAsync<CidmsChildRecord>(@"SELECT ""AssetAccountSubGroupID"" AS ""Id"", ""AssetAccountSubGroupDesc"" AS ""Desc"", ""AssetAccountGroupID"" AS ""ParentId"" FROM ""Const_Asset_CIDMS_Accounting_Sub_Group"" WHERE ""Enabled"" = 1")).ToList();
@@ -190,19 +195,10 @@ public class BulkUploadValidationService
         _categoryIdsWithRequiredStatus = new HashSet<int>(categoryIdsRequiringStatus);
 
         var typeMeasRows = await conn.QueryAsync<(int typeId, int measId)>(
-            @"SELECT DISTINCT ""TypeID"", ""AssetMeasurement_ID"" FROM ""Const_AssetClass_sys""
-              WHERE ""Enabled"" = 1 AND ""TypeID"" IS NOT NULL AND ""AssetMeasurement_ID"" IS NOT NULL AND ""AssetMeasurement_ID"" > 0");
+            @"SELECT ""AssetType_ID"", ""MeasurementType_ID"" FROM ""AssetConfig_AssetType_MeasurementType_Link""");
         _validTypeMeasPairs = new HashSet<(int, int)>(typeMeasRows);
         _typeIdsWithMeasConstraint = new HashSet<int>(typeMeasRows.Select(x => x.typeId));
-
-        var typeIdsRequiringMeas = await conn.QueryAsync<int>(
-            @"SELECT DISTINCT ""TypeID"" FROM ""Const_AssetClass_sys""
-              WHERE ""Enabled"" = 1 AND ""TypeID"" IS NOT NULL
-              AND ""TypeID"" NOT IN (
-                SELECT DISTINCT ""TypeID"" FROM ""Const_AssetClass_sys""
-                WHERE ""Enabled"" = 1 AND (""AssetMeasurement_ID"" IS NULL OR ""AssetMeasurement_ID"" = 0)
-              )");
-        _typeIdsWithRequiredMeas = new HashSet<int>(typeIdsRequiringMeas);
+        _typeIdsWithRequiredMeas = _typeIdsWithMeasConstraint;
     }
 
     public (Dictionary<string, string?> errors, Dictionary<string, string> resolvedIds) ValidateRow(
@@ -259,7 +255,16 @@ public class BulkUploadValidationService
         if (!string.IsNullOrWhiteSpace(measVal))
         {
             if (_measurementTypes.TryGetValue(measVal, out resolvedMeasurementId))
+            {
                 resolved["MeasurementType_ID"] = resolvedMeasurementId.ToString();
+                if (_measurementTypeIdToName.TryGetValue(resolvedMeasurementId, out var measName))
+                {
+                    if (string.Equals(_measurementModel, "Cost", StringComparison.OrdinalIgnoreCase) && measName.Contains("Revaluation", StringComparison.OrdinalIgnoreCase))
+                        errors["MeasurementType_ID"] = $"Measurement Type '{measVal}' does not comply with the organisation's Cost Model setting.";
+                    else if (string.Equals(_measurementModel, "Revaluation", StringComparison.OrdinalIgnoreCase) && measName.Contains("Cost", StringComparison.OrdinalIgnoreCase))
+                        errors["MeasurementType_ID"] = $"Measurement Type '{measVal}' does not comply with the organisation's Revaluation Model setting.";
+                }
+            }
             else
                 errors["MeasurementType_ID"] = "Invalid data in column: MeasurementType - '" + measVal + "' not found";
         }
@@ -377,7 +382,26 @@ public class BulkUploadValidationService
                 errors["AssetClass_ID"] = errMsg;
             }
             else
+            {
                 resolved["AssetClass_ID"] = foundClassId.ToString();
+                if (!string.Equals(_measurementModel, "Mixed", StringComparison.OrdinalIgnoreCase))
+                {
+                    var foundClass = _assetClassRecords.Find(cl => cl.Id == foundClassId);
+                    var classMeasId = foundClass?.MeasurementId;
+                    if (classMeasId == null || classMeasId == 0)
+                    {
+                        if (string.Equals(_measurementModel, "Revaluation", StringComparison.OrdinalIgnoreCase))
+                            errors["AssetClass_ID"] = $"Asset Class '{classVal}' has no measurement type configured and does not comply with the organisation's Revaluation Model setting.";
+                    }
+                    else if (_measurementTypeIdToName.TryGetValue(classMeasId.Value, out var clsMeasName))
+                    {
+                        if (string.Equals(_measurementModel, "Cost", StringComparison.OrdinalIgnoreCase) && clsMeasName.Contains("Revaluation", StringComparison.OrdinalIgnoreCase))
+                            errors["AssetClass_ID"] = $"Asset Class '{classVal}' is a Revaluation Model class and does not comply with the organisation's Cost Model setting.";
+                        else if (string.Equals(_measurementModel, "Revaluation", StringComparison.OrdinalIgnoreCase) && clsMeasName.Contains("Cost", StringComparison.OrdinalIgnoreCase))
+                            errors["AssetClass_ID"] = $"Asset Class '{classVal}' is a Cost Model class and does not comply with the organisation's Revaluation Model setting.";
+                    }
+                }
+            }
         }
 
         ResolveFk(row, errors, resolved, "AssetCondition_ID", _assetConditions, true);
@@ -708,6 +732,62 @@ public class BulkUploadValidationService
         else if (!_validInfrastructure.Contains(infraVal))
             errors["InfrastructurOrNonInfrastructure"] = "Invalid or missing entries, please indicate if the Asset is an Infrastructure/Non-Infrastructure";
 
+        // --- VerificationDoneBy: required when VerificationDate is provided (legacy: CheckDescriptionForID mustExist=isVerifiedRequired) ---
+        {
+            var vDateVal = GetVal(row, "VerificationDate");
+            var vDoneByVal = GetVal(row, "VerificationDoneBy");
+            bool isVerifiedRequired = !string.IsNullOrWhiteSpace(vDateVal)
+                && !string.Equals(vDateVal, "NULL", StringComparison.OrdinalIgnoreCase);
+            if (isVerifiedRequired)
+            {
+                if (string.IsNullOrWhiteSpace(vDoneByVal))
+                    errors["VerificationDoneBy"] = "VerificationDoneBy field is blank (Mandatory Field when Verified Date is provided).";
+                else if (!_custodians.ContainsKey(vDoneByVal))
+                    errors["VerificationDoneBy"] = $"Invalid data in column: VerificationDoneBy - '{vDoneByVal}' not found";
+            }
+        }
+
+        // --- CustodianIdNumber: required (legacy: CheckString mustExist=true) ---
+        if (string.IsNullOrWhiteSpace(GetVal(row, "CustodianIdNumber")))
+            errors["CustodianIdNumber"] = "CustodianIdNumber field is blank (Mandatory Field).";
+
+        // --- FundingSourceNumber: required integer (legacy: CheckNumber mustExist=true, checkInteger=true) ---
+        {
+            var fsNum = GetVal(row, "FundingSourceNumber");
+            if (string.IsNullOrWhiteSpace(fsNum) || string.Equals(fsNum, "NULL", StringComparison.OrdinalIgnoreCase))
+                errors["FundingSourceNumber"] = "FundingSourceNumber field is blank (Mandatory Field).";
+            else if (!long.TryParse(fsNum.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                errors["FundingSourceNumber"] = $"Invalid format in column: FundingSourceNumber - '{fsNum}', it must be an integer";
+        }
+
+        // --- FundingSourceAmount: required (legacy: CheckNumber mustExist=true) ---
+        if (!errors.ContainsKey("FundingSourceAmount"))
+        {
+            var fsAmt = GetVal(row, "FundingSourceAmount");
+            if (string.IsNullOrWhiteSpace(fsAmt) || string.Equals(fsAmt, "NULL", StringComparison.OrdinalIgnoreCase))
+                errors["FundingSourceAmount"] = "FundingSourceAmount field is blank (Mandatory Field).";
+        }
+
+        // --- Disposal fields: optional numeric (legacy: CheckNumber optional) ---
+        ValidateNumeric(row, errors, "DisposalAmountCost");
+        ValidateNumeric(row, errors, "DisposalProceeds");
+        ValidateNumeric(row, errors, "ProfitOrLossOnDisposal");
+
+        // --- SCOA item fields: optional format validation (legacy: CheckSCOA) ---
+        ValidateScoaItem(row, errors, "PurchaseAmount_Cost2");
+        ValidateScoaItem(row, errors, "AccumulatedDepreciationScoaItem");
+        ValidateScoaItem(row, errors, "AccumulatedImpairmentScoaItem");
+
+        // --- ErfNumber: integer format (legacy: CheckNumber checkInteger=true) ---
+        {
+            var erfNum = GetVal(row, "ErfNumber");
+            if (!string.IsNullOrWhiteSpace(erfNum) && !string.Equals(erfNum, "NULL", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!long.TryParse(erfNum.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                    errors["ErfNumber"] = $"Invalid format in column: ErfNumber - '{erfNum}', it must be an integer";
+            }
+        }
+
         var barcode = GetVal(row, "Barcode");
         if (!string.IsNullOrWhiteSpace(barcode))
         {
@@ -717,6 +797,18 @@ public class BulkUploadValidationService
                 errors["Barcode"] = "Duplicate barcode in upload: " + barcode;
             else
                 batchBarcodes.Add(barcode);
+        }
+
+        foreach (var kv in row)
+        {
+            if (errors.ContainsKey(kv.Key)) continue;
+            if (string.IsNullOrWhiteSpace(kv.Value)) continue;
+            if (!StringColumnMaxLengths.TryGetValue(kv.Key, out var maxLen)) continue;
+            if (kv.Value.Length > maxLen)
+            {
+                var label = DbColToExcelHeader.TryGetValue(kv.Key, out var hdr) ? hdr : kv.Key;
+                errors[kv.Key] = "Value too long for '" + label + "' (max " + maxLen + " chars, got " + kv.Value.Length + ")";
+            }
         }
 
         return (errors, resolved);
@@ -786,6 +878,16 @@ public class BulkUploadValidationService
         if (string.IsNullOrWhiteSpace(val)) return;
         if (!decimal.TryParse(val, NumberStyles.Any, CultureInfo.InvariantCulture, out _))
             errors[field] = "Invalid numeric value in column: " + field + " - '" + val + "'";
+    }
+
+    private static void ValidateScoaItem(Dictionary<string, string> row, Dictionary<string, string?> errors, string field)
+    {
+        if (errors.ContainsKey(field)) return;
+        var val = GetVal(row, field);
+        if (string.IsNullOrWhiteSpace(val) || string.Equals(val, "NULL", StringComparison.OrdinalIgnoreCase)) return;
+        if (val.Length > 30) return;
+        if (!long.TryParse(val.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+            errors[field] = $"Invalid SCOA item in column: {field} - '{val}', expected an integer ID or SCOA code";
     }
 
     public static readonly string[] ExcelHeaders = {
@@ -903,6 +1005,144 @@ public class BulkUploadValidationService
         "Custom1", "Custom2", "Custom3", "Custom4", "Custom5",
         "Custom6", "Custom7", "Custom8", "Custom9"
     };
+
+    public static readonly Dictionary<string, int> StringColumnMaxLengths = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { "ComponentID_AssetRegisterID",       100 },
+        { "Description",                        500 },
+        { "ParentAssetRegisterItem_ID",         100 },
+        { "MunicipalAssetID",                   100 },
+        { "MainAssetID",                        100 },
+        { "MainAssetDescription",               500 },
+        { "OldBarCode",                         100 },
+        { "Barcode",                            100 },
+        { "ImageRef",                           255 },
+        { "InsuranceCover",                      10 },
+        { "InsurancePolicyNo",                  100 },
+        { "SGKey",                              100 },
+        { "DeedNumber",                         100 },
+        { "ErfNumber",                          100 },
+        { "PortionNumber",                      100 },
+        { "CustodianIdNumber",                   50 },
+        { "AssetOwnershipName",                 200 },
+        { "GISFeatureID",                       100 },
+        { "FundingSourceNumber",                100 },
+        { "FundingSource",                      200 },
+        { "FundType",                           100 },
+        { "DonorName",                          200 },
+        { "Custom1",                            200 },
+        { "Custom2",                            200 },
+        { "Custom3",                            200 },
+        { "Custom4",                            200 },
+        { "Custom5",                            200 },
+        { "Custom6",                            200 },
+        { "Custom7",                            200 },
+        { "Custom8",                            200 },
+        { "Custom9",                            200 },
+        { "Make",                               100 },
+        { "Model",                              100 },
+        { "UnitNumber",                         100 },
+        { "RegistrationNumber",                 100 },
+        { "SerialNumber",                       100 },
+        { "Warranty",                            10 },
+        { "CashOrNoncashgeneratingunit",         50 },
+        { "InfrastructurOrNonInfrastructure",    50 },
+        { "NatureOfAddition",                    50 },
+        { "ConstructionMaterial",               100 },
+        { "VerificationDoneBy",                 100 },
+        { "YearConstructed",                     50 },
+        { "ForecastReplacementYear",             50 },
+        { "ReasonforDisposal",                  200 },
+        { "ConsequenceOfFailure",                50 },
+        { "DeemedCost",                          10 },
+        { "DebitPlanProjectItemID",             100 },
+    };
+
+    public static readonly Dictionary<string, string> DbColToExcelHeader = BuildDbColToExcelHeader();
+    private static Dictionary<string, string> BuildDbColToExcelHeader()
+    {
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < DbColumns.Length && i < ExcelHeaders.Length; i++)
+            map.TryAdd(DbColumns[i], ExcelHeaders[i]);
+        return map;
+    }
+
+    private static readonly Dictionary<string, string> _bulkValidationSchemaFixes =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            { "latitude",                           "Lattitude" },
+            { "PurchaseAmount",                     "PurchaseAmount_Cost" },
+            // UOM: Excel header "UoM" strips to "UoM" but table column is "UOM" (case-sensitive in PG)
+            { "UOM",                                "UOM" },
+            // ErfNumber: Excel header "Erf/ Farm Number" strips to "Erf/FarmNumber" (slash = invalid SQL)
+            { "ErfNumber",                          "ErfNumber" },
+            // CashOrNoncashgeneratingunit: header "Cash Or Non-Cash generating unit" → "CashOrNon_Cashgeneratingunit"
+            { "CashOrNoncashgeneratingunit",        "CashOrNoncashgeneratingunit" },
+            // InfrastructurOrNonInfrastructure: header has lowercase "or" and hyphen → wrong case+underscore
+            { "InfrastructurOrNonInfrastructure",   "InfrastructurOrNonInfrastructure" },
+            // NatureOfAddition: header "Nature of addition" strips to "Natureofaddition" (wrong case)
+            { "NatureOfAddition",                   "NatureOfAddition" },
+            // DonorName: header "Donor Name / Company Name / Parastatal Name" strips with slashes → invalid
+            { "DonorName",                          "DonorName" },
+            // ComponentID_AssetRegisterID: Excel header "Component ID/Asset Register ID" strips to
+            // "ComponentID/AssetRegisterID" (slash retained, wrong). Force the correct DB column name.
+            { "ComponentID_AssetRegisterID",        "ComponentID_AssetRegisterID" },
+        };
+
+    // All valid column names in Asset_BulkValidation. Used to defensively skip unmapped error keys
+    // so a single bad mapping never causes an entire row's INSERT to fail silently.
+    public static readonly HashSet<string> ValidBulkValidationColumns = new(StringComparer.Ordinal)
+    {
+        "Upload_JobID", "RowNumber", "FileName", "AssetSetting_ID", "Description",
+        "ComponentID_AssetRegisterID", "AssetDescription", "ParentAssetRegisterID",
+        "MunicipalAssetID", "MainAssetID", "MainAssetDescription", "Barcode", "ImageRef",
+        "AssetType", "AssetCategory", "AssetSub_Category", "AssetClass",
+        "CIDMSSubComponentType", "CIDMSComponentType", "CIDMSAccountingGroup",
+        "CIDMSSubAccountingGroup", "CIDMSAssetClass", "CIDMSAssetGroupType", "CIDMSAssetType",
+        "CashOrNoncashgeneratingunit", "MeasurementType",
+        "AssetStatus", "FinancialStatus", "AcquisitionDate", "CommisioningDate",
+        "InfrastructurOrNonInfrastructure", "NatureOfAddition", "CostOfAddition",
+        "InServiceDate", "DisposalDate", "ReasonforDisposal",
+        "ImpairmentDate", "DateModified", "VerifiedDate", "VerificationDoneBy",
+        "YearConstructed", "ForecastReplacementYear", "AssetCondition",
+        "InsuranceCover", "InsurancePolicyNo", "Warranty",
+        "CurrentReplacementCostCRC", "DepreciatedReplacementCostDRC",
+        "AnnualisedMaintenanceCRC", "AnnualMaintenanceBudgetNeed",
+        "UsefulLifeMonthComponent", "UsefulLifeYearComponent",
+        "RemainingUsefulLifeYearComponent", "RemainingUsefulLifeMonthComponent",
+        "RemainingUsefulLifeAtTakeOn", "ConstructionMaterial", "UOM",
+        "Dim1", "Dim2", "Dim3", "DimensionQuantity", "Quantity", "Diameter", "Capacity",
+        "SGKey", "DeedNumber", "PortionNumber", "ErfsizeM2",
+        "Make", "Model", "UnitNumber", "RegistrationNumber", "SerialNumber",
+        "CustodianName", "CustodianIDNumber", "BasicMunicipalityService",
+        "CriticalityGrade", "PerformanceGrade", "UtilisationGrade",
+        "InfrastructureHealthGrade", "ConsequenceOfFailure", "Risk",
+        "AssetOwnershipName", "MunicipalDepartment", "Division",
+        "Town", "Suburb", "Street", "Building", "Floor", "Room", "Zone", "Ward",
+        "GISFeatureID", "Lattitude", "Longitude",
+        "FundingSourceNumber", "FundingSourceAmount", "FundingSource", "FundType",
+        "PurchaseAmount_Cost", "PurchaseAmountMovement",
+        "AccumulatedDepreciation", "AccumulatedImpairment",
+        "DepreciationPerMonth", "ResidualValue", "FairValue", "CarryingAmount",
+        "DonorName", "DonorDate", "DonorConditions",
+        "Custom1", "Custom2", "Custom3", "Custom4", "Custom5",
+        "Custom6", "Custom7", "Custom8", "Custom9",
+        "RevaluationOpeningBalance", "RevaluationDate", "MovementInRevaluationReserve",
+        "TransferDate", "DepreciationOffset", "DeemedCost",
+        "DebitPlanProjectItemID",
+        // Columns added by migration for newly-validated fields
+        "ErfNumber", "DisposalValue", "DisposalProceeds", "ProfitorLossonDisposal",
+        "SCOAItem_PurchaseAmountOrCost", "SCOAItem_AccumulatedDepreciation", "SCOAItem_AccumulatedImpairment",
+    };
+
+    public static string GetBulkValidationColumnName(string dbCol)
+    {
+        if (_bulkValidationSchemaFixes.TryGetValue(dbCol, out var fix))
+            return fix;
+        if (DbColToExcelHeader.TryGetValue(dbCol, out var header))
+            return header.Replace(" ", "").Replace("-", "_");
+        return dbCol;
+    }
 
     public static readonly HashSet<string> IntegerColumns = new() {
         "AssetType_ID", "AssetCategory_ID", "Asset_SubCategory_ID", "AssetClass_ID",

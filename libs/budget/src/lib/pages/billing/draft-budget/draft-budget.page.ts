@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '../../../core/services/api.service';
-import { DraftRevenueBudget, BillingIntegrationStatus, BudgetVersionSummary } from '../../../core/models/budget.models';
+import { DraftRevenueBudget, BillingIntegrationStatus, BudgetVersionSummary, FinancialYear } from '../../../core/models/budget.models';
 
 @Component({
   selector: 'app-draft-budget-page',
@@ -189,8 +189,10 @@ import { DraftRevenueBudget, BillingIntegrationStatus, BudgetVersionSummary } fr
                 </select>
               </div>
               <div class="form-group">
-                <label>Financial Year ID</label>
-                <input type="number" [(ngModel)]="generateForm.financialYearId">
+                <label>Financial Year</label>
+                <select [(ngModel)]="generateForm.financialYearId">
+                  <option *ngFor="let fy of financialYears" [ngValue]="fy.id">{{fy.yearCode}}</option>
+                </select>
               </div>
             </div>
             <div class="gen-result" *ngIf="generateResult">
@@ -299,10 +301,11 @@ export class DraftBudgetPage implements OnInit {
   integrationStatus: BillingIntegrationStatus | null = null;
   billingStrings: any[] = [];
   budgetVersions: BudgetVersionSummary[] = [];
+  financialYears: FinancialYear[] = [];
   showGenerateDialog = false;
   generating = false;
   generateResult: any = null;
-  generateForm: any = { budgetVersionId: 1, financialYearId: 1 };
+  generateForm: any = { budgetVersionId: 1, financialYearId: 0 };
 
   constructor(private api: ApiService, private cdr: ChangeDetectorRef) {}
 
@@ -313,6 +316,7 @@ export class DraftBudgetPage implements OnInit {
     this.api.getBillingIntegrationStatus().subscribe(data => { this.integrationStatus = data; this.cdr.markForCheck(); });
     this.api.getBillingBudgetStrings().subscribe(data => { this.billingStrings = data; this.cdr.markForCheck(); });
     this.api.getBudgetVersions().subscribe(data => { this.budgetVersions = data; if (data.length) this.generateForm.budgetVersionId = data[0].id; this.cdr.markForCheck(); });
+    this.api.getFinancialYears().subscribe(fys => { this.financialYears = fys; if (fys.length) this.generateForm.financialYearId = fys[0].id; this.cdr.markForCheck(); });
   }
 
   generateStrings() {

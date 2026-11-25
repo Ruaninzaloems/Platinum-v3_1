@@ -43,7 +43,7 @@ public class FleetController : ControllerBase
         await conn.OpenAsync();
         var result = await conn.QueryFirstOrDefaultAsync<dynamic>(@"
             UPDATE ""Asset_TripRequests"" SET ""status"" = @Status, ""approved_by"" = 1,
-                ""driver_id"" = COALESCE(@DriverId, ""driver_id""), ""updated_at"" = GETDATE()
+                ""driver_id"" = COALESCE(@DriverId, ""driver_id""), ""updated_at"" = NOW()
             WHERE ""id"" = @id RETURNING *", new { update.Status, update.DriverId, id });
         return result is null ? NotFound(new { error = "Trip not found" }) : Ok(result);
     }

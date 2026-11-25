@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Dapper;
 using AssetManagement.Data;
+using AssetManagement.Helpers;
 
 namespace AssetManagement.Controllers;
 
@@ -68,11 +69,12 @@ public class ScmContractDetailItemsController : ControllerBase
             p.Add("TotalAmount", body.GetValueOrDefault("TotalAmount") ?? body.GetValueOrDefault("totalAmount"));
             p.Add("BillOfQuantityID", body.GetValueOrDefault("BillOfQuantityID") ?? body.GetValueOrDefault("billOfQuantityId"));
             p.Add("Enabled", body.GetValueOrDefault("Enabled") ?? body.GetValueOrDefault("enabled") ?? 1);
+            p.Add("ModifierID", this.GetCapturerId());
             var rows = await conn.ExecuteAsync(@"
                 UPDATE ""SCM_ContractDetailItems""
                 SET ""ContractID"" = @ContractID, ""Cost"" = @Cost, ""VatAmount"" = @VatAmount,
                     ""TotalAmount"" = @TotalAmount, ""BillOfQuantityID"" = @BillOfQuantityID,
-                    ""Enabled"" = @Enabled, ""DateModified"" = NOW(), ""ModifierID"" = 1
+                    ""Enabled"" = @Enabled, ""DateModified"" = NOW(), ""ModifierID"" = @ModifierID
                 WHERE ""ContractDetailItems_ID"" = @id", p);
             return rows == 0 ? NotFound() : NoContent();
         }

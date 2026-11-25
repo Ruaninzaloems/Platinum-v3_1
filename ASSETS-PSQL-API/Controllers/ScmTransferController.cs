@@ -9,7 +9,12 @@ namespace AssetManagement.Controllers;
 public class ScmTransferController : ControllerBase
 {
     private readonly DbConnectionFactory _db;
-    public ScmTransferController(DbConnectionFactory db) => _db = db;
+    private readonly AssetManagement.Services.EmailService _emailService;
+    public ScmTransferController(DbConnectionFactory db, AssetManagement.Services.EmailService emailService)
+    {
+        _db = db;
+        _emailService = emailService;
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? finYear)
@@ -83,10 +88,19 @@ public class ScmTransferController : ControllerBase
                 cls.""Asset_SubCategory_ID"" AS ""classSubCategoryId"",
                 cls.""AssetMeasurement_ID""  AS ""classMeasurementTypeId"",
                 cls.""AssetStatus_ID""       AS ""classAssetStatusId"",
-                cls.""UsefulLifeInMonths""   AS ""classUsefulLifeMonths""
+                cls.""UsefulLifeInMonths""   AS ""classUsefulLifeMonths"",
+                ppi.""PlanProjectItem_ID""   AS ""projectItemId"",
+                pp.""Project_ID""            AS ""projectId"",
+                COALESCE(pp.""ProjectName"", '') AS ""projectName"",
+                CASE WHEN ppi.""PlanProjectItem_ID"" IS NOT NULL
+                     THEN CONCAT(ppi.""PlanProjectItem_ID"", ' | ', COALESCE(css.""ScoaCode"", ''), ' | ', COALESCE(css.""ScoaShortDesc"", ''))
+                     ELSE '' END              AS ""scoaDesc""
             FROM ""Asset_SCMTransfer"" s
             LEFT JOIN ""Const_AssetCategory_sys"" cat ON cat.""AssetCategoryID"" = s.""AssetCategory_ID""
             LEFT JOIN ""Const_AssetClass_sys""    cls ON cls.""AssetClass_ID""   = s.""AssetClass_ID""
+            LEFT JOIN ""Plan_ProjectItem""        ppi ON ppi.""PlanProjectItem_ID"" = s.""ProjectItem_ID""
+            LEFT JOIN ""Plan_Project""            pp  ON pp.""Project_ID""  = ppi.""ProjectID""
+            LEFT JOIN ""Const_SCOA_Structure""    css ON css.""ScoaID""     = ppi.""SCOAItemID""
             WHERE s.""CurrentAmount"" IS NOT NULL
               AND s.""AssetRegisterItem_ID"" IS NULL
             ORDER BY s.""ID"" ASC");
@@ -106,6 +120,21 @@ public class ScmTransferController : ControllerBase
         var rows = await conn.ExecuteAsync(
             @"UPDATE ""Asset_SCMTransfer"" SET ""AssetRegisterItem_ID"" = @assetId WHERE ""ID"" = @id",
             new { assetId, id });
-        return rows == 0 ? NotFound(new { error = $"SCM transfer {id} not found" }) : Ok(new { success = true });
+        if (rows == 0) return NotFound(new { error = $"SCM transfer {id} not found" });
+        try
+        {
+            var tfrTokens = await _emailService.BuildAssetBaseTokensAsync(conn, assetId);
+            var scmDept = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                @"SELECT COALESCE(""MunicipalDepartment_ID""::text, '') AS dept FROM ""Asset_SCMTransfer"" WHERE ""ID"" = @id",
+                new { id });
+            var assetDept = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                @"SELECT COALESCE(""MunicipalDepartment_ID""::text, '') AS dept FROM ""Asset_Register_Items"" WHERE ""AssetRegisterItem_ID"" = @assetId",
+                new { assetId });
+            tfrTokens["FromLocation"] = (string?)(scmDept?.dept) ?? "";
+            tfrTokens["ToLocation"]   = (string?)(assetDept?.dept) ?? "";
+            _ = _emailService.SendTransactionEmailsAsync("Transfer", tfrTokens);
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[ScmTransferController] Email dispatch failed for Transfer approval {id}: {ex.Message}"); }
+        return Ok(new { success = true });
     }
 }

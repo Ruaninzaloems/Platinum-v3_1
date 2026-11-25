@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Dapper;
 using AssetManagement.Data;
 using AssetManagement.Models;
+using AssetManagement.Services;
 
 namespace AssetManagement.Controllers;
 
@@ -10,8 +11,13 @@ namespace AssetManagement.Controllers;
 public class AssetImpairmentPostingController : ControllerBase
 {
     private readonly DbConnectionFactory _db;
+    private readonly EmailService _emailService;
 
-    public AssetImpairmentPostingController(DbConnectionFactory db) => _db = db;
+    public AssetImpairmentPostingController(DbConnectionFactory db, EmailService emailService)
+    {
+        _db = db;
+        _emailService = emailService;
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] int? assetImpairmentId)
@@ -43,7 +49,7 @@ public class AssetImpairmentPostingController : ControllerBase
             INSERT INTO ""Asset_ImpairmentPostings"" (""Impairment_ID"", ""PostingDate"", ""PostedByID"", ""Status"",
                 ""FairValueAmt"", ""CostToSell"", ""PresentValue"", ""ImpairmentLostAmt"", ""AmountFromRevaluationReserve"", ""IsReversal"", ""DateCaptured"", ""CapturerID"")
             VALUES (COALESCE(@Impairment_ID, @AssetImpairment_ID), @PostingDate, @PostedByID, @Status,
-                @FairValueAmt, @CostToSell, @PresentValue, @ImpairmentLostAmt, @AmountFromRevaluationReserve, COALESCE(@IsReversal, 0), GETDATE(), @CapturerID)
+                @FairValueAmt, @CostToSell, @PresentValue, @ImpairmentLostAmt, @AmountFromRevaluationReserve, COALESCE(@IsReversal, 0), NOW(), @CapturerID)
             RETURNING ""Id""", model);
         model.ImpairmentPosting_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
