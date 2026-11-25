@@ -5,7 +5,6 @@ import { ActivatedRoute } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { SharePointConfigService } from '@platinumv3/assets';
-import { GraphService } from '@platinumv3/shared/graph';
 
 const STORAGE_KEY = 'platinum_module_config';
 
@@ -137,6 +136,11 @@ export interface ModuleApiConfig {
   afsAuditFindingsSharePointSiteUrl : string;
   afsAuditFindingsSharePointLibrary : string;
   afsAuditFindingsSharePointLinkColumn : string;
+  // AFS general information SharePoint document storage (separate library)
+  afsGeneralInfoSharePointEnabled : boolean;
+  afsGeneralInfoSharePointSiteUrl : string;
+  afsGeneralInfoSharePointLibrary : string;
+  afsGeneralInfoSharePointLinkColumn : string;
   // AFS PostgreSQL database (maps to AZURE_POSTGRES_URL read by AFS-UI/api)
   afsDbHost     : string;
   afsDbPort     : string;
@@ -288,6 +292,11 @@ const DEFAULTS: ModuleApiConfig = {
   afsAuditFindingsSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsAuditFindingsSharePointLibrary : 'UatAFS Audit_Findings',
   afsAuditFindingsSharePointLinkColumn : 'AFSID',
+  // AFS general information documents → separate SharePoint library
+  afsGeneralInfoSharePointEnabled : false,
+  afsGeneralInfoSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  afsGeneralInfoSharePointLibrary : 'UatAFS General_Information',
+  afsGeneralInfoSharePointLinkColumn : 'AFSID',
   // AFS database — separate "AFS" PostgreSQL on Azure
   afsDbHost     : 'platinum-postgre-sql.postgres.database.azure.com',
   afsDbPort     : '5432',
@@ -671,11 +680,6 @@ const MODULES: ModuleDef[] = [
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afs' || !cfg.afsSharePointEnabled || !cfg.afsSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afs')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afs' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afs' ? 'Creating…' : 'Create ' + afsLinkColumn('afs') + ' column' }}
-            </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
             </button>
@@ -746,11 +750,6 @@ const MODULES: ModuleDef[] = [
                     (click)="testSharePointAfsAdjustments()">
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
-            </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsAdjustments' || !cfg.afsAdjustmentsSharePointEnabled || !cfg.afsAdjustmentsSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsAdjustments')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsAdjustments' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsAdjustments' ? 'Creating…' : 'Create ' + afsLinkColumn('afsAdjustments') + ' column' }}
             </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
@@ -823,11 +822,6 @@ const MODULES: ModuleDef[] = [
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsRfi' || !cfg.afsRfiSharePointEnabled || !cfg.afsRfiSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsRfi')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsRfi' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsRfi' ? 'Creating…' : 'Create ' + afsLinkColumn('afsRfi') + ' column' }}
-            </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
             </button>
@@ -898,11 +892,6 @@ const MODULES: ModuleDef[] = [
                     (click)="testSharePointAfsWp()">
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
-            </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsWp' || !cfg.afsWpSharePointEnabled || !cfg.afsWpSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsWp')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsWp' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsWp' ? 'Creating…' : 'Create ' + afsLinkColumn('afsWp') + ' column' }}
             </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
@@ -975,11 +964,6 @@ const MODULES: ModuleDef[] = [
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsFinding' || !cfg.afsFindingSharePointEnabled || !cfg.afsFindingSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsFinding')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsFinding' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsFinding' ? 'Creating…' : 'Create ' + afsLinkColumn('afsFinding') + ' column' }}
-            </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
             </button>
@@ -1050,11 +1034,6 @@ const MODULES: ModuleDef[] = [
                     (click)="testSharePointAfsScoa()">
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
-            </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsScoa' || !cfg.afsScoaSharePointEnabled || !cfg.afsScoaSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsScoa')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsScoa' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsScoa' ? 'Creating…' : 'Create ' + afsLinkColumn('afsScoa') + ' column' }}
             </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
@@ -1127,11 +1106,6 @@ const MODULES: ModuleDef[] = [
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsDraft' || !cfg.afsDraftSharePointEnabled || !cfg.afsDraftSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsDraft')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsDraft' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsDraft' ? 'Creating…' : 'Create ' + afsLinkColumn('afsDraft') + ' column' }}
-            </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
             </button>
@@ -1202,11 +1176,6 @@ const MODULES: ModuleDef[] = [
                     (click)="testSharePointAfsFinal()">
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
-            </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsFinal' || !cfg.afsFinalSharePointEnabled || !cfg.afsFinalSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsFinal')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsFinal' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsFinal' ? 'Creating…' : 'Create ' + afsLinkColumn('afsFinal') + ' column' }}
             </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
@@ -1279,11 +1248,6 @@ const MODULES: ModuleDef[] = [
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsAdjSupport' || !cfg.afsAdjSupportSharePointEnabled || !cfg.afsAdjSupportSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsAdjSupport')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsAdjSupport' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsAdjSupport' ? 'Creating…' : 'Create ' + afsLinkColumn('afsAdjSupport') + ' column' }}
-            </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
             </button>
@@ -1354,11 +1318,6 @@ const MODULES: ModuleDef[] = [
                     (click)="testSharePointAfsMapping()">
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
-            </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsMapping' || !cfg.afsMappingSharePointEnabled || !cfg.afsMappingSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsMapping')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsMapping' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsMapping' ? 'Creating…' : 'Create ' + afsLinkColumn('afsMapping') + ' column' }}
             </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
@@ -1431,11 +1390,6 @@ const MODULES: ModuleDef[] = [
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsExport' || !cfg.afsExportSharePointEnabled || !cfg.afsExportSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsExport')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsExport' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsExport' ? 'Creating…' : 'Create ' + afsLinkColumn('afsExport') + ' column' }}
-            </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
             </button>
@@ -1506,11 +1460,6 @@ const MODULES: ModuleDef[] = [
                     (click)="testSharePointAfsTemplate()">
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
-            </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsTemplate' || !cfg.afsTemplateSharePointEnabled || !cfg.afsTemplateSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsTemplate')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsTemplate' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsTemplate' ? 'Creating…' : 'Create ' + afsLinkColumn('afsTemplate') + ' column' }}
             </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
@@ -1583,11 +1532,6 @@ const MODULES: ModuleDef[] = [
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsEvidence' || !cfg.afsEvidenceSharePointEnabled || !cfg.afsEvidenceSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsEvidence')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsEvidence' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsEvidence' ? 'Creating…' : 'Create ' + afsLinkColumn('afsEvidence') + ' column' }}
-            </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
             </button>
@@ -1658,11 +1602,6 @@ const MODULES: ModuleDef[] = [
                     (click)="testSharePointAfsAdmin()">
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
-            </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsAdmin' || !cfg.afsAdminSharePointEnabled || !cfg.afsAdminSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsAdmin')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsAdmin' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsAdmin' ? 'Creating…' : 'Create ' + afsLinkColumn('afsAdmin') + ' column' }}
             </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
@@ -1735,11 +1674,6 @@ const MODULES: ModuleDef[] = [
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsDocMgmt' || !cfg.afsDocMgmtSharePointEnabled || !cfg.afsDocMgmtSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsDocMgmt')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsDocMgmt' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsDocMgmt' ? 'Creating…' : 'Create ' + afsLinkColumn('afsDocMgmt') + ' column' }}
-            </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
             </button>
@@ -1810,11 +1744,6 @@ const MODULES: ModuleDef[] = [
                     (click)="testSharePointAfsTb()">
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
-            </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsTb' || !cfg.afsTbSharePointEnabled || !cfg.afsTbSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsTb')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsTb' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsTb' ? 'Creating…' : 'Create ' + afsLinkColumn('afsTb') + ' column' }}
             </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
@@ -1887,11 +1816,6 @@ const MODULES: ModuleDef[] = [
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsRollupGl' || !cfg.afsRollupGlSharePointEnabled || !cfg.afsRollupGlSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsRollupGl')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsRollupGl' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsRollupGl' ? 'Creating…' : 'Create ' + afsLinkColumn('afsRollupGl') + ' column' }}
-            </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
             </button>
@@ -1962,11 +1886,6 @@ const MODULES: ModuleDef[] = [
                     (click)="testSharePointAfsMfma()">
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
-            </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsMfma' || !cfg.afsMfmaSharePointEnabled || !cfg.afsMfmaSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsMfma')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsMfma' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsMfma' ? 'Creating…' : 'Create ' + afsLinkColumn('afsMfma') + ' column' }}
             </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
@@ -2039,11 +1958,6 @@ const MODULES: ModuleDef[] = [
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsOverview' || !cfg.afsOverviewSharePointEnabled || !cfg.afsOverviewSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsOverview')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsOverview' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsOverview' ? 'Creating…' : 'Create ' + afsLinkColumn('afsOverview') + ' column' }}
-            </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
             </button>
@@ -2114,11 +2028,6 @@ const MODULES: ModuleDef[] = [
                     (click)="testSharePointAfsExportsCenter()">
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
-            </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsExportsCenter' || !cfg.afsExportsCenterSharePointEnabled || !cfg.afsExportsCenterSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsExportsCenter')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsExportsCenter' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsExportsCenter' ? 'Creating…' : 'Create ' + afsLinkColumn('afsExportsCenter') + ' column' }}
             </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
@@ -2191,11 +2100,6 @@ const MODULES: ModuleDef[] = [
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsRfiMgmt' || !cfg.afsRfiMgmtSharePointEnabled || !cfg.afsRfiMgmtSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsRfiMgmt')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsRfiMgmt' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsRfiMgmt' ? 'Creating…' : 'Create ' + afsLinkColumn('afsRfiMgmt') + ' column' }}
-            </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
             </button>
@@ -2267,10 +2171,76 @@ const MODULES: ModuleDef[] = [
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
-            <button class="btn-secondary" [disabled]="spColumnBusy() === 'afsAuditFindings' || !cfg.afsAuditFindingsSharePointEnabled || !cfg.afsAuditFindingsSharePointSiteUrl"
-                    (click)="createAfsLinkColumn('afsAuditFindings')" title="Create the link column in this SharePoint library if it is missing">
-              <mat-icon>{{ spColumnBusy() === 'afsAuditFindings' ? 'hourglass_empty' : 'view_column' }}</mat-icon>
-              {{ spColumnBusy() === 'afsAuditFindings' ? 'Creating…' : 'Create ' + afsLinkColumn('afsAuditFindings') + ' column' }}
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- AFS general information SharePoint library (separate from general AFS docs) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>General Information</span>
+          </div>
+
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.afsGeneralInfoSharePointEnabled"
+                    (click)="cfg.afsGeneralInfoSharePointEnabled = !cfg.afsGeneralInfoSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.afsGeneralInfoSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for general information documents</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, general information documents are stored in the dedicated AFS general information SharePoint library (with metadata) instead of the general AFS library or local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.afsGeneralInfoSharePointEnabled">
+              {{ cfg.afsGeneralInfoSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <div class="field-grid" [class.sp-disabled]="!cfg.afsGeneralInfoSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.afsGeneralInfoSharePointSiteUrl"
+                     [disabled]="!cfg.afsGeneralInfoSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.afsGeneralInfoSharePointLibrary"
+                     [disabled]="!cfg.afsGeneralInfoSharePointEnabled"
+                     placeholder="UatAFS General_Information"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatAFS General_Information</strong> (the library's title or the URL segment in its address)</div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.afsGeneralInfoSharePointLinkColumn"
+                     [disabled]="!cfg.afsGeneralInfoSharePointEnabled"
+                     placeholder="AFSID"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the linked AFS entity id (default <strong>AFSID</strong>). Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value).</div>
+            </div>
+          </div>
+
+          @if (!cfg.afsGeneralInfoSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — general information documents use the AFS SharePoint library above (when it is on) or the module's local file storage.
+              </div>
+            </div>
+          }
+
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.afsGeneralInfoSharePointEnabled || !cfg.afsGeneralInfoSharePointSiteUrl"
+                    (click)="testSharePointAfsExportsCenter()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
             <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
               <mat-icon>save</mat-icon> Save Configuration
@@ -2580,9 +2550,6 @@ export class AdminSettingsComponent implements OnInit {
   cfg: ModuleApiConfig = loadModuleConfig();
   dirty = signal(false);
   spTesting = signal(false);
-  private graph = inject(GraphService);
-  /** Prefix of the AFS card whose link column is being created (disables its button). */
-  spColumnBusy = signal('');
 
   activeKey = signal('assets');
 
@@ -2600,53 +2567,6 @@ export class AdminSettingsComponent implements OnInit {
   }
 
   markDirty() { this.dirty.set(true); }
-
-  /** The link column an AFS card uses (the general AFS card has no field, so AFSID). */
-  afsLinkColumn(prefix: string): string {
-    return (((this.cfg as any)[prefix + 'SharePointLinkColumn'] as string) || '').trim() || 'AFSID';
-  }
-
-  /**
-   * Create the card's link column (AFSID by default) in its SharePoint library when missing,
-   * using the signed-in Microsoft account. Only the exact library is touched — never a fallback.
-   */
-  async createAfsLinkColumn(prefix: string) {
-    const c = this.cfg as any;
-    const siteUrl = ((c[prefix + 'SharePointSiteUrl'] as string) || '').trim();
-    const library = ((c[prefix + 'SharePointLibrary'] as string) || '').trim();
-    const column = this.afsLinkColumn(prefix);
-    if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(column)) {
-      this.snack.open(`"${column}" isn't a valid column name — use letters, digits and _ only (e.g. AFSID).`, 'OK', { duration: 6000 });
-      return;
-    }
-    this.spColumnBusy.set(prefix);
-    try {
-      const u = new URL(siteUrl);
-      const site = await this.graph.getSiteByPath(u.hostname, u.pathname.replace(/\/$/, ''));
-      const drives = await this.graph.getDrives(site.id);
-      const norm = (v?: string) => { let x = v || ''; try { x = decodeURIComponent(x); } catch {} return x.toLowerCase().replace(/\s+/g, ''); };
-      const seg = (url?: string) => (url || '').replace(/\/+$/, '').split('/').pop() || '';
-      const drive = drives.find(d => norm(d.name) === norm(library) || norm(seg(d.webUrl)) === norm(library));
-      if (!drive) {
-        const afsLibs = drives.filter(d => /afs/i.test(d.name) || /afs/i.test(seg(d.webUrl)));
-        this.snack.open(`Library "${library}" was not found on the site. AFS libraries there: ` +
-          (afsLibs.length ? afsLibs.map(d => `${d.name} (URL: ${seg(d.webUrl)})`).join('; ') : 'none'), 'OK', { duration: 30000 });
-        return;
-      }
-      const result = await this.graph.ensureTextColumn(drive.id, column);
-      this.snack.open(result === 'created'
-        ? `Created column "${column}" in "${drive.name}".`
-        : `Column "${column}" already exists in "${drive.name}".`, 'OK', { duration: 6000 });
-    } catch (e: any) {
-      const msg = e?.message || String(e);
-      const hint = /signed-in Microsoft account/i.test(msg) ? ' Sign in on the SharePoint page first.'
-        : /\b403\b|accessDenied|Access denied/i.test(msg) ? ' Your account cannot manage this library\'s columns — ask the SharePoint admin to add it.'
-        : '';
-      this.snack.open(`Could not create "${column}": ${msg}${hint}`, 'OK', { duration: 12000 });
-    } finally {
-      this.spColumnBusy.set('');
-    }
-  }
 
   save() {
     try {
@@ -3096,6 +3016,20 @@ export class AdminSettingsComponent implements OnInit {
       this.spTesting.set(false);
       if (ok) {
         this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsAuditFindingsSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointAfsGeneralInfo() {
+    this.spTesting.set(true);
+    const url = this.cfg.afsGeneralInfoSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsGeneralInfoSharePointLibrary}`, 'OK', { duration: 4000 });
       } else {
         this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
       }

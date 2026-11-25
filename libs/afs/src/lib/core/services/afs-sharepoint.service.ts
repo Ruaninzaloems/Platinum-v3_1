@@ -9,7 +9,7 @@ import { GraphService } from '@platinumv3/shared/graph';
  *
  *   Library columns written:  AFSID, description, Classification, Category, Tags
  *
- * Twenty-two independent libraries are supported, each with its own enable toggle:
+ * Twenty-three independent libraries are supported, each with its own enable toggle:
  *   • 'afs'          → general AFS documents (and working papers when 'workingPaper' is off) (default lib: UatAFS)
  *   • 'adjustments'  → adjustment supporting documents   (default lib: UatAFSAdjustments)
  *   • 'rfi'          → Working-Papers RFI attachments    (default lib: UatAFS WorkingPapers_RFI_Attachment)
@@ -32,12 +32,13 @@ import { GraphService } from '@platinumv3/shared/graph';
  *   • 'exportsCenter' → AFS exports center      (default lib: UatAFS Exports Center Overview)
  *   • 'rfiManagement' → AFS RFI management      (default lib: UatAFS RFI Management)
  *   • 'auditFindings' → AFS audit findings      (default lib: UatAFS Audit_Findings)
+ *   • 'generalInformation' → AFS general information      (default lib: UatAFS General_Information)
  *
  * Mirrors the Assets SharePointConfigService / Overtime OvertimeSharePointService.
  */
 const STORAGE_KEY = 'platinum_module_config';
 
-export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi' | 'workingPaper' | 'finding' | 'scoaVersion' | 'afsDraft' | 'afsFinal' | 'adjustmentSupport' | 'mappingSnapshot' | 'export' | 'template' | 'evidence' | 'administration' | 'documentManagement' | 'dataSourceTb' | 'rolledUpGl' | 'mfmaReporting' | 'dashboardOverview' | 'exportsCenter' | 'rfiManagement' | 'auditFindings';
+export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi' | 'workingPaper' | 'finding' | 'scoaVersion' | 'afsDraft' | 'afsFinal' | 'adjustmentSupport' | 'mappingSnapshot' | 'export' | 'template' | 'evidence' | 'administration' | 'documentManagement' | 'dataSourceTb' | 'rolledUpGl' | 'mfmaReporting' | 'dashboardOverview' | 'exportsCenter' | 'rfiManagement' | 'auditFindings' | 'generalInformation';
 
 export interface AfsSharePointConfig {
   enabled: boolean;
@@ -89,6 +90,7 @@ const DEFAULT_CONFIGS: Record<AfsSpVariant, AfsSharePointConfig> = {
   exportsCenter: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS Exports Center Overview' },
   rfiManagement: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS RFI Management' },
   auditFindings: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS Audit_Findings' },
+  generalInformation: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS General_Information' },
 };
 
 interface AfsDocMeta {
@@ -128,6 +130,7 @@ const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   exportsCenter: { key: 'afsid', defaultName: 'AFSID' },
   rfiManagement: { key: 'afsid', defaultName: 'AFSID' },
   auditFindings: { key: 'afsid', defaultName: 'AFSID' },
+  generalInformation: { key: 'afsid', defaultName: 'AFSID' },
 };
 
 /** Normalise a library title / URL segment for matching: decode %20, lowercase, drop whitespace
@@ -186,10 +189,12 @@ export class AfsSharePointService {
   readonly rfiManagementConfig = signal<AfsSharePointConfig>(this.read('rfiManagement'));
   /** AFS audit findings library config. */
   readonly auditFindingsConfig = signal<AfsSharePointConfig>(this.read('auditFindings'));
+  /** AFS general information library config. */
+  readonly generalInformationConfig = signal<AfsSharePointConfig>(this.read('generalInformation'));
 
-  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null, documentManagement: null, dataSourceTb: null, rolledUpGl: null, mfmaReporting: null, dashboardOverview: null, exportsCenter: null, rfiManagement: null, auditFindings: null };
+  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null, documentManagement: null, dataSourceTb: null, rolledUpGl: null, mfmaReporting: null, dashboardOverview: null, exportsCenter: null, rfiManagement: null, auditFindings: null, generalInformation: null };
   private fieldsByVariant: Record<AfsSpVariant, Record<string, string | null>> = {
-    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields(), documentManagement: emptyFields(), dataSourceTb: emptyFields(), rolledUpGl: emptyFields(), mfmaReporting: emptyFields(), dashboardOverview: emptyFields(), exportsCenter: emptyFields(), rfiManagement: emptyFields(), auditFindings: emptyFields(),
+    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields(), documentManagement: emptyFields(), dataSourceTb: emptyFields(), rolledUpGl: emptyFields(), mfmaReporting: emptyFields(), dashboardOverview: emptyFields(), exportsCenter: emptyFields(), rfiManagement: emptyFields(), auditFindings: emptyFields(), generalInformation: emptyFields(),
   };
 
   refresh(): void {
@@ -215,8 +220,9 @@ export class AfsSharePointService {
     this.exportsCenterConfig.set(this.read('exportsCenter'));
     this.rfiManagementConfig.set(this.read('rfiManagement'));
     this.auditFindingsConfig.set(this.read('auditFindings'));
-    this.driveIds = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null, documentManagement: null, dataSourceTb: null, rolledUpGl: null, mfmaReporting: null, dashboardOverview: null, exportsCenter: null, rfiManagement: null, auditFindings: null };
-    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields(), documentManagement: emptyFields(), dataSourceTb: emptyFields(), rolledUpGl: emptyFields(), mfmaReporting: emptyFields(), dashboardOverview: emptyFields(), exportsCenter: emptyFields(), rfiManagement: emptyFields(), auditFindings: emptyFields() };
+    this.generalInformationConfig.set(this.read('generalInformation'));
+    this.driveIds = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null, documentManagement: null, dataSourceTb: null, rolledUpGl: null, mfmaReporting: null, dashboardOverview: null, exportsCenter: null, rfiManagement: null, auditFindings: null, generalInformation: null };
+    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields(), documentManagement: emptyFields(), dataSourceTb: emptyFields(), rolledUpGl: emptyFields(), mfmaReporting: emptyFields(), dashboardOverview: emptyFields(), exportsCenter: emptyFields(), rfiManagement: emptyFields(), auditFindings: emptyFields(), generalInformation: emptyFields() };
   }
 
   private configSignal(variant: AfsSpVariant) {
@@ -242,6 +248,7 @@ export class AfsSharePointService {
       case 'exportsCenter': return this.exportsCenterConfig;
       case 'rfiManagement': return this.rfiManagementConfig;
       case 'auditFindings': return this.auditFindingsConfig;
+      case 'generalInformation': return this.generalInformationConfig;
       default: return this.config;
     }
   }
@@ -389,8 +396,8 @@ export class AfsSharePointService {
       throw new Error(
         `File uploaded to "${this.read(variant).library}", but it could not be linked — ` +
         `that library has no "${candidates[0]}" column (tried: ${candidates.join(', ')}). ` +
-        `In Admin → AFS, click "Create ${candidates[0]} column" on this library's card, then upload again ` +
-        `(or set the card's "Link Column" to the INTERNAL name of an existing ID column). ` +
+        `Add a "${candidates[0]}" column to that library in SharePoint, then upload again ` +
+        `(or set the card's "Link Column" in Admin → AFS to the INTERNAL name of an existing ID column). ` +
         `Writable columns Graph currently reports: ${cols}`
       );
     }
@@ -574,6 +581,14 @@ export class AfsSharePointService {
             siteUrl: p.afsRfiSharePointSiteUrl || d.siteUrl,
             library: p.afsRfiSharePointLibrary || d.library,
             linkColumn: (p.afsRfiSharePointLinkColumn || '').trim() || undefined,
+          };
+        }
+        if (variant === 'generalInformation') {
+          return {
+            enabled: p.afsGeneralInfoSharePointEnabled ?? d.enabled,
+            siteUrl: p.afsGeneralInfoSharePointSiteUrl || d.siteUrl,
+            library: p.afsGeneralInfoSharePointLibrary || d.library,
+            linkColumn: (p.afsGeneralInfoSharePointLinkColumn || '').trim() || undefined,
           };
         }
         if (variant === 'auditFindings') {
