@@ -9,6 +9,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthService } from '@platinumv3/shared/auth';
 import { DatabaseToggleService, OrgSettingsService } from '@platinumv3/assets';
 import { UserContextService, type MeDto } from '@platinumv3/overtime';
+import { PinnedLibrariesService, type PinnedLibrary } from '../features/sharepoint/pinned-libraries.service';
 import { filter, Subscription } from 'rxjs';
 
 interface NavItem {
@@ -413,6 +414,17 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
               <span>UatOvertime</span>
             </a>
             <div style="padding:2px 16px 0 44px;font-size:11px;color:#94a3b8">Sebata2</div>
+            @for (p of pinnedLibs.list(); track p.hostname + p.sitePath + p.libraryName) {
+              <a class="nav-link sub-item" routerLink="/sharepoint"
+                 [queryParams]="{ host: p.hostname, site: p.sitePath, library: p.libraryName, name: p.siteName }">
+                <mat-icon class="nav-icon">folder_open</mat-icon>
+                <span>{{ p.libraryName }}</span>
+              </a>
+              <div style="padding:2px 16px 0 44px;font-size:11px;color:#94a3b8">
+                {{ p.siteName }} ·
+                <a style="cursor:pointer;color:#3f51b5" (click)="pinnedLibs.remove(p)">unpin</a>
+              </div>
+            }
           } @else if (activeModule() === 'admin') {
             <!-- API Config (collapsible) -->
             <button class="nav-group-header" (click)="toggleGroup('API Config')">
@@ -652,6 +664,7 @@ export class ShellComponent implements OnInit, OnDestroy {
     public dbToggle: DatabaseToggleService,
     public orgSettings: OrgSettingsService,
     private injector: Injector,
+    public pinnedLibs: PinnedLibrariesService,
   ) {}
 
   ngOnInit() {

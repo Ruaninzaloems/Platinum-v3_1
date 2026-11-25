@@ -38,6 +38,7 @@ export interface DriveItem {
   webUrl          : string;
   size            : number | null;
   lastModifiedDateTime : string;
+  lastModifiedBy  ?: { user?: { displayName?: string; email?: string } };
   createdDateTime : string;
   file            ?: { mimeType: string };
   folder          ?: { childCount: number };
@@ -179,6 +180,64 @@ export class GraphService {
       .map((h, i) => ({ h, i }))
       .sort((a, b) => Number(b.h.nameMatch) - Number(a.h.nameMatch) || a.i - b.i)
       .map(x => x.h);
+  }
+
+  /**
+   * LIVE name search inside one library: walks the folder tree through the drive API instead of the
+   * search index, so files uploaded seconds ago are found (the index can lag several minutes).
+   * Matches file names that contain every search term anywhere in the name (case-insensitive), so
+   * "est01" finds "test01.png". Bounded by `maxFolders` and `maxMs`; `truncated` tells the caller
+   * whether the walk stopped early on a very large library.
+   */
+  async searchDriveByName(
+    driveId: string, input: string, maxFolders = 800, maxMs = 20000,
+  ): Promise<{ hits: DocumentHit[]; truncated: boolean }> {
+    if (searchTerms(input).length === 0) return { hits: [], truncated: false };
+    const started = Date.now();
+    const select = '$select=id,name,webUrl,size,lastModifiedDateTime,folder,file&$top=200';
+    const hits: DocumentHit[] = [];
+    const queue: string[] = ['root'];
+    let foldersSeen = 0;
+    let truncated = false;
+
+    const listAll = async (folderId: string): Promise<any[]> => {
+      const base = folderId === 'root'
+        ? `/drives/${driveId}/root/children`
+        : `/drives/${driveId}/items/${folderId}/children`;
+      const all: any[] = [];
+      let path: string | null = `${base}?${select}`;
+      while (path) {
+        const resp: { value: any[]; '@odata.nextLink'?: string } = await this.get(path);
+        all.push(...(resp.value || []));
+        const next = resp['@odata.nextLink'];
+        path = next ? next.replace(GRAPH, '') : null;
+      }
+      return all;
+    };
+
+    while (queue.length) {
+      if (foldersSeen >= maxFolders || Date.now() - started > maxMs) { truncated = true; break; }
+      const batch = queue.splice(0, 6);
+      foldersSeen += batch.length;
+      const lists = await Promise.all(batch.map(id => listAll(id).catch(() => [] as any[])));
+      for (const items of lists) {
+        for (const r of items) {
+          if (r.folder) { queue.push(r.id); continue; }
+          if (!r.name || !nameContainsAll(r.name, input)) continue;
+          hits.push({
+            id: r.id,
+            driveId,
+            name: r.name,
+            webUrl: r.webUrl ?? '',
+            size: r.size ?? null,
+            lastModifiedDateTime: r.lastModifiedDateTime ?? '',
+            location: locationFromUrl(r.webUrl ?? ''),
+            nameMatch: true,
+          });
+        }
+      }
+    }
+    return { hits, truncated };
   }
 
   /** Get a specific site by ID. */

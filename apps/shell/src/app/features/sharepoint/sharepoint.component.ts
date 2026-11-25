@@ -2,14 +2,16 @@ import {
   Component, signal, computed, inject, OnInit, ViewChild, ElementRef
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { GraphService, SharePointSite, Drive, DriveItem, DocumentHit } from '@platinumv3/shared/graph';
+import { GraphService, SharePointSite, Drive, DriveItem, DocumentHit, ListColumn } from '@platinumv3/shared/graph';
 import { MsAuthService } from '@platinumv3/shared/auth';
+import { PinnedLibrariesService } from './pinned-libraries.service';
 
 interface BreadcrumbItem { id: string; name: string; }
 
@@ -29,6 +31,14 @@ const PINNED_SITES: PinnedSite[] = [
     defaultLibrary: 'UatAssets',
   },
 ];
+
+type EditColumnType = 'text' | 'note' | 'choice' | 'boolean' | 'number' | 'dateTime';
+interface EditColumn {
+  name        : string;   // SharePoint internal name (used for read/write)
+  displayName : string;
+  type        : EditColumnType;
+  choices    ?: string[];
+}
 
 @Component({
   selector: 'app-sharepoint',
@@ -104,45 +114,6 @@ const PINNED_SITES: PinnedSite[] = [
               }
             </ul>
 
-            <!-- Divider -->
-            <div class="panel-divider"></div>
-
-            <!-- All sites search -->
-            <div class="panel-section-header">
-              <mat-icon>language</mat-icon> Find a site
-            </div>
-            <div class="search-box">
-              <mat-icon>search</mat-icon>
-              <input type="text" placeholder="Site name…"
-                     [(ngModel)]="siteQuery" (input)="searchSites()">
-            </div>
-
-            @if (sitesLoading()) {
-              <div class="spinner-wrap"><mat-spinner diameter="32"></mat-spinner></div>
-            } @else {
-              <ul class="site-list scrollable">
-                @for (s of sites(); track s.id) {
-                  <li [class.active]="selectedSite()?.id === s.id"
-                      (click)="selectSite(s)">
-                    <mat-icon>language</mat-icon>
-                    <div>
-                      <div class="site-name">{{ s.displayName || s.name }}</div>
-                      <div class="site-url">{{ s.webUrl | slice:8:50 }}…</div>
-                    </div>
-                  </li>
-                }
-                @if (sites().length === 0 && siteQuery) {
-                  <li class="empty">No sites found</li>
-                  <li class="empty search-docs-link" (click)="searchDocsFromSiteBox()">
-                    <mat-icon>description</mat-icon>
-                    <span>Looking for a file? Search documents for “{{ siteQuery }}”</span>
-                  </li>
-                }
-                @if (sites().length === 0 && !siteQuery) {
-                  <li class="empty">Type to search sites</li>
-                }
-              </ul>
-            }
           </aside>
 
           <!-- ── Main area ─────────────────────────────────────────────── -->
@@ -229,7 +200,79 @@ const PINNED_SITES: PinnedSite[] = [
                     <option [value]="d.id">{{ d.name }}</option>
                   }
                 </select>
+                <button class="pin-lib" [class.on]="isLibraryPinned()"
+                        [matTooltip]="isLibraryPinned() ? 'Remove from Pinned Libraries' : 'Pin this library to the sidebar'"
+                        (click)="togglePinLibrary()">
+                  <mat-icon>push_pin</mat-icon> {{ isLibraryPinned() ? 'Pinned' : 'Pin library' }}
+                </button>
                 <span class="drive-url">{{ selectedSite()?.webUrl }}</span>
+              </div>
+            }
+
+            <!-- Shared hidden file picker: used by the toolbar Upload and the empty-folder Upload buttons -->
+            <input #fileInput type="file" multiple hidden (change)="onFilesSelected($event)">
+
+            <!-- Edit dialog: rename + the library's editable metadata columns -->
+            @if (editOpen()) {
+              <div class="modal-backdrop" (click)="closeEdit()">
+                <div class="modal" (click)="$event.stopPropagation()">
+                  <div class="modal-head">
+                    <h2>Edit {{ editItem()?.folder ? 'folder' : 'document' }}</h2>
+                    <button mat-icon-button (click)="closeEdit()"><mat-icon>close</mat-icon></button>
+                  </div>
+                  <div class="modal-body">
+                    <div class="field">
+                      <label>Name</label>
+                      <input type="text" [ngModel]="editName()" (ngModelChange)="editName.set($event)">
+                      <small class="hint">Renaming changes the item's URL in SharePoint.</small>
+                    </div>
+                    @if (editLoading()) {
+                      <div class="meta-loading"><mat-spinner diameter="20"></mat-spinner> Loading details…</div>
+                    }
+                    @for (col of editColumns(); track col.name) {
+                      <div class="field">
+                        <label>{{ col.displayName }}</label>
+                        @switch (col.type) {
+                          @case ('choice') {
+                            <select [ngModel]="editValues()[col.name]" (ngModelChange)="setEditValue(col.name, $event)">
+                              <option value="">— None —</option>
+                              @for (c of col.choices; track c) { <option [value]="c">{{ c }}</option> }
+                            </select>
+                          }
+                          @case ('note') {
+                            <textarea rows="3" [ngModel]="editValues()[col.name]"
+                                      (ngModelChange)="setEditValue(col.name, $event)"></textarea>
+                          }
+                          @case ('boolean') {
+                            <label class="check">
+                              <input type="checkbox" [ngModel]="!!editValues()[col.name]"
+                                     (ngModelChange)="setEditValue(col.name, $event)"> Yes
+                            </label>
+                          }
+                          @case ('number') {
+                            <input type="number" [ngModel]="editValues()[col.name]"
+                                   (ngModelChange)="setEditValue(col.name, $event)">
+                          }
+                          @case ('dateTime') {
+                            <input type="date" [ngModel]="editValues()[col.name]"
+                                   (ngModelChange)="setEditValue(col.name, $event)">
+                          }
+                          @default {
+                            <input type="text" [ngModel]="editValues()[col.name]"
+                                   (ngModelChange)="setEditValue(col.name, $event)">
+                          }
+                        }
+                      </div>
+                    }
+                  </div>
+                  <div class="modal-foot">
+                    <button mat-stroked-button (click)="closeEdit()" [disabled]="editSaving()">Cancel</button>
+                    <button mat-raised-button color="primary" (click)="saveEdit()"
+                            [disabled]="editSaving() || !editName().trim()">
+                      {{ editSaving() ? 'Saving…' : 'Save changes' }}
+                    </button>
+                  </div>
+                </div>
               </div>
             }
 
@@ -261,8 +304,6 @@ const PINNED_SITES: PinnedSite[] = [
                 <button mat-raised-button color="primary" (click)="fileInput.click()">
                   <mat-icon>upload</mat-icon> Upload
                 </button>
-                <input #fileInput type="file" multiple hidden
-                       (change)="onFilesSelected($event)">
               </div>
             }
 
@@ -277,7 +318,7 @@ const PINNED_SITES: PinnedSite[] = [
             } @else {
               <div class="file-grid">
                 @for (item of sortedItems(); track item.id) {
-                  <div class="file-card" (dblclick)="openItem(item)"
+                  <div class="file-card" [class.is-folder]="!!item.folder" (click)="item.folder && openItem(item)"
                        [matTooltip]="item.name + (item.folder ? ' (folder)' : ' — ' + formatSize(item.size))">
                     <div class="file-icon" [class.folder-icon]="item.folder">
                       <mat-icon>{{ item.folder ? 'folder' : getFileIcon(item.name) }}</mat-icon>
@@ -288,10 +329,17 @@ const PINNED_SITES: PinnedSite[] = [
                         {{ item.folder
                           ? (item.folder.childCount + ' items')
                           : formatSize(item.size) }}
-                        · {{ item.lastModifiedDateTime | date:'dd MMM yyyy' }}
+                        · Modified {{ timeAgo(item.lastModifiedDateTime) }}
+                        @if (item.lastModifiedBy?.user?.displayName) {
+                          · Modified by {{ item.lastModifiedBy?.user?.displayName }}
+                        }
                       </div>
                     </div>
                     <div class="file-actions">
+                      <button mat-icon-button matTooltip="Edit (rename / details)"
+                              (click)="openEdit(item); $event.stopPropagation()">
+                        <mat-icon>edit</mat-icon>
+                      </button>
                       @if (!item.folder) {
                         <button mat-icon-button matTooltip="Download"
                                 (click)="download(item); $event.stopPropagation()">
@@ -309,7 +357,9 @@ const PINNED_SITES: PinnedSite[] = [
                   <div class="empty-folder">
                     <mat-icon>folder_open</mat-icon>
                     <p>This folder is empty</p>
-                    <button mat-stroked-button (click)="fileInput.click()">Upload a file</button>
+                    <button mat-raised-button color="primary" (click)="fileInput.click()">
+                      <mat-icon>upload</mat-icon> Upload a file
+                    </button>
                   </div>
                 }
               </div>
@@ -441,12 +491,50 @@ const PINNED_SITES: PinnedSite[] = [
       transition: box-shadow .15s;
     }
     .file-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+    .file-card.is-folder { cursor: pointer; }
+    .file-card.is-folder:hover { border-color: #93c5fd; background: #f8fbff; }
     .file-icon mat-icon { font-size: 28px; width: 28px; height: 28px; color: #64748b; }
     .file-icon.folder-icon mat-icon { color: #f59e0b; }
     .file-meta { flex: 1; min-width: 0; }
     .file-name { font-size: .9rem; font-weight: 600; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .file-info { font-size: .75rem; color: #94a3b8; margin-top: .15rem; }
     .file-actions { display: flex; gap: .25rem; }
+    .pin-lib {
+      display: inline-flex; align-items: center; gap: .25rem; margin-left: .5rem;
+      padding: .25rem .65rem; border: 1px solid #cbd5e1; border-radius: 999px;
+      background: #fff; color: #475569; font-size: .8rem; cursor: pointer;
+    }
+    .pin-lib mat-icon { font-size: 16px; width: 16px; height: 16px; }
+    .pin-lib:hover { background: #eef2ff; border-color: #3f51b5; color: #3f51b5; }
+    .pin-lib.on { background: #e0e7ff; border-color: #3f51b5; color: #3f51b5; font-weight: 600; }
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(15, 23, 42, .45);
+      display: flex; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal {
+      width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto;
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, .25);
+      display: flex; flex-direction: column;
+    }
+    .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 1.1rem 1.5rem .5rem; }
+    .modal-head h2 { margin: 0; font-size: 1.15rem; font-weight: 700; color: #0f172a; }
+    .modal-body { padding: .5rem 1.5rem 1rem; display: flex; flex-direction: column; gap: 1.1rem; }
+    .field { display: flex; flex-direction: column; gap: .35rem; }
+    .field label { font-size: .85rem; font-weight: 700; color: #0f172a; }
+    .field input, .field textarea, .field select {
+      width: 100%; box-sizing: border-box; padding: .55rem .7rem;
+      border: 1px solid #cbd5e1; border-radius: 8px; font-size: .9rem;
+      color: #0f172a; background: #fff; outline: none; font-family: inherit;
+    }
+    .field input:focus, .field textarea:focus, .field select:focus { border-color: #3f51b5; }
+    .field textarea { resize: vertical; min-height: 70px; }
+    .field .hint { font-size: .75rem; color: #94a3b8; }
+    .field .check { flex-direction: row; align-items: center; gap: .5rem; font-weight: 500; font-size: .9rem; color: #0f172a; }
+    .field .check input { width: auto; }
+    .meta-loading { display: flex; align-items: center; gap: .6rem; font-size: .85rem; color: #64748b; }
+    .modal-foot { display: flex; align-items: center; justify-content: flex-end; gap: .6rem; padding: .75rem 1.5rem 1.25rem; }
 
     /* Document search */
     .doc-search {
@@ -484,17 +572,14 @@ export class SharepointComponent implements OnInit {
   msAuth  = inject(MsAuthService);
   private graph  = inject(GraphService);
   private snack  = inject(MatSnackBar);
+  private route  = inject(ActivatedRoute);
+  pinnedLibs = inject(PinnedLibrariesService);
 
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
   // ── Pinned sites ──────────────────────────────────────────────────────────
   pinnedSites   = signal<PinnedSite[]>(PINNED_SITES);
   pinnedLoading = signal(false);
-
-  // ── Search ────────────────────────────────────────────────────────────────
-  siteQuery    = '';
-  sites        = signal<SharePointSite[]>([]);
-  sitesLoading = signal(false);
 
   // ── Document search (files across all libraries) ──────────────────────────
   docQuery      = signal('');
@@ -530,12 +615,30 @@ export class SharepointComponent implements OnInit {
   signingIn = signal(false);
 
   ngOnInit(): void {
-    if (this.msAuth.isSignedIn()) {
-      // Already signed in — load immediately
-      this.selectPinned(PINNED_SITES[0]);
+    // Re-runs whenever the sidebar navigates here with a different pinned library (?site=&library=).
+    this.route.queryParamMap.subscribe(() => {
+      if (this.msAuth.isSignedIn()) {
+        // Already signed in — load immediately
+        this.loadFromRoute();
+      } else if (!this.signingIn()) {
+        // Not signed in — auto-trigger Microsoft sign-in popup
+        this.signIn();
+      }
+    });
+  }
+
+  /** Open the pinned library named in the URL, or the default pinned site when none is given. */
+  private loadFromRoute(): void {
+    const q = this.route.snapshot.queryParamMap;
+    const sitePath = q.get('site');
+    const library = q.get('library');
+    if (sitePath && library) {
+      const host = q.get('host') || PINNED_SITES[0].hostname;
+      this.selectPinned({
+        hostname: host, sitePath, displayName: q.get('name') || sitePath, defaultLibrary: library,
+      });
     } else {
-      // Not signed in — auto-trigger Microsoft sign-in popup
-      this.signIn();
+      this.selectPinned(PINNED_SITES[0]);
     }
   }
 
@@ -543,7 +646,7 @@ export class SharepointComponent implements OnInit {
     this.signingIn.set(true);
     try {
       await this.msAuth.signIn();
-      this.selectPinned(PINNED_SITES[0]);
+      this.loadFromRoute();
     } catch (e: any) {
       // user_cancelled is fine — they closed the popup intentionally
       if (e?.errorCode !== 'user_cancelled') {
@@ -599,12 +702,6 @@ export class SharepointComponent implements OnInit {
     this.docTimer = setTimeout(() => this.runDocSearch(), 450); // debounce while typing
   }
 
-  /** From the site finder's empty state: run the same text as a DOCUMENT search instead. */
-  searchDocsFromSiteBox(): void {
-    this.onDocQueryChange(this.siteQuery);
-    this.runDocSearch();
-  }
-
   onDocScopeChange(scope: 'library' | 'site' | 'all'): void {
     this.docScope.set(scope);
     if (this.docSearchActive()) this.runDocSearch();
@@ -624,11 +721,31 @@ export class SharepointComponent implements OnInit {
     const seq = ++this.docSeq; // ignore out-of-order responses from earlier keystrokes
     this.docSearching.set(true);
     try {
-      const hits = await this.graph.searchDocuments(q, scopeUrl);
+      // The search index lags a few minutes behind new uploads, so for a library/site scope also
+      // walk the folders live and merge the two result sets (live hits first, de-duplicated).
+      let indexError: any = null;
+      const [indexHits, liveHits] = await Promise.all([
+        this.graph.searchDocuments(q, scopeUrl).catch(e => { indexError = e; return [] as DocumentHit[]; }),
+        this.liveSearch(q, scope),
+      ]);
       if (seq !== this.docSeq) return;
-      this.docResults.set(hits);
+      const seen = new Set<string>();
+      const merged = [...liveHits, ...indexHits].filter(h => {
+        const key = `${h.driveId}|${h.id}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      const ordered = merged
+        .map((h, i) => ({ h, i }))
+        .sort((a, b) => Number(b.h.nameMatch) - Number(a.h.nameMatch) || a.i - b.i)
+        .map(x => x.h);
+      this.docResults.set(ordered);
       this.docQueryRan.set(q);
       this.docScopeRan.set(scope);
+      if (indexError && ordered.length === 0) {
+        this.snack.open(indexError?.message ?? 'Document search failed', 'Close', { duration: 6000 });
+      }
     } catch (e: any) {
       if (seq !== this.docSeq) return;
       this.docResults.set([]);
@@ -638,6 +755,24 @@ export class SharepointComponent implements OnInit {
     } finally {
       if (seq === this.docSeq) this.docSearching.set(false);
     }
+  }
+
+  /** Live (index-free) name search for the library or site in scope; empty for "all sites". */
+  private async liveSearch(q: string, scope: 'library' | 'site' | 'all'): Promise<DocumentHit[]> {
+    try {
+      if (scope === 'library') {
+        const id = this.selectedDriveId();
+        return id ? (await this.graph.searchDriveByName(id, q)).hits : [];
+      }
+      if (scope === 'site') {
+        const ids = this.drives().map(d => d.id);
+        const results = await Promise.all(ids.map(id => this.graph.searchDriveByName(id, q)));
+        return results.flatMap(r => r.hits);
+      }
+    } catch {
+      /* fall back to the index results */
+    }
+    return [];
   }
 
   clearDocSearch(): void {
@@ -658,36 +793,6 @@ export class SharepointComponent implements OnInit {
       await this.graph.triggerDownload(hit.driveId, hit.id, hit.name);
     } catch (e: any) {
       this.snack.open('Download failed: ' + (e?.message ?? e), 'Close', { duration: 4000 });
-    }
-  }
-
-  // ── Search site selection ─────────────────────────────────────────────────
-
-  async searchSites(): Promise<void> {
-    if (!this.siteQuery.trim()) { this.sites.set([]); return; }
-    this.sitesLoading.set(true);
-    try {
-      this.sites.set(await this.graph.searchSites(this.siteQuery));
-    } catch (e: any) {
-      this.snack.open('Failed to load sites: ' + (e?.message ?? e), 'Close', { duration: 4000 });
-    } finally {
-      this.sitesLoading.set(false);
-    }
-  }
-
-  async selectSite(site: SharePointSite): Promise<void> {
-    this.selectedSite.set(site);
-    this.breadcrumbs.set([]);
-    this.items.set([]);
-    try {
-      const ds = await this.graph.getDrives(site.id);
-      this.drives.set(ds);
-      if (ds.length) {
-        this.selectedDriveId.set(ds[0].id);
-        await this.loadRoot();
-      }
-    } catch (e: any) {
-      this.snack.open('Failed to load drives: ' + (e?.message ?? e), 'Close', { duration: 4000 });
     }
   }
 
@@ -799,7 +904,183 @@ export class SharepointComponent implements OnInit {
     }
   }
 
+  // ── Pin library ───────────────────────────────────────────────────────────
+
+  /** Host + site path of the open site, derived from its web URL. */
+  private currentSiteRef(): { hostname: string; sitePath: string; siteName: string } | null {
+    const site = this.selectedSite();
+    if (!site?.webUrl) return null;
+    try {
+      const u = new URL(site.webUrl);
+      return {
+        hostname: u.hostname,
+        sitePath: u.pathname.replace(/\/+$/, ''),
+        siteName: site.displayName || site.name || u.pathname.split('/').filter(Boolean).pop() || 'Site',
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  isLibraryPinned(): boolean {
+    const ref = this.currentSiteRef();
+    const lib = this.selectedDrive();
+    return !!ref && !!lib && this.pinnedLibs.isPinned(ref.hostname, ref.sitePath, lib.name);
+  }
+
+  togglePinLibrary(): void {
+    const ref = this.currentSiteRef();
+    const lib = this.selectedDrive();
+    if (!ref || !lib) return;
+    const nowPinned = this.pinnedLibs.toggle({ ...ref, libraryName: lib.name });
+    this.snack.open(
+      nowPinned ? `"${lib.name}" pinned to the sidebar.` : `"${lib.name}" removed from Pinned Libraries.`,
+      'Close', { duration: 2500 });
+  }
+
+  // ── Edit (rename + metadata) ──────────────────────────────────────────────
+
+  editOpen    = signal(false);
+  editItem    = signal<DriveItem | null>(null);
+  editName    = signal('');
+  editColumns = signal<EditColumn[]>([]);
+  editValues  = signal<Record<string, any>>({});
+  editLoading = signal(false);
+  editSaving  = signal(false);
+  private editOriginal: Record<string, any> = {};
+  private columnCache = new Map<string, EditColumn[]>();
+
+  /** Map a raw Graph column to an editable column, or null if it should be hidden. */
+  private toEditColumn(c: ListColumn): EditColumn | null {
+    if (c.readOnly || c.hidden || c.calculated) return null;
+    if (!c.name || c.name.startsWith('_')) return null;
+    if (new Set(['Title', 'ContentType', 'FileLeafRef']).has(c.name)) return null;
+    const base = { name: c.name, displayName: c.displayName || c.name };
+    if (c.choice)               return { ...base, type: 'choice', choices: c.choice.choices ?? [] };
+    if (c.boolean)              return { ...base, type: 'boolean' };
+    if (c.number || c.currency) return { ...base, type: 'number' };
+    if (c.dateTime)             return { ...base, type: 'dateTime' };
+    if (c.note)                 return { ...base, type: 'note' };
+    if (c.text)                 return { ...base, type: c.text.allowMultipleLines ? 'note' : 'text' };
+    return null; // person, lookup and other complex types are not editable here
+  }
+
+  private seedEditValue(col: EditColumn, raw: any): any {
+    if (raw === null || raw === undefined) return col.type === 'boolean' ? false : '';
+    if (col.type === 'boolean') return !!raw;
+    if (col.type === 'dateTime') {
+      const d = new Date(raw);
+      return isNaN(+d) ? '' : d.toISOString().slice(0, 10);
+    }
+    return raw;
+  }
+
+  private async editColumnsFor(driveId: string): Promise<EditColumn[]> {
+    const cached = this.columnCache.get(driveId);
+    if (cached) return cached;
+    try {
+      const cols = (await this.graph.getDriveColumns(driveId))
+        .map(c => this.toEditColumn(c))
+        .filter((c): c is EditColumn => c !== null);
+      this.columnCache.set(driveId, cols);
+      return cols;
+    } catch {
+      return [];
+    }
+  }
+
+  setEditValue(name: string, val: any): void {
+    this.editValues.update(v => ({ ...v, [name]: val }));
+  }
+
+  async openEdit(item: DriveItem): Promise<void> {
+    this.editItem.set(item);
+    this.editName.set(item.name);
+    this.editColumns.set([]);
+    this.editValues.set({});
+    this.editOriginal = {};
+    this.editOpen.set(true);
+    this.editLoading.set(true);
+    try {
+      const driveId = this.selectedDriveId();
+      const [cols, fields] = await Promise.all([
+        this.editColumnsFor(driveId),
+        this.graph.getItemFields(driveId, item.id).catch(() => item.listItem?.fields ?? {}),
+      ]);
+      const values: Record<string, any> = {};
+      for (const c of cols) values[c.name] = this.seedEditValue(c, (fields as Record<string, any>)?.[c.name]);
+      this.editColumns.set(cols);
+      this.editValues.set(values);
+      this.editOriginal = { ...values };
+    } finally {
+      this.editLoading.set(false);
+    }
+  }
+
+  closeEdit(): void {
+    if (this.editSaving()) return;
+    this.editOpen.set(false);
+    this.editItem.set(null);
+  }
+
+  async saveEdit(): Promise<void> {
+    const item = this.editItem();
+    const newName = this.editName().trim();
+    if (!item || !newName) return;
+    const driveId = this.selectedDriveId();
+
+    // Only send columns whose value actually changed.
+    const payload: Record<string, any> = {};
+    for (const c of this.editColumns()) {
+      const now = this.editValues()[c.name];
+      if (now === this.editOriginal[c.name]) continue;
+      const blank = now === '' || now === null || now === undefined;
+      switch (c.type) {
+        case 'boolean':  payload[c.name] = !!now; break;
+        case 'number':   payload[c.name] = blank ? null : Number(now); break;
+        case 'dateTime': {
+          const ms = blank ? NaN : Date.parse(now);
+          payload[c.name] = isNaN(ms) ? null : new Date(ms).toISOString();
+          break;
+        }
+        case 'choice':   payload[c.name] = now || null; break;
+        default:         payload[c.name] = blank ? '' : String(now).trim();
+      }
+    }
+
+    this.editSaving.set(true);
+    try {
+      if (newName !== item.name) await this.graph.renameItem(driveId, item.id, newName);
+      if (Object.keys(payload).length) await this.graph.updateItemFields(driveId, item.id, payload);
+      this.snack.open(`"${newName}" updated.`, 'Close', { duration: 3000 });
+      this.editOpen.set(false);
+      this.editItem.set(null);
+      await this.reload();
+    } catch (e: any) {
+      this.snack.open('Save failed: ' + (e?.message ?? e), 'Close', { duration: 5000 });
+    } finally {
+      this.editSaving.set(false);
+    }
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
+
+  /** Relative time like SharePoint's Modified column ("About a minute ago", "3 days ago"). */
+  timeAgo(iso: string | null | undefined): string {
+    if (!iso) return '';
+    const t = new Date(iso).getTime();
+    if (isNaN(t)) return '';
+    const secs = Math.max(0, Math.round((Date.now() - t) / 1000));
+    if (secs < 45) return 'a few seconds ago';
+    const mins = Math.round(secs / 60);
+    if (mins < 2) return 'about a minute ago';
+    if (mins < 60) return `${mins} minutes ago`;
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return hrs === 1 ? 'about an hour ago' : `${hrs} hours ago`;
+    const days = Math.round(hrs / 24);
+    if (days < 7) return days === 1 ? 'yesterday' : `${days} days ago`;
+    return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
 
   formatSize(bytes: number | null): string {
     if (bytes === null || bytes === undefined) return '';
