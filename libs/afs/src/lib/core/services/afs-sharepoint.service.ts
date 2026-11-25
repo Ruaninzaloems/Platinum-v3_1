@@ -29,7 +29,7 @@ import { GraphService } from '@platinumv3/shared/graph';
  *   • 'rolledUpGl'   → AFS dashboard rolled-up GL          (default lib: UatAFS Dashboard Rolled_Up_GL)
  *   • 'mfmaReporting' → AFS MFMA reporting dashboard      (default lib: UatAFS MFMA Reporting Dashboard)
  *   • 'dashboardOverview' → AFS dashboard overview      (default lib: UatAFS Dashboard Overview)
- *   • 'exportsCenter' → AFS exports center      (default lib: UatAFS Exports Center Overview)
+ *   • 'exportsCenter' → AFS exports center      (default lib: UatAFS Exports Center)
  *   • 'rfiManagement' → AFS RFI management      (default lib: UatAFS RFI Management)
  *   • 'auditFindings' → AFS audit findings      (default lib: UatAFS Audit_Findings)
  *   • 'generalInformation' → AFS general information      (default lib: UatAFS General_Information)
@@ -87,7 +87,7 @@ const DEFAULT_CONFIGS: Record<AfsSpVariant, AfsSharePointConfig> = {
   rolledUpGl: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS Dashboard Rolled_Up_GL' },
   mfmaReporting: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS MFMA Reporting Dashboard' },
   dashboardOverview: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS Dashboard Overview' },
-  exportsCenter: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS Exports Center Overview' },
+  exportsCenter: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS Exports Center' },
   rfiManagement: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS RFI Management' },
   auditFindings: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS Audit_Findings' },
   generalInformation: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS General_Information' },

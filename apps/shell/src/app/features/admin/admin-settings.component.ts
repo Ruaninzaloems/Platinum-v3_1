@@ -5,6 +5,7 @@ import { ActivatedRoute } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { SharePointConfigService } from '@platinumv3/assets';
+import { GraphService } from '@platinumv3/shared/graph';
 
 const STORAGE_KEY = 'platinum_module_config';
 
@@ -280,7 +281,7 @@ const DEFAULTS: ModuleApiConfig = {
   // AFS exports center documents → separate SharePoint library
   afsExportsCenterSharePointEnabled : false,
   afsExportsCenterSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
-  afsExportsCenterSharePointLibrary : 'UatAFS Exports Center Overview',
+  afsExportsCenterSharePointLibrary : 'UatAFS Exports Center',
   afsExportsCenterSharePointLinkColumn : 'AFSID',
   // AFS RFI management documents → separate SharePoint library
   afsRfiMgmtSharePointEnabled : false,
@@ -339,6 +340,11 @@ export function loadModuleConfig(): ModuleApiConfig {
       // The Working Paper library's real name uses an underscore; fix configs saved with the old hyphen.
       if (stored.afsWpSharePointLibrary === 'UatAFS WorkingPapers-WorkingPaper') {
         stored.afsWpSharePointLibrary = 'UatAFS WorkingPapers_WorkingPaper';
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+      }
+      // The Exports Center library is "UatAFS Exports Center"; fix configs saved with the old name.
+      if (stored.afsExportsCenterSharePointLibrary === 'UatAFS Exports Center Overview') {
+        stored.afsExportsCenterSharePointLibrary = 'UatAFS Exports Center';
         localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
       }
       return { ...DEFAULTS, ...stored };
@@ -621,6 +627,49 @@ const MODULES: ModuleDef[] = [
 
       <!-- SharePoint config — AFS module only -->
       @if (activeKey() === 'afs') {
+        <!-- Live check of every AFS card against SharePoint -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">fact_check</mat-icon>
+            <span>Check AFS SharePoint libraries</span>
+          </div>
+          <div style="font-size:12px;color:#64748b;margin-bottom:12px">
+            Uses your signed-in Microsoft account to confirm that each card's library exists on its SharePoint site
+            and has the card's link column. It checks the values currently on this page (saved or not) and changes nothing.
+          </div>
+          <div class="actions" style="margin-top:0">
+            <button class="btn-primary" [disabled]="afsChecking()" (click)="checkAllAfsLibraries()">
+              <mat-icon>{{ afsChecking() ? 'hourglass_empty' : 'fact_check' }}</mat-icon>
+              {{ afsChecking() ? 'Checking…' : 'Check all AFS libraries' }}
+            </button>
+            @if (afsCheck().length && !afsChecking()) {
+              <span style="font-size:13px;color:#334155;align-self:center">
+                {{ afsCheckOk() }} of {{ afsCheck().length }} OK
+              </span>
+            }
+          </div>
+          @if (afsCheck().length) {
+            <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:12px">
+              <tr style="text-align:left;color:#64748b;border-bottom:1px solid #e2e8f0">
+                <th style="padding:6px">Card</th><th style="padding:6px">On</th><th style="padding:6px">Library</th>
+                <th style="padding:6px">Link column</th><th style="padding:6px">Result</th>
+              </tr>
+              @for (r of afsCheck(); track r.prefix) {
+                <tr style="border-bottom:1px solid #f1f5f9;vertical-align:top">
+                  <td style="padding:6px;font-weight:600;color:#1e293b">{{ r.title }}</td>
+                  <td style="padding:6px">{{ r.enabled ? 'Yes' : 'No' }}</td>
+                  <td style="padding:6px">{{ r.library }}</td>
+                  <td style="padding:6px">{{ r.column }}</td>
+                  <td style="padding:6px" [style.color]="r.status === 'ok' ? '#15803d' : r.status === 'pending' ? '#64748b' : r.status === 'warn' ? '#b45309' : '#b91c1c'">
+                    <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:-2px">{{ r.status === 'ok' ? 'check_circle' : r.status === 'pending' ? 'hourglass_empty' : r.status === 'warn' ? 'warning' : 'error' }}</mat-icon>
+                    {{ r.message }}
+                  </td>
+                </tr>
+              }
+            </table>
+          }
+        </div>
+
         <div class="config-card">
           <div class="sp-header">
             <mat-icon style="color:#0078d4">cloud</mat-icon>
@@ -2000,9 +2049,9 @@ const MODULES: ModuleDef[] = [
               <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
               <input class="field-input" [(ngModel)]="cfg.afsExportsCenterSharePointLibrary"
                      [disabled]="!cfg.afsExportsCenterSharePointEnabled"
-                     placeholder="UatAFS Exports Center Overview"
+                     placeholder="UatAFS Exports Center"
                      (ngModelChange)="markDirty()">
-              <div class="field-hint">Default library: <strong>UatAFS Exports Center Overview</strong> (the library's title or the URL segment in its address)</div>
+              <div class="field-hint">Default library: <strong>UatAFS Exports Center</strong> (the library's title or the URL segment in its address)</div>
             </div>
             <div class="field-block">
               <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
@@ -2550,6 +2599,24 @@ export class AdminSettingsComponent implements OnInit {
   cfg: ModuleApiConfig = loadModuleConfig();
   dirty = signal(false);
   spTesting = signal(false);
+  private graph = inject(GraphService);
+  afsChecking = signal(false);
+  afsCheck = signal<{ prefix: string; title: string; enabled: boolean; library: string; column: string; status: 'ok' | 'warn' | 'error' | 'pending'; message: string }[]>([]);
+  afsCheckOk = computed(() => this.afsCheck().filter(r => r.status === 'ok').length);
+
+  /** Every AFS SharePoint card, in page order: config prefix → card title. */
+  private readonly AFS_CARDS: [string, string][] = [
+    ['afs', 'AFS (general)'], ['afsAdjustments', 'Adjustments'], ['afsRfi', 'Working Papers - RFI Attachment'],
+    ['afsWp', 'Working Papers - WorkingPaper'], ['afsFinding', 'Working Papers - Finding Attachment'],
+    ['afsScoa', 'Working Papers - SCOA Version'], ['afsDraft', 'Working Papers - AFS Draft'],
+    ['afsFinal', 'Working Papers - AFS Final'], ['afsAdjSupport', 'Working Papers - Adjustment Support'],
+    ['afsMapping', 'Working Papers - Mapping Snapshot'], ['afsExport', 'Working Papers - Export'],
+    ['afsTemplate', 'Working Papers - Template'], ['afsEvidence', 'Working Papers - Evidence'],
+    ['afsAdmin', 'Administration'], ['afsDocMgmt', 'Document Management'], ['afsTb', 'Data Sources(TB)'],
+    ['afsRollupGl', 'Dashboard Rolled Up GL'], ['afsMfma', 'MFMA Reporting Dashboard'],
+    ['afsOverview', 'Dashboard Overview'], ['afsExportsCenter', 'Exports Center'], ['afsRfiMgmt', 'RFI Management'],
+    ['afsAuditFindings', 'Audit Findings'], ['afsGeneralInfo', 'General Information'],
+  ];
 
   activeKey = signal('assets');
 
@@ -2567,6 +2634,67 @@ export class AdminSettingsComponent implements OnInit {
   }
 
   markDirty() { this.dirty.set(true); }
+
+  /**
+   * Read-only check of every AFS card: does its library exist on the site, and does it have the
+   * card's link column? Uses the signed-in Microsoft account; nothing on SharePoint is changed.
+   */
+  async checkAllAfsLibraries() {
+    const c = this.cfg as any;
+    const norm = (v?: string) => { let x = v || ''; try { x = decodeURIComponent(x); } catch {} return x.toLowerCase().replace(/\s+/g, ''); };
+    const seg = (url?: string) => (url || '').replace(/\/+$/, '').split('/').pop() || '';
+    const rows = this.AFS_CARDS.map(([prefix, title]) => ({
+      prefix, title,
+      enabled: !!c[prefix + 'SharePointEnabled'],
+      siteUrl: ((c[prefix + 'SharePointSiteUrl'] as string) || '').trim(),
+      library: ((c[prefix + 'SharePointLibrary'] as string) || '').trim(),
+      column: ((c[prefix + 'SharePointLinkColumn'] as string) || '').trim() || 'AFSID',
+    }));
+    this.afsCheck.set(rows.map(({ siteUrl, ...r }) => ({ ...r, status: 'pending' as const, message: 'Checking…' })));
+    this.afsChecking.set(true);
+    const sites = new Map<string, Promise<any[]>>();   // siteUrl → its libraries (looked up once)
+    const drivesFor = (siteUrl: string) => {
+      if (!sites.has(siteUrl)) {
+        sites.set(siteUrl, (async () => {
+          const u = new URL(siteUrl);
+          const site = await this.graph.getSiteByPath(u.hostname, u.pathname.replace(/\/$/, ''));
+          return this.graph.getDrives(site.id);
+        })());
+      }
+      return sites.get(siteUrl)!;
+    };
+    const set = (i: number, status: 'ok' | 'warn' | 'error', message: string) =>
+      this.afsCheck.update(list => list.map((r, j) => j === i ? { ...r, status, message } : r));
+    try {
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        try {
+          if (!r.siteUrl || !r.library) { set(i, 'error', 'Site URL or library name is empty.'); continue; }
+          const drives = await drivesFor(r.siteUrl);
+          const drive = drives.find((d: any) => norm(d.name) === norm(r.library) || norm(seg(d.webUrl)) === norm(r.library));
+          if (!drive) {
+            const words = norm(r.library).replace(/^uatafs/, '').split(/[_\-]/).filter(w => w.length > 2);
+            const close = drives.filter((d: any) => words.some(w => norm(d.name).includes(w) || norm(seg(d.webUrl)).includes(w)))
+              .map((d: any) => d.name).slice(0, 4);
+            set(i, 'error', 'Library not found on the site.' + (close.length ? ' Similar: ' + close.join('; ') : ''));
+            continue;
+          }
+          const cols: any[] = await this.graph.getDriveColumns(drive.id);
+          const want = norm(r.column);
+          const col = cols.find(x => norm(x.name) === want || norm(x.displayName) === want);
+          if (!col) { set(i, 'warn', `Library found, but it has no "${r.column}" column — uploads cannot be linked.`); continue; }
+          if (col.readOnly) { set(i, 'warn', `"${r.column}" exists but is read-only.`); continue; }
+          set(i, 'ok', col.name && col.name !== r.column ? `OK (column internal name: ${col.name})` : 'OK');
+        } catch (e: any) {
+          const msg = e?.message || String(e);
+          set(i, 'error', /signed-in Microsoft account/i.test(msg) ? 'Not signed in to Microsoft — sign in on the SharePoint page first.'
+            : /\b403\b|accessDenied/i.test(msg) ? 'Access denied to this site/library.' : msg);
+        }
+      }
+    } finally {
+      this.afsChecking.set(false);
+    }
+  }
 
   save() {
     try {
