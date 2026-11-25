@@ -27,6 +27,8 @@ import { TbImportWorkbenchService } from './tb-import-workbench.service';
 import { AuthService } from '../../core/services/auth.service';
 import { PeriodFilterService } from '../../core/services/period-filter.service';
 import { ApiService } from '../../core/services/api.service';
+import { AfsSharePointService } from '../../core/services/afs-sharepoint.service';
+import { SpDocumentsPanelComponent } from '../../shared/components/sp-documents-panel.component';
 
 export interface ErrorPanel {
   type: 'error' | 'warning' | 'info';
@@ -46,6 +48,7 @@ export interface ErrorPanel {
     MatChipsModule, MatProgressBarModule, MatSnackBarModule, MatDialogModule,
     MatTooltipModule, MatBadgeModule, MatRadioModule, MatCheckboxModule,
     MatTabsModule, MatDividerModule, MatExpansionModule, MatAutocompleteModule,
+    SpDocumentsPanelComponent,
   ],
   templateUrl: './tb-import-workbench.component.html',
   styleUrls: ['./tb-import-workbench.component.scss'],
@@ -107,6 +110,9 @@ export class TbImportWorkbenchComponent implements OnInit, OnDestroy {
 
   successBanner: string | null = null;
 
+  /** Bumped after a TB file is stored in SharePoint so the TB source documents panel reloads. */
+  spReloadToken = 0;
+
   normValidateProgress = 0;
   normValidatePhase: 'idle' | 'normalizing' | 'validating' | 'complete' = 'idle';
   private progressInterval: any = null;
@@ -130,6 +136,7 @@ export class TbImportWorkbenchComponent implements OnInit, OnDestroy {
     private api: ApiService,
     private ngZone: NgZone,
     private cdr: ChangeDetectorRef,
+    private afsSp: AfsSharePointService,
   ) {
     effect(() => {
       const fyId = this.periodFilter.selectedFyId();
@@ -309,6 +316,24 @@ export class TbImportWorkbenchComponent implements OnInit, OnDestroy {
     input.value = '';
   }
 
+  /** When Data Sources(TB) SharePoint storage is on (Admin → AFS), keep a copy of the uploaded
+   *  TB file in that library, linked to the target compilation (AFSID = compilation id).
+   *  Runs alongside the import so a SharePoint problem never blocks the TB import itself. */
+  private storeTbFileInSharePoint(file: File): void {
+    if (!this.compilationId || !this.afsSp.isEnabled('dataSourceTb')) return;
+    this.afsSp.uploadAfsDocument(this.compilationId, file, {
+      documentType: 'Trial Balance',
+      category: this.getPeriodLabel(this.periodType),
+      description: this.selectedCompilation?.name ? `TB source file for ${this.selectedCompilation.name}` : undefined,
+    }, 'dataSourceTb').then(() => {
+      this.spReloadToken++;
+      this.snackBar.open('TB file saved to SharePoint (Data Sources TB library).', 'OK', { duration: 4000 });
+      this.cdr.markForCheck();
+    }).catch((e: any) => {
+      this.snackBar.open(`TB file was not saved to SharePoint: ${e?.message || e}`, 'Dismiss', { duration: 8000 });
+    });
+  }
+
   cancelUpload(): void {
     this.selectedFile = null;
     this.selectedFileInfo = null;
@@ -335,6 +360,8 @@ export class TbImportWorkbenchComponent implements OnInit, OnDestroy {
         });
       }, 1000);
     });
+
+    this.storeTbFileInSharePoint(file);
 
     const formData = new FormData();
     formData.append('file', file);

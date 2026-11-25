@@ -9,11 +9,11 @@ import { GraphService } from '@platinumv3/shared/graph';
  *
  *   Library columns written:  AFSID, description, Classification, Category, Tags
  *
- * Twenty independent libraries are supported, each with its own enable toggle:
+ * Twenty-one independent libraries are supported, each with its own enable toggle:
  *   • 'afs'          → general AFS documents (and working papers when 'workingPaper' is off) (default lib: UatAFS)
  *   • 'adjustments'  → adjustment supporting documents   (default lib: UatAFSAdjustments)
  *   • 'rfi'          → Working-Papers RFI attachments    (default lib: UatAFS WorkingPapers_RFI_Attachment)
- *   • 'workingPaper' → Working-Papers working papers     (default lib: UatAFS WorkingPapers-WorkingPaper)
+ *   • 'workingPaper' → Working-Papers working papers     (default lib: UatAFS WorkingPapers_WorkingPaper)
  *   • 'finding'      → Working-Papers finding attachments (default lib: UatAFS WorkingPapers_FindingAttachment)
  *   • 'scoaVersion'  → Working-Papers SCOA version documents (default lib: UatAFS WorkingPapers_ScoaVersion)
  *   • 'afsDraft'     → Working-Papers AFS drafts           (default lib: UatAFS WorkingPapers_AFS_Draft)
@@ -30,12 +30,13 @@ import { GraphService } from '@platinumv3/shared/graph';
  *   • 'mfmaReporting' → AFS MFMA reporting dashboard      (default lib: UatAFS MFMA Reporting Dashboard)
  *   • 'dashboardOverview' → AFS dashboard overview      (default lib: UatAFS Dashboard Overview)
  *   • 'exportsCenter' → AFS exports center      (default lib: UatAFS Exports Center Overview)
+ *   • 'rfiManagement' → AFS RFI management      (default lib: UatAFS RFI Management)
  *
  * Mirrors the Assets SharePointConfigService / Overtime OvertimeSharePointService.
  */
 const STORAGE_KEY = 'platinum_module_config';
 
-export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi' | 'workingPaper' | 'finding' | 'scoaVersion' | 'afsDraft' | 'afsFinal' | 'adjustmentSupport' | 'mappingSnapshot' | 'export' | 'template' | 'evidence' | 'administration' | 'documentManagement' | 'dataSourceTb' | 'rolledUpGl' | 'mfmaReporting' | 'dashboardOverview' | 'exportsCenter';
+export type AfsSpVariant = 'afs' | 'adjustments' | 'rfi' | 'workingPaper' | 'finding' | 'scoaVersion' | 'afsDraft' | 'afsFinal' | 'adjustmentSupport' | 'mappingSnapshot' | 'export' | 'template' | 'evidence' | 'administration' | 'documentManagement' | 'dataSourceTb' | 'rolledUpGl' | 'mfmaReporting' | 'dashboardOverview' | 'exportsCenter' | 'rfiManagement';
 
 export interface AfsSharePointConfig {
   enabled: boolean;
@@ -68,7 +69,7 @@ const DEFAULT_CONFIGS: Record<AfsSpVariant, AfsSharePointConfig> = {
   // "UatAFSAdjustments" but that name was taken, so SharePoint suffixed the URL with 1).
   adjustments: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFSAdjustments1' },
   rfi: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_RFI_Attachment' },
-  workingPaper: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers-WorkingPaper' },
+  workingPaper: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_WorkingPaper' },
   finding: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_FindingAttachment' },
   scoaVersion: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_ScoaVersion' },
   afsDraft: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS WorkingPapers_AFS_Draft' },
@@ -85,6 +86,7 @@ const DEFAULT_CONFIGS: Record<AfsSpVariant, AfsSharePointConfig> = {
   mfmaReporting: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS MFMA Reporting Dashboard' },
   dashboardOverview: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS Dashboard Overview' },
   exportsCenter: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS Exports Center Overview' },
+  rfiManagement: { enabled: false, siteUrl: 'https://zamicromega.sharepoint.com/sites/Sebata2', library: 'UatAFS RFI Management' },
 };
 
 interface AfsDocMeta {
@@ -122,6 +124,7 @@ const LINK_FIELD: Record<AfsSpVariant, { key: string; defaultName: string }> = {
   mfmaReporting: { key: 'afsid', defaultName: 'AFSID' },
   dashboardOverview: { key: 'afsid', defaultName: 'AFSID' },
   exportsCenter: { key: 'afsid', defaultName: 'AFSID' },
+  rfiManagement: { key: 'afsid', defaultName: 'AFSID' },
 };
 
 /** Normalise a library title / URL segment for matching: decode %20, lowercase, drop whitespace
@@ -176,10 +179,12 @@ export class AfsSharePointService {
   readonly dashboardOverviewConfig = signal<AfsSharePointConfig>(this.read('dashboardOverview'));
   /** AFS exports center library config. */
   readonly exportsCenterConfig = signal<AfsSharePointConfig>(this.read('exportsCenter'));
+  /** AFS RFI management library config. */
+  readonly rfiManagementConfig = signal<AfsSharePointConfig>(this.read('rfiManagement'));
 
-  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null, documentManagement: null, dataSourceTb: null, rolledUpGl: null, mfmaReporting: null, dashboardOverview: null, exportsCenter: null };
+  private driveIds: Record<AfsSpVariant, string | null> = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null, documentManagement: null, dataSourceTb: null, rolledUpGl: null, mfmaReporting: null, dashboardOverview: null, exportsCenter: null, rfiManagement: null };
   private fieldsByVariant: Record<AfsSpVariant, Record<string, string | null>> = {
-    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields(), documentManagement: emptyFields(), dataSourceTb: emptyFields(), rolledUpGl: emptyFields(), mfmaReporting: emptyFields(), dashboardOverview: emptyFields(), exportsCenter: emptyFields(),
+    afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields(), documentManagement: emptyFields(), dataSourceTb: emptyFields(), rolledUpGl: emptyFields(), mfmaReporting: emptyFields(), dashboardOverview: emptyFields(), exportsCenter: emptyFields(), rfiManagement: emptyFields(),
   };
 
   refresh(): void {
@@ -203,8 +208,9 @@ export class AfsSharePointService {
     this.mfmaReportingConfig.set(this.read('mfmaReporting'));
     this.dashboardOverviewConfig.set(this.read('dashboardOverview'));
     this.exportsCenterConfig.set(this.read('exportsCenter'));
-    this.driveIds = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null, documentManagement: null, dataSourceTb: null, rolledUpGl: null, mfmaReporting: null, dashboardOverview: null, exportsCenter: null };
-    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields(), documentManagement: emptyFields(), dataSourceTb: emptyFields(), rolledUpGl: emptyFields(), mfmaReporting: emptyFields(), dashboardOverview: emptyFields(), exportsCenter: emptyFields() };
+    this.rfiManagementConfig.set(this.read('rfiManagement'));
+    this.driveIds = { afs: null, adjustments: null, rfi: null, workingPaper: null, finding: null, scoaVersion: null, afsDraft: null, afsFinal: null, adjustmentSupport: null, mappingSnapshot: null, export: null, template: null, evidence: null, administration: null, documentManagement: null, dataSourceTb: null, rolledUpGl: null, mfmaReporting: null, dashboardOverview: null, exportsCenter: null, rfiManagement: null };
+    this.fieldsByVariant = { afs: emptyFields(), adjustments: emptyFields(), rfi: emptyFields(), workingPaper: emptyFields(), finding: emptyFields(), scoaVersion: emptyFields(), afsDraft: emptyFields(), afsFinal: emptyFields(), adjustmentSupport: emptyFields(), mappingSnapshot: emptyFields(), export: emptyFields(), template: emptyFields(), evidence: emptyFields(), administration: emptyFields(), documentManagement: emptyFields(), dataSourceTb: emptyFields(), rolledUpGl: emptyFields(), mfmaReporting: emptyFields(), dashboardOverview: emptyFields(), exportsCenter: emptyFields(), rfiManagement: emptyFields() };
   }
 
   private configSignal(variant: AfsSpVariant) {
@@ -228,12 +234,18 @@ export class AfsSharePointService {
       case 'mfmaReporting': return this.mfmaReportingConfig;
       case 'dashboardOverview': return this.dashboardOverviewConfig;
       case 'exportsCenter': return this.exportsCenterConfig;
+      case 'rfiManagement': return this.rfiManagementConfig;
       default: return this.config;
     }
   }
 
   isEnabled(variant: AfsSpVariant = 'afs'): boolean {
     return this.read(variant).enabled;
+  }
+
+  /** The current (Admin → AFS) config for a library variant. */
+  configFor(variant: AfsSpVariant = 'afs'): AfsSharePointConfig {
+    return this.read(variant);
   }
 
   // ── SharePoint operations ───────────────────────────────────────────────────
@@ -249,14 +261,15 @@ export class AfsSharePointService {
     // libraries titled "UatAFSAdjustments"), so the URL segment ("UatAFSAdjustments1") disambiguates.
     const want = normLibrary(cfg.library);
     const segOf = (url?: string) => (url || '').replace(/\/+$/, '').split('/').pop()?.toLowerCase() || '';
-    const exact = drives.find(d => normLibrary(d.name) === want || normLibrary(segOf(d.webUrl)) === want);
-    const drive = exact ?? drives[0];
-    if (!drive) throw new Error(`Document library "${cfg.library}" not found on the SharePoint site.`);
-    if (!exact) {
-      console.warn(`[AfsSharePoint] library "${cfg.library}" NOT found — falling back to "${drive.name}". Available libraries: ${drives.map(d => `${d.name} (${segOf(d.webUrl)})`).join(', ')}`);
-    } else {
-      console.log(`[AfsSharePoint] resolved ${variant} library → "${drive.name}" [${segOf(drive.webUrl)}] (${drive.id})`);
+    const drive = drives.find(d => normLibrary(d.name) === want || normLibrary(segOf(d.webUrl)) === want);
+    // Never fall back to another library — that would store and link documents in the wrong place.
+    if (!drive) {
+      const afsLibs = drives.filter(d => /afs/i.test(d.name) || /afs/i.test(segOf(d.webUrl)));
+      throw new Error(`Document library "${cfg.library}" was not found on the SharePoint site. ` +
+        `Set the exact name in Admin → AFS. AFS libraries on the site: ` +
+        (afsLibs.length ? afsLibs.map(d => `${d.name} (URL: ${segOf(d.webUrl)})`).join('; ') : 'none'));
     }
+    console.log(`[AfsSharePoint] resolved ${variant} library → "${drive.name}" [${segOf(drive.webUrl)}] (${drive.id})`);
     this.driveIds[variant] = drive.id;
     return drive.id;
   }
@@ -367,9 +380,10 @@ export class AfsSharePointService {
       const cols = await this.dumpColumns(driveId);
       console.warn('[AfsSharePoint] link column write failed. Tried:', candidates.join(', '), '| last error:', lastErr?.message ?? lastErr);
       throw new Error(
-        `File uploaded and metadata saved, but it could not be linked to the adjustment — ` +
-        `none of these column names were accepted by SharePoint: ${candidates.join(', ')}. ` +
-        `Set Admin → AFS → Adjustments SharePoint "Link Column" to the INTERNAL name of your ID column. ` +
+        `File uploaded to "${this.read(variant).library}", but it could not be linked — ` +
+        `that library has no "${candidates[0]}" column (tried: ${candidates.join(', ')}). ` +
+        `In Admin → AFS, click "Create ${candidates[0]} column" on this library's card, then upload again ` +
+        `(or set the card's "Link Column" to the INTERNAL name of an existing ID column). ` +
         `Writable columns Graph currently reports: ${cols}`
       );
     }
@@ -553,6 +567,14 @@ export class AfsSharePointService {
             siteUrl: p.afsRfiSharePointSiteUrl || d.siteUrl,
             library: p.afsRfiSharePointLibrary || d.library,
             linkColumn: (p.afsRfiSharePointLinkColumn || '').trim() || undefined,
+          };
+        }
+        if (variant === 'rfiManagement') {
+          return {
+            enabled: p.afsRfiMgmtSharePointEnabled ?? d.enabled,
+            siteUrl: p.afsRfiMgmtSharePointSiteUrl || d.siteUrl,
+            library: p.afsRfiMgmtSharePointLibrary || d.library,
+            linkColumn: (p.afsRfiMgmtSharePointLinkColumn || '').trim() || undefined,
           };
         }
         if (variant === 'exportsCenter') {

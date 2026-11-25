@@ -312,6 +312,18 @@
             </table>
           </div>
         }
+
+        <!-- Data Sources(TB) SharePoint library (Admin → AFS), linked by AFSID = compilation id -->
+        <app-sp-documents-panel
+          variant="dataSourceTb"
+          [linkValue]="compilationId"
+          [linkLabel]="selectedCompilation?.name ? selectedCompilation.name + ' (' + compilationId + ')' : ''"
+          [reloadToken]="spReloadToken"
+          [allowUpload]="false"
+          title="TB source documents"
+          configTitle="Data Sources(TB) SharePoint Configuration"
+          emptyLinkHint="Select a compilation to see its TB source documents.">
+        </app-sp-documents-panel>
       </mat-card-content>
     </mat-card>
   }

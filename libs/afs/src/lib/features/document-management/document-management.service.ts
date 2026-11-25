@@ -120,6 +120,23 @@ export interface UploadMetadata {
   storageProvider?: string;
 }
 
+/** Document Type (upload dialog) → the Working-Papers SharePoint library it is stored in. */
+const TYPE_VARIANT: Record<string, AfsSpVariant> = {
+  working_paper: 'workingPaper',
+  rfi_attachment: 'rfi',
+  finding_attachment: 'finding',
+  adjustment_support: 'adjustmentSupport',
+  afs_draft: 'afsDraft',
+  afs_final: 'afsFinal',
+  export: 'export',
+  template: 'template',
+  mapping_snapshot: 'mappingSnapshot',
+  scoa_version: 'scoaVersion',
+  evidence: 'evidence',
+};
+const VARIANT_TYPE: Partial<Record<AfsSpVariant, string>> =
+  Object.fromEntries(Object.entries(TYPE_VARIANT).map(([t, v]) => [v, t]));
+
 @Injectable({ providedIn: 'root' })
 export class DocumentManagementService {
   private api = inject(ApiService);
@@ -128,11 +145,12 @@ export class DocumentManagementService {
   /** The AFS entity id a document is linked to (working paper / compilation / finding / …).
    *  The RFI, working-paper and finding libraries link by the RFI / working-paper / finding id itself. */
   private contextId(m: UploadMetadata, variant: AfsSpVariant): string {
-    if (variant === 'rfi') return (m.rfiId || '') as string;
-    if (variant === 'workingPaper') return (m.workingPaperId || '') as string;
-    if (variant === 'finding') return (m.findingId || '') as string;
-    if (variant === 'adjustmentSupport') return (m.adjustmentId || '') as string;
-    return (m.workingPaperId || m.compilationId || m.findingId || m.rfiId || m.adjustmentId || '') as string;
+    const any = (m.workingPaperId || m.compilationId || m.findingId || m.rfiId || m.adjustmentId || '') as string;
+    if (variant === 'rfi') return (m.rfiId || any) as string;
+    if (variant === 'workingPaper') return (m.workingPaperId || any) as string;
+    if (variant === 'finding') return (m.findingId || any) as string;
+    if (variant === 'adjustmentSupport') return (m.adjustmentId || any) as string;
+    return any;
   }
 
   /** Adjustment documents go to the Working-Papers adjustment support library when its toggle is
@@ -142,16 +160,12 @@ export class DocumentManagementService {
    *  (when those toggles are on); everything else to the AFS library. */
   private variantForUpload(m: UploadMetadata): AfsSpVariant {
     if (m.adjustmentId) return this.afsSp.isEnabled('adjustmentSupport') ? 'adjustmentSupport' : 'adjustments';
+    // The chosen Document Type picks its library when that library is active (Admin → AFS) …
+    const typed = m.documentType ? TYPE_VARIANT[m.documentType] : undefined;
+    if (typed && this.afsSp.isEnabled(typed)) return typed;
+    // … otherwise the library of the entity the upload came from.
     if (m.rfiId && this.afsSp.isEnabled('rfi')) return 'rfi';
     if (m.findingId && this.afsSp.isEnabled('finding')) return 'finding';
-    if (m.documentType === 'scoa_version' && this.afsSp.isEnabled('scoaVersion')) return 'scoaVersion';
-    if (m.documentType === 'afs_draft' && this.afsSp.isEnabled('afsDraft')) return 'afsDraft';
-    if (m.documentType === 'afs_final' && this.afsSp.isEnabled('afsFinal')) return 'afsFinal';
-    if (m.documentType === 'adjustment_support' && this.afsSp.isEnabled('adjustmentSupport')) return 'adjustmentSupport';
-    if (m.documentType === 'mapping_snapshot' && this.afsSp.isEnabled('mappingSnapshot')) return 'mappingSnapshot';
-    if (m.documentType === 'export' && this.afsSp.isEnabled('export')) return 'export';
-    if (m.documentType === 'template' && this.afsSp.isEnabled('template')) return 'template';
-    if (m.documentType === 'evidence' && this.afsSp.isEnabled('evidence')) return 'evidence';
     if (m.workingPaperId && this.afsSp.isEnabled('workingPaper')) return 'workingPaper';
     return 'afs';
   }
@@ -200,7 +214,7 @@ export class DocumentManagementService {
       description: d.description || undefined,
       tags: d.tags,
       uploadedBy: '',
-      documentType: 'working_paper',
+      documentType: VARIANT_TYPE[d.__variant] || 'working_paper',
       classificationLabel: d.classificationLabel || undefined,
       accessLevel: undefined,
       storageProvider: 'sharepoint',
@@ -347,6 +361,17 @@ export class DocumentManagementService {
       return forkJoin([support$, list$.pipe(catchError(() => of([] as DmsDocument[])))]).pipe(
         map(lists => lists.flatMap(l => l || [])),
       );
+    }
+    if (contextType === 'working_paper' || contextType === 'rfi' || contextType === 'finding') {
+      const extra = [...new Set(Object.values(TYPE_VARIANT))]
+        .filter(v => v !== variant && this.afsSp.isEnabled(v))
+        .map(v => from(this.afsSp.listAfsDocuments(contextId, v).then(docs => docs.map(d => this.spToDms(d))))
+          .pipe(catchError(() => of([] as DmsDocument[]))));
+      if (extra.length) {
+        return forkJoin([list$.pipe(catchError(() => of([] as DmsDocument[]))), ...extra]).pipe(
+          map(lists => lists.flatMap(l => l || [])),
+        );
+      }
     }
     if (contextType === 'compilation') {
       const extra = ([['afsDraft', 'afs_draft'], ['afsFinal', 'afs_final']] as [AfsSpVariant, string][])

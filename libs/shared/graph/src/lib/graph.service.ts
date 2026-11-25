@@ -123,10 +123,21 @@ export class GraphService {
     return this.get<SharePointSite>(`/sites/${hostname}:${sitePath}`);
   }
 
-  /** List document libraries (drives) for a site. */
+  /**
+   * List document libraries (drives) for a site.
+   * Follows @odata.nextLink — sites with many libraries return them over several pages,
+   * and libraries on later pages would otherwise look missing.
+   */
   async getDrives(siteId: string): Promise<Drive[]> {
-    const resp = await this.get<{ value: Drive[] }>(`/sites/${siteId}/drives`);
-    return resp.value;
+    const all: Drive[] = [];
+    let path: string | null = `/sites/${siteId}/drives`;
+    while (path) {
+      const resp: { value: Drive[]; '@odata.nextLink'?: string } = await this.get(path);
+      all.push(...(resp.value || []));
+      const next = resp['@odata.nextLink'];
+      path = next ? next.replace(GRAPH, '') : null;
+    }
+    return all;
   }
 
   // ── Files & Folders ────────────────────────────────────────────────────────
@@ -261,6 +272,34 @@ export class GraphService {
       path = next ? next.replace(GRAPH, '') : null;
     }
     return all;
+  }
+
+  /**
+   * Make sure a drive's SharePoint list has a single-line-of-text column with this internal
+   * name. Returns 'exists' when a column already uses the name (internal or display), or
+   * 'created' after adding it. Needs permission to manage the library's columns.
+   */
+  async ensureTextColumn(driveId: string, name: string): Promise<'exists' | 'created'> {
+    const want = name.toLowerCase();
+    const cols = await this.getDriveColumns(driveId);
+    if (cols.some(c => c.name?.toLowerCase() === want || c.displayName?.toLowerCase() === want)) return 'exists';
+
+    const list = await this.get<{ id: string; parentReference?: { siteId?: string } }>(
+      `/drives/${driveId}/list?$select=id,parentReference`);
+    const siteId = list.parentReference?.siteId;
+    if (!siteId) throw new Error('Could not resolve the SharePoint site for this library.');
+
+    const token   = await this.msAuth.getGraphToken();
+    const headers = new HttpHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' });
+    try {
+      await firstValueFrom(this.http.post(`${GRAPH}/sites/${siteId}/lists/${list.id}/columns`,
+        { name, displayName: name, text: {} }, { headers }));
+      return 'created';
+    } catch (err: any) {
+      const graphMsg = err?.error?.error?.message ?? err?.error?.message ?? null;
+      const status   = err?.status ?? '';
+      throw new Error(graphMsg ? `Graph API error ${status}: ${graphMsg}` : `Failed to create column (HTTP ${status}).`);
+    }
   }
 
   /** Read the SharePoint metadata (list item fields) for a drive item. */
