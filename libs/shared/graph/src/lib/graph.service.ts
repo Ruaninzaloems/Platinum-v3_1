@@ -3,7 +3,10 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { MsAuthService } from '@platinumv3/shared/auth';
 
-import { searchTerms, buildDocumentQuery, locationFromUrl, nameContainsAll } from './document-search';
+import {
+  searchTerms, buildDocumentQuery, locationFromUrl, nameContainsAll,
+  crawlFolders, withRetry, type FolderRef,
+} from './document-search';
 
 /** "A/B c/D" → "A/B%20c/D": URL-encode each segment, drop empty ones. */
 function encodeFolderPath(path: string): string {
@@ -183,31 +186,32 @@ export class GraphService {
   }
 
   /**
-   * LIVE name search inside one library: walks the folder tree through the drive API instead of the
-   * search index, so files uploaded seconds ago are found (the index can lag several minutes).
-   * Matches file names that contain every search term anywhere in the name (case-insensitive), so
-   * "est01" finds "test01.png". Bounded by `maxFolders` and `maxMs`; `truncated` tells the caller
-   * whether the walk stopped early on a very large library.
+   * LIVE name search: walks folder trees through the drive API instead of the search index, so
+   * files uploaded seconds ago are found (the index can lag several minutes). Matches file names
+   * that contain every search term anywhere in the name (case-insensitive), so "est01" finds
+   * "test01.png". `groups` are priority tiers (see {@link crawlFolders}). Throttled requests are
+   * retried; `failedFolders` and `truncated` tell the caller when the results may be incomplete.
    */
-  async searchDriveByName(
-    driveId: string, input: string, maxFolders = 800, maxMs = 20000,
-  ): Promise<{ hits: DocumentHit[]; truncated: boolean }> {
-    if (searchTerms(input).length === 0) return { hits: [], truncated: false };
-    const started = Date.now();
+  async searchByNameLive(
+    groups: FolderRef[][], input: string,
+    opts: { maxFolders?: number; maxMs?: number; cancelled?: () => boolean } = {},
+  ): Promise<{ hits: DocumentHit[]; failedFolders: number; truncated: boolean }> {
+    if (searchTerms(input).length === 0) return { hits: [], failedFolders: 0, truncated: false };
+    const deadline = Date.now() + (opts.maxMs ?? 30000);
     const select = '$select=id,name,webUrl,size,lastModifiedDateTime,folder,file&$top=200';
-    const hits: DocumentHit[] = [];
-    const queue: string[] = ['root'];
-    let foldersSeen = 0;
-    let truncated = false;
 
-    const listAll = async (folderId: string): Promise<any[]> => {
+    const listAll = async ({ driveId, folderId }: FolderRef): Promise<any[]> => {
       const base = folderId === 'root'
         ? `/drives/${driveId}/root/children`
         : `/drives/${driveId}/items/${folderId}/children`;
       const all: any[] = [];
       let path: string | null = `${base}?${select}`;
       while (path) {
-        const resp: { value: any[]; '@odata.nextLink'?: string } = await this.get(path);
+        const url: string = path;
+        const resp = await withRetry(
+          () => this.get<{ value: any[]; '@odata.nextLink'?: string }>(url),
+          { deadline, cancelled: opts.cancelled },
+        );
         all.push(...(resp.value || []));
         const next = resp['@odata.nextLink'];
         path = next ? next.replace(GRAPH, '') : null;
@@ -215,29 +219,24 @@ export class GraphService {
       return all;
     };
 
-    while (queue.length) {
-      if (foldersSeen >= maxFolders || Date.now() - started > maxMs) { truncated = true; break; }
-      const batch = queue.splice(0, 6);
-      foldersSeen += batch.length;
-      const lists = await Promise.all(batch.map(id => listAll(id).catch(() => [] as any[])));
-      for (const items of lists) {
-        for (const r of items) {
-          if (r.folder) { queue.push(r.id); continue; }
-          if (!r.name || !nameContainsAll(r.name, input)) continue;
-          hits.push({
-            id: r.id,
-            driveId,
-            name: r.name,
-            webUrl: r.webUrl ?? '',
-            size: r.size ?? null,
-            lastModifiedDateTime: r.lastModifiedDateTime ?? '',
-            location: locationFromUrl(r.webUrl ?? ''),
-            nameMatch: true,
-          });
-        }
-      }
-    }
-    return { hits, truncated };
+    const result = await crawlFolders<any>(
+      groups, listAll, r => !!r.name && nameContainsAll(r.name, input),
+      { maxFolders: opts.maxFolders ?? 2000, deadline, concurrency: 4, cancelled: opts.cancelled },
+    );
+    return {
+      hits: result.matches.map(({ driveId, item: r }): DocumentHit => ({
+        id: r.id,
+        driveId,
+        name: r.name,
+        webUrl: r.webUrl ?? '',
+        size: r.size ?? null,
+        lastModifiedDateTime: r.lastModifiedDateTime ?? '',
+        location: locationFromUrl(r.webUrl ?? ''),
+        nameMatch: true,
+      })),
+      failedFolders: result.failedFolders,
+      truncated: result.truncated,
+    };
   }
 
   /** Get a specific site by ID. */

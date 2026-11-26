@@ -9,7 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { GraphService, SharePointSite, Drive, DriveItem, DocumentHit, ListColumn } from '@platinumv3/shared/graph';
+import { GraphService, SharePointSite, Drive, DriveItem, DocumentHit, ListColumn, FolderRef, withRetry } from '@platinumv3/shared/graph';
 import { MsAuthService } from '@platinumv3/shared/auth';
 import { PinnedLibrariesService } from './pinned-libraries.service';
 
@@ -154,6 +154,22 @@ interface EditColumn {
                   {{ docScopeRan() === 'library' ? 'this library' : docScopeRan() === 'site' ? 'this site' : 'all sites' }}
                   @if (docResults().length >= 50) { <span> (showing the first 50 — refine your search)</span> }
                 </div>
+                @if (docWarnings().length) {
+                  <div class="ds-warning" role="alert">
+                    <mat-icon>warning</mat-icon>
+                    <div>
+                      <strong>These results may be incomplete.</strong>
+                      @for (w of docWarnings(); track w) { <div>{{ w }}</div> }
+                    </div>
+                    <button mat-stroked-button (click)="runDocSearch()">Search again</button>
+                  </div>
+                }
+                @if (docScopeRan() === 'all') {
+                  <div class="ds-note">
+                    “All sites” checks file names directly in your open and pinned libraries.
+                    New uploads in other libraries can take a few minutes to appear.
+                  </div>
+                }
                 <div class="file-grid">
                   @for (hit of docResults(); track hit.driveId + hit.id) {
                     <div class="file-card" (dblclick)="openHit(hit)"
@@ -182,8 +198,12 @@ interface EditColumn {
                   @if (docResults().length === 0) {
                     <div class="empty-folder">
                       <mat-icon>search_off</mat-icon>
-                      <p>No documents found for “{{ docQueryRan() }}”.</p>
-                      <p class="ds-hint">Search matches the start of words (e.g. “screen” finds “Screenshot…”). Newly uploaded files can take a few minutes to appear.</p>
+                      @if (docWarnings().length) {
+                        <p>No matches for “{{ docQueryRan() }}” in what could be checked.</p>
+                      } @else {
+                        <p>No documents found for “{{ docQueryRan() }}”.</p>
+                      }
+                      <p class="ds-hint">Try part of the file name. Searching text inside a file or its details matches the start of words, and new uploads can take a few minutes to appear that way.</p>
                     </div>
                   }
                 </div>
@@ -580,6 +600,14 @@ interface EditColumn {
     .search-docs-link:hover { background: #eef2ff; }
     .search-docs-link mat-icon { font-size: 18px; width: 18px; height: 18px; flex-shrink: 0; }
     .ds-summary { font-size: .85rem; color: #475569; }
+    .ds-warning {
+      display: flex; align-items: flex-start; gap: .6rem; flex-wrap: wrap;
+      background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px;
+      padding: .6rem .8rem; font-size: .82rem; color: #78350f;
+    }
+    .ds-warning > div { flex: 1; min-width: 200px; }
+    .ds-warning mat-icon { color: #d97706; }
+    .ds-note { font-size: .78rem; color: #64748b; }
     .ds-hint { font-size: .8rem; max-width: 460px; text-align: center; margin: 0; }
     .file-loc { font-size: .72rem; color: #64748b; margin-top: .1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -615,6 +643,8 @@ export class SharepointComponent implements OnInit {
   docResults    = signal<DocumentHit[]>([]);
   docQueryRan   = signal('');
   docScopeRan   = signal<'library' | 'site' | 'all'>('site');
+  /** Reasons the results on screen may be incomplete (empty when everything was checked). */
+  docWarnings   = signal<string[]>([]);
   /** The document library currently open in the picker (for the "This library" scope). */
   selectedDrive = computed(() => this.drives().find(d => d.id === this.selectedDriveId()) ?? null);
   /** True while a (non-blank) document search is shown instead of the folder view. */
@@ -775,16 +805,21 @@ export class SharepointComponent implements OnInit {
     const seq = ++this.docSeq; // ignore out-of-order responses from earlier keystrokes
     this.docSearching.set(true);
     try {
-      // The search index lags a few minutes behind new uploads, so for a library/site scope also
-      // walk the folders live and merge the two result sets (live hits first, de-duplicated).
+      // The search index lags a few minutes behind new uploads, so also walk the folders live and
+      // merge the two result sets (live hits first, de-duplicated).
       let indexError: any = null;
-      const [indexHits, liveHits] = await Promise.all([
+      const [indexHits, live] = await Promise.all([
         this.graph.searchDocuments(q, scopeUrl).catch(e => { indexError = e; return [] as DocumentHit[]; }),
-        this.liveSearch(q, scope),
+        this.liveSearch(q, scope, () => seq !== this.docSeq),
       ]);
       if (seq !== this.docSeq) return;
+      const warnings = [...live.warnings];
+      if (indexError) {
+        warnings.push('SharePoint’s search index did not respond, so matches on file contents or details are missing.');
+      }
+      this.docWarnings.set(warnings);
       const seen = new Set<string>();
-      const merged = [...liveHits, ...indexHits].filter(h => {
+      const merged = [...live.hits, ...indexHits].filter(h => {
         const key = `${h.driveId}|${h.id}`;
         if (seen.has(key)) return false;
         seen.add(key);
@@ -803,6 +838,7 @@ export class SharepointComponent implements OnInit {
     } catch (e: any) {
       if (seq !== this.docSeq) return;
       this.docResults.set([]);
+      this.docWarnings.set(['The search failed before it could finish.']);
       this.docQueryRan.set(q);
       this.docScopeRan.set(scope);
       this.snack.open(e?.message ?? 'Document search failed', 'Close', { duration: 6000 });
@@ -811,22 +847,73 @@ export class SharepointComponent implements OnInit {
     }
   }
 
-  /** Live (index-free) name search for the library or site in scope; empty for "all sites". */
-  private async liveSearch(q: string, scope: 'library' | 'site' | 'all'): Promise<DocumentHit[]> {
+  /**
+   * Live (index-free) name search. Order: the open folder, then the open library, then the other
+   * libraries in scope (the site's libraries, or for "all sites" the pinned libraries).
+   * Every reason the results may be incomplete is returned in `warnings`.
+   */
+  private async liveSearch(
+    q: string, scope: 'library' | 'site' | 'all', cancelled: () => boolean,
+  ): Promise<{ hits: DocumentHit[]; warnings: string[] }> {
+    const warnings: string[] = [];
     try {
-      if (scope === 'library') {
-        const id = this.selectedDriveId();
-        return id ? (await this.graph.searchDriveByName(id, q)).hits : [];
-      }
+      const openDrive = this.selectedDrive()?.id ?? '';
+      const crumbs = this.breadcrumbs();
+      const openFolder = crumbs.length ? crumbs[crumbs.length - 1].id : 'root';
+
+      let others: string[] = [];
       if (scope === 'site') {
-        const ids = this.drives().map(d => d.id);
-        const results = await Promise.all(ids.map(id => this.graph.searchDriveByName(id, q)));
-        return results.flatMap(r => r.hits);
+        others = this.drives().map(d => d.id);
+      } else if (scope === 'all') {
+        const pinned = await this.pinnedDriveIds(cancelled);
+        others = pinned.ids;
+        if (pinned.unreachable.length) {
+          warnings.push(`Could not check these pinned libraries: ${pinned.unreachable.join(', ')}.`);
+        }
       }
+
+      const groups: FolderRef[][] = [
+        openDrive ? [{ driveId: openDrive, folderId: openFolder }] : [],
+        openDrive ? [{ driveId: openDrive, folderId: 'root' }] : [],
+        others.map(driveId => ({ driveId, folderId: 'root' })),
+      ];
+      const found = await this.graph.searchByNameLive(groups, q, { cancelled });
+      if (found.failedFolders) {
+        const n = found.failedFolders;
+        warnings.push(`SharePoint did not return ${n} folder${n === 1 ? '' : 's'}, so ${n === 1 ? 'it and its sub-folders were' : 'they and their sub-folders were'} not checked.`);
+      }
+      if (found.truncated) {
+        warnings.push('There are too many folders to check them all. Open the folder you want and search “This library” to check it first.');
+      }
+      return { hits: found.hits, warnings };
     } catch {
-      /* fall back to the index results */
+      warnings.push('The folders could not be checked directly, so new uploads may be missing.');
+      return { hits: [], warnings };
     }
-    return [];
+  }
+
+  /** Drive ids of the pinned libraries (sidebar pins plus the built-in pinned sites). */
+  private async pinnedDriveIds(cancelled: () => boolean): Promise<{ ids: string[]; unreachable: string[] }> {
+    const wanted = [
+      ...PINNED_SITES.map(p => ({ hostname: p.hostname, sitePath: p.sitePath, libraryName: p.defaultLibrary })),
+      ...this.pinnedLibs.list(),
+    ];
+    const ids = new Set<string>();
+    const unreachable = new Set<string>();
+    // One at a time, to avoid adding to SharePoint throttling.
+    for (const lib of wanted) {
+      if (cancelled()) break;
+      try {
+        const site = await withRetry(() => this.graph.getSiteByPath(lib.hostname, lib.sitePath), { cancelled });
+        const drives = await withRetry(() => this.graph.getDrives(site.id), { cancelled });
+        const drive = drives.find(d => d.name.toLowerCase() === lib.libraryName.toLowerCase());
+        if (drive) ids.add(drive.id);
+        else unreachable.add(lib.libraryName);
+      } catch {
+        unreachable.add(lib.libraryName);
+      }
+    }
+    return { ids: [...ids], unreachable: [...unreachable] };
   }
 
   clearDocSearch(): void {
